@@ -65,15 +65,13 @@ while running:
             elif event.key == pygame.K_d:
                 player_dx -= 1
 
-    # normalize movement vector and apply speed
-    # dt = delta time
+    # Calculate delta time in seconds
     dt = clock.tick(framerate) / 1000.0
-    if player_dx != 0 or player_dy != 0:
-        # holy pythagorean theoryem. this is propably not a good implementation.
-        # i will change it to use constant values
-        magnitude = (player_dx**2 + player_dy**2) ** 0.5
 
-    if magnitude != 0:
+    # Normalize movement and apply speed (1 unit per second)
+    magnitude = (player_dx**2 + player_dy**2) ** 0.5
+
+    if magnitude > 0:
         player_x += (player_dx / magnitude) * dt
         player_y += (player_dy / magnitude) * dt
 
