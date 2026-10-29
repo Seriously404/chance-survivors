@@ -3,9 +3,10 @@ import pygame
 # Initialize Pygame
 pygame.init()
 
+
 # Set up the display
-screen_width = 800
-screen_height = 600
+screen_width: int = 1920
+screen_height: int = 1080
 screen = pygame.display.set_mode((screen_width, screen_height))
 
 # Set the title of the window
@@ -13,33 +14,89 @@ pygame.display.set_caption("Chance Survivors")
 
 # set up text
 font = pygame.font.Font(None, 20)
-text_surface = font.render("EYour FPS: 0", True, (255, 255, 255))
-text_rect = text_surface.get_rect(topleft=(20, 20))
+time_text_surface = font.render("Elapsed: 00:00:000", True, (255, 255, 255))
+time_text_rect = time_text_surface.get_rect(topleft=(20, 20))
+debug_text_surface = font.render("Hello World from the debug menu!", True, (255, 255, 255))
+debug_text_rect = debug_text_surface.get_rect(topright=(-50, -20))
 
 
 # set up variables for the game
-player_x = 0
-player_y = 0
-total_score = 0
-absolute_score = 0
+# player has 2 values here, 1 for their current value, and one for the direction they are going in, 
+player_x: float = 0
+player_y: float = 0
+player_dx: float = 0
+player_dy: float = 0
+
+total_score: int = 0
+absolute_score: int = 0
 
 
+# initialize main loop variables
+clock: int = pygame.time.Clock()
+running: bool = True
+elapsed_ms: int = 0
+framerate: int = 60
 
-# Main loop
-running = True
-clock = pygame.time.Clock()
+# main loop
 while running:
+    
+    # get player input
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_w:
+                player_dy -= 1
+            elif event.key == pygame.K_s:
+                player_dy += 1
+            elif event.key == pygame.K_a:
+                player_dx -= 1
+            elif event.key == pygame.K_d:
+                player_dx += 1
+        # there are likely better ways to get player input than this garbage, but i do not care, this is the prototype
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_w:
+                player_dy += 1
+            elif event.key == pygame.K_s:
+                player_dy -= 1
+            elif event.key == pygame.K_a:
+                player_dx += 1
+            elif event.key == pygame.K_d:
+                player_dx -= 1
 
-    screen.fill((30, 30, 40))  # Dark background
+    # normalize movement vector and apply speed
+    speed: float = 1000 / framerate
+    if player_dx != 0 or player_dy != 0:
+        # holy pythagorean theoryem. this is propably not a good implementation.
+        # i will change it to use constant values
+        magnitude = (player_dx**2 + player_dy**2) ** 0.5
+        player_dx = (player_dx / magnitude) * speed
+        player_dy = (player_dy / magnitude) * speed
+    player_x += player_dx
+    player_y += player_dy
 
-    text_surface = font.render(f"Your FPS: {clock.get_fps():.1f}", True, (255, 255, 255))
-    screen.blit(text_surface, text_rect)
+    screen.fill((30, 30, 30))  # Dark background
 
+    # update the debug menu
+    debug_text_surface = font.render(f"player x: {player_x:.2f} \n player y: {player_y:.2f}", True, (255, 255, 255))
+
+    # timer
+    elapsed_ms = pygame.time.get_ticks()
+    minutes = elapsed_ms // 60_000
+    seconds = (elapsed_ms // 1_000) % 60
+    milliseconds = elapsed_ms % 1_000
+    time_text_surface = font.render(
+        f"Elapsed: {minutes:02d}:{seconds:02d}:{milliseconds:03d}",
+        True,
+        (255, 255, 255),
+    )
+    screen.blit(time_text_surface, time_text_rect)
+    screen.blit(debug_text_surface, debug_text_rect)
+
+
+    # refresh display
     pygame.display.flip()
-    clock.tick(60)
+    clock.tick(framerate)
 
 # Quit Pygame
 pygame.quit()
