@@ -5,8 +5,8 @@ pygame.init()
 
 
 # Set up the display
-screen_width: int = 1920
-screen_height: int = 1080
+screen_width: int = 800
+screen_height: int = 600
 screen = pygame.display.set_mode((screen_width, screen_height))
 
 # Set the title of the window
@@ -17,7 +17,7 @@ font = pygame.font.Font(None, 20)
 time_text_surface = font.render("Elapsed: 00:00:000", True, (255, 255, 255))
 time_text_rect = time_text_surface.get_rect(topleft=(20, 20))
 debug_text_surface = font.render("Hello World from the debug menu!", True, (255, 255, 255))
-debug_text_rect = debug_text_surface.get_rect(topright=(-50, -20))
+debug_text_rect = debug_text_surface.get_rect(topright=(screen_width - 20, 20))
 
 
 # set up variables for the game
@@ -26,13 +26,14 @@ player_x: float = 0
 player_y: float = 0
 player_dx: float = 0
 player_dy: float = 0
+magnitude: float = 1
 
 total_score: int = 0
 absolute_score: int = 0
 
 
 # initialize main loop variables
-clock: int = pygame.time.Clock()
+clock  = pygame.time.Clock()
 running: bool = True
 elapsed_ms: int = 0
 framerate: int = 60
@@ -46,9 +47,9 @@ while running:
             running = False
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_w:
-                player_dy -= 1
-            elif event.key == pygame.K_s:
                 player_dy += 1
+            elif event.key == pygame.K_s:
+                player_dy -= 1
             elif event.key == pygame.K_a:
                 player_dx -= 1
             elif event.key == pygame.K_d:
@@ -56,24 +57,25 @@ while running:
         # there are likely better ways to get player input than this garbage, but i do not care, this is the prototype
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_w:
-                player_dy += 1
-            elif event.key == pygame.K_s:
                 player_dy -= 1
+            elif event.key == pygame.K_s:
+                player_dy += 1
             elif event.key == pygame.K_a:
                 player_dx += 1
             elif event.key == pygame.K_d:
                 player_dx -= 1
 
     # normalize movement vector and apply speed
-    speed: float = 1000 / framerate
+    # dt = delta time
+    dt = clock.tick(framerate) / 1000.0
     if player_dx != 0 or player_dy != 0:
         # holy pythagorean theoryem. this is propably not a good implementation.
         # i will change it to use constant values
         magnitude = (player_dx**2 + player_dy**2) ** 0.5
-        player_dx = (player_dx / magnitude) * speed
-        player_dy = (player_dy / magnitude) * speed
-    player_x += player_dx
-    player_y += player_dy
+
+    if magnitude != 0:
+        player_x += (player_dx / magnitude) * dt
+        player_y += (player_dy / magnitude) * dt
 
     screen.fill((30, 30, 30))  # Dark background
 
@@ -96,7 +98,6 @@ while running:
 
     # refresh display
     pygame.display.flip()
-    clock.tick(framerate)
 
 # Quit Pygame
 pygame.quit()
