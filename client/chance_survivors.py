@@ -9,7 +9,7 @@ screen_height = 600
 screen = pygame.display.set_mode((screen_width, screen_height))
 
 # Set the title of the window
-pygame.display.set_caption('Pygame Example')
+pygame.display.set_caption('chance survivors')
 
 # Main loop
 running = True
