@@ -59,14 +59,7 @@ enemy_types = {
     }
 }
 
-enemy_list = [
-    {
-        "type": "basic",
-        "x": 1.0,
-        "y": 0.0,
-        "angle": 0.0,
-    }
-]
+enemy_list = []
 
 bullet_list = []
 
