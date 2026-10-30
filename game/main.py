@@ -1,35 +1,45 @@
-import pygame
-
 
 from client.render import Renderer
 
 
+# -------------------------
 # Display and world settings
+# -------------------------
+
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 PIXELS_PER_UNIT = 200
 
 FRAMERATE = 60
 
+
+# -------------------------
 # Player settings
+# -------------------------
+
 player_x = 0.0
 player_y = 0.0
 
-player_dx = 0.0
-player_dy = 0.0
-
 player_health = 100
 
-# Bullet settings (hardcoded prototype)
+
+# Bullet settings
 bullet_base_speed = 1.0
 basic_bullet_speed_modifier = 3.0
 
+
+# -------------------------
 # Score
+# -------------------------
+
 total_score = 0
 absolute_score = 0
 
 
+# -------------------------
 # Entity storage
+# -------------------------
+
 enemy_types = {
     "basic": {
         "speed": 1.0,
@@ -52,52 +62,56 @@ enemy_list = [
 bullet_list = []
 
 
-# Initialize client and clock
+# -------------------------
+# Initialization
+# -------------------------
+
 renderer = Renderer(
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     PIXELS_PER_UNIT
 )
 
-clock = pygame.time.Clock()
 
-running = True
-
-
+# -------------------------
 # Helper functions
+# -------------------------
+
 def get_distance(x1, y1, x2, y2):
-    return ((x2 - x1)**2 + (y2 - y1)**2)**0.5
+    return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
 
 
 def get_player_rotation(mouse_position):
     mouse_x, mouse_y = mouse_position
 
-    direction = pygame.Vector2(
-        mouse_x - SCREEN_WIDTH / 2,
-        SCREEN_HEIGHT / 2 - mouse_y
-    )
+    direction_x = mouse_x - SCREEN_WIDTH / 2
+    direction_y = SCREEN_HEIGHT / 2 - mouse_y
 
-    if direction.length_squared() == 0:
+    if direction_x == 0 and direction_y == 0:
         return 0.0
 
-    return direction.as_polar()[1] * 0.01745329252
+    import math
+
+    return math.atan2(direction_y, direction_x)
 
 
+# -------------------------
 # Gameplay functions
+# -------------------------
+
 def shoot_bullet(mouse_position):
     angle = get_player_rotation(mouse_position)
 
-    direction = pygame.Vector2(1, 0).rotate_rad(angle)
+    import math
 
-    # Don't shoot if the mouse is exactly at the player's centre
-    if direction.length_squared() == 0:
-        return
+    direction_x = math.cos(angle)
+    direction_y = math.sin(angle)
 
     bullet = {
         "x": player_x,
         "y": player_y,
-        "dx": direction.x,
-        "dy": direction.y,
+        "dx": direction_x,
+        "dy": direction_y,
         "angle": angle,
         "speed": bullet_base_speed * basic_bullet_speed_modifier,
     }
@@ -125,7 +139,7 @@ def update_bullets(dt):
             bullet_list.remove(bullet)
 
 
-def update_player(dt):
+def update_player(dt, player_dx, player_dy):
     global player_x, player_y
 
     magnitude = get_distance(
@@ -138,71 +152,59 @@ def update_player(dt):
         player_y += (player_dy / magnitude) * dt
 
 
+# -------------------------
 # Main loop
-elapsed_ms = 0
+# -------------------------
 
-while running:
+def main():
+    running = True
 
-    # Input handling
-    for event in pygame.event.get():
+    try:
+        while running:
 
-        if event.type == pygame.QUIT:
-            running = False
+            # Input handling
+            running, shots = renderer.process_events()
 
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_w:
-                player_dy += 1
-            elif event.key == pygame.K_s:
-                player_dy -= 1
-            elif event.key == pygame.K_a:
-                player_dx -= 1
-            elif event.key == pygame.K_d:
-                player_dx += 1
+            for mouse_position in shots:
+                shoot_bullet(mouse_position)
 
-        elif event.type == pygame.KEYUP:
-            if event.key == pygame.K_w:
-                player_dy -= 1
-            elif event.key == pygame.K_s:
-                player_dy += 1
-            elif event.key == pygame.K_a:
-                player_dx += 1
-            elif event.key == pygame.K_d:
-                player_dx -= 1
+            # Time
+            dt = renderer.tick(FRAMERATE)
+            elapsed_ms = renderer.get_elapsed_ms()
 
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button in (1, 3):
-                shoot_bullet(event.pos)
+            # Movement input
+            player_dx, player_dy = renderer.get_movement()
 
-    # Time
-    dt = clock.tick(FRAMERATE) / 1000.0
-    elapsed_ms = pygame.time.get_ticks()
+            # Update game logic
+            update_player(dt, player_dx, player_dy)
+            update_bullets(dt)
 
-    # Update game logic
-    update_player(dt)
-    update_bullets(dt)
+            # Player rotation
+            player_angle = get_player_rotation(
+                renderer.get_mouse_position()
+            )
 
-    # Get current player rotation for rendering
-    player_angle = get_player_rotation(pygame.mouse.get_pos())
+            # Prepare state for rendering
+            game_state = {
+                "player_x": player_x,
+                "player_y": player_y,
+                "player_health": player_health,
+                "player_angle": player_angle,
 
-    # Prepare state for the renderer
-    game_state = {
-        "player_x": player_x,
-        "player_y": player_y,
-        "player_health": player_health,
-        "player_angle": player_angle,
+                "bullet_list": bullet_list,
+                "enemy_list": enemy_list,
+                "enemy_types": enemy_types,
 
-        "bullet_list": bullet_list,
-        "enemy_list": enemy_list,
-        "enemy_types": enemy_types,
+                "total_score": total_score,
+                "elapsed_ms": elapsed_ms,
+                "fps": renderer.get_fps(),
+            }
 
-        "total_score": total_score,
-        "elapsed_ms": elapsed_ms,
-        "fps": clock.get_fps(),
-    }
+            renderer.draw(game_state)
 
-    # One call to the client to render everything
-    renderer.draw(game_state)
+    finally:
+        renderer.close()
 
 
-# Shutdown
-renderer.close()
+if __name__ == "__main__":
+    main()

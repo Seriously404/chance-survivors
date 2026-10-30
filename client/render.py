@@ -16,9 +16,77 @@ class Renderer:
         pygame.display.set_caption("Chance Survivors")
 
         self.font = pygame.font.Font(None, 20)
+        self.clock = pygame.time.Clock()
 
         self.bullet_size = (16, 6)
         self.bullet_color = (255, 220, 50)
+
+        self.start_time = pygame.time.get_ticks()
+
+        # Input state
+        self.player_dx = 0
+        self.player_dy = 0
+        self.mouse_position = (screen_width // 2, screen_height // 2)
+
+    # -------------------------
+    # Client / input management
+    # -------------------------
+
+    def process_events(self):
+        running = True
+        shots = []
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_w:
+                    self.player_dy += 1
+                elif event.key == pygame.K_s:
+                    self.player_dy -= 1
+                elif event.key == pygame.K_a:
+                    self.player_dx -= 1
+                elif event.key == pygame.K_d:
+                    self.player_dx += 1
+
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_w:
+                    self.player_dy -= 1
+                elif event.key == pygame.K_s:
+                    self.player_dy += 1
+                elif event.key == pygame.K_a:
+                    self.player_dx += 1
+                elif event.key == pygame.K_d:
+                    self.player_dx -= 1
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button in (1, 3):
+                    shots.append(event.pos)
+
+        self.mouse_position = pygame.mouse.get_pos()
+
+        return running, shots
+
+    def get_movement(self):
+        return self.player_dx, self.player_dy
+
+    def get_mouse_position(self):
+        return self.mouse_position
+
+    def tick(self, framerate):
+        return self.clock.tick(framerate) / 1000.0
+
+    def get_elapsed_ms(self):
+        return pygame.time.get_ticks() - self.start_time
+
+    def get_fps(self):
+        return self.clock.get_fps()
+
+    # -------------------------
+    # Coordinate conversion
+    # -------------------------
 
     def world_to_screen(self, x, y, player_x, player_y):
         screen_x = (
@@ -30,7 +98,11 @@ class Renderer:
             + self.screen_height / 2
         )
 
-        return (screen_x, screen_y)
+        return screen_x, screen_y
+
+    # -------------------------
+    # Rendering
+    # -------------------------
 
     def draw_grid(self, player_x, player_y):
         spacing = self.pixels_per_unit
@@ -193,7 +265,6 @@ class Renderer:
         rect = text.get_rect(topleft=(20, 20))
         self.screen.blit(text, rect)
 
-    # The one main rendering call used by the game
     def draw(self, state):
         self.screen.fill((30, 30, 30))
 
