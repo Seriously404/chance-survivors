@@ -1,8 +1,0 @@
-#!/bin/sh
-'''exec' "/home/seriously404/chance survivors/.venv/bin/python" "$0" "$@"
-' '''
-import sys
-from pycodestyle import _main
-if __name__ == '__main__':
-    sys.argv[0] = sys.argv[0].removesuffix('.exe')
-    sys.exit(_main())

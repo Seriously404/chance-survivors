@@ -1,5 +1,5 @@
-
 import pygame
+
 
 from client.render import Renderer
 
