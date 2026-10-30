@@ -68,7 +68,8 @@ while running:
     # Calculate delta time in seconds
     dt = clock.tick(framerate) / 1000.0
 
-    # Normalize movement and apply speed (1 unit per second)
+    # normalize the movement, so diagonals are fair too.
+    # no i will not import numpy just to use the normalize function it has.
     magnitude = (player_dx**2 + player_dy**2) ** 0.5
 
     if magnitude > 0:
@@ -78,7 +79,7 @@ while running:
     screen.fill((30, 30, 30))  # Dark background
 
     # update the debug menu
-    debug_text_surface = font.render(f"player x: {player_x:.2f} \n player y: {player_y:.2f}", True, (255, 255, 255))
+    debug_text_surface = font.render(f"player x: {player_x:.2f} player y: {player_y:.2f}", True, (255, 255, 255))
 
     # timer
     elapsed_ms = pygame.time.get_ticks()
