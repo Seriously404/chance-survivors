@@ -1,3 +1,5 @@
+import random
+import math
 
 from client.render import Renderer
 
@@ -22,6 +24,13 @@ player_y = 0.0
 
 player_health = 100
 
+
+# -------------------------
+# Enemy settings
+# -------------------------
+
+# enemy spawn delay is in miliseconds.
+enemy_spawn_delay = 2000
 
 # Bullet settings
 bullet_base_speed = 1.0
@@ -90,8 +99,6 @@ def get_player_rotation(mouse_position):
     if direction_x == 0 and direction_y == 0:
         return 0.0
 
-    import math
-
     return math.atan2(direction_y, direction_x)
 
 
@@ -101,8 +108,6 @@ def get_player_rotation(mouse_position):
 
 def shoot_bullet(mouse_position):
     angle = get_player_rotation(mouse_position)
-
-    import math
 
     direction_x = math.cos(angle)
     direction_y = math.sin(angle)
@@ -152,13 +157,38 @@ def update_player(dt, player_dx, player_dy):
         player_y += (player_dy / magnitude) * dt
 
 
+def spawn_enemy():
+    x = random.uniform(-1, 1)
+    y = random.uniform(-1, 1)
+
+    magnitude = get_distance(0, 0, x, y)
+    x /= magnitude
+    y /= magnitude
+
+    x = (x * (SCREEN_WIDTH  / 2 / PIXELS_PER_UNIT ) * 1.5 ) + player_x
+    y = (y * (SCREEN_HEIGHT / 2/ PIXELS_PER_UNIT ) * 1.5 ) + player_y
+
+    dx = player_x - x
+    dy = y - player_y
+
+    angle = math.atan2(dy, dx)
+
+    enemy_list.append({
+            "type": "basic",
+            "x": x,
+            "y": y,
+            "angle": angle
+        })
+
 # -------------------------
 # Main loop
 # -------------------------
 
+
 def main():
     running = True
-
+    enemy_spawn_timer = 0
+    
     try:
         while running:
 
@@ -171,6 +201,10 @@ def main():
             # Time
             dt = renderer.tick(FRAMERATE)
             elapsed_ms = renderer.get_elapsed_ms()
+            enemy_spawn_timer += dt * 1000
+            if enemy_spawn_timer >= enemy_spawn_delay:
+                enemy_spawn_timer -= enemy_spawn_delay
+                spawn_enemy()
 
             # Movement input
             player_dx, player_dy = renderer.get_movement()
@@ -198,6 +232,7 @@ def main():
                 "total_score": total_score,
                 "elapsed_ms": elapsed_ms,
                 "fps": renderer.get_fps(),
+                "delta_time": dt,
             }
 
             renderer.draw(game_state)

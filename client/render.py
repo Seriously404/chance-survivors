@@ -232,7 +232,8 @@ class Renderer:
             "score": state["total_score"],
             "FPS": state["fps"],
             "player health": state["player_health"],
-            "bullets": len(state["bullet_list"])
+            "bullets": len(state["bullet_list"]),
+            "delta time": state["delta_time"],
         }
 
         for i, (key, value) in enumerate(debug_values.items()):
