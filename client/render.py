@@ -128,7 +128,7 @@ class Renderer:
                 2
             )
 
-    def draw_player(self, angle):
+    def draw_player(self, angle, health, max_health):
         player_size = 30
 
         player_surface = pygame.Surface(
@@ -157,19 +157,26 @@ class Renderer:
             angle * 57.295779513
         )
 
-        rect = rotated.get_rect(
-            center=(
-                self.screen_width // 2,
-                self.screen_height // 2
-            )
-        )
+        center_x = self.screen_width // 2
+        center_y = self.screen_height // 2
 
+        rect = rotated.get_rect(center=(center_x, center_y))
         self.screen.blit(rotated, rect)
+
+        # Only show the player's healthbar when damaged
+        if health < max_health:
+            self.draw_health_bar(
+                center_x,
+                center_y - player_size // 2 - 10,
+                health,
+                max_health
+            )
 
     def draw_enemies(self, enemy_list, enemy_types, player_x, player_y):
         for enemy in enemy_list:
             stats = enemy_types[enemy["type"]]
             size = stats["size"]
+            max_health = enemy["max_health"]
 
             enemy_surface = pygame.Surface(
                 (size, size),
@@ -196,6 +203,15 @@ class Renderer:
 
             rect = rotated.get_rect(center=screen_position)
             self.screen.blit(rotated, rect)
+
+            # Only show the enemy's healthbar when damaged
+            if enemy["health"] < max_health:
+                self.draw_health_bar(
+                    screen_position[0],
+                    screen_position[1] - size / 2 - 8,
+                    enemy["health"],
+                    max_health
+                )
 
     def draw_bullets(self, bullet_list, player_x, player_y):
         for bullet in bullet_list:
@@ -224,6 +240,31 @@ class Renderer:
 
             rect = rotated.get_rect(center=screen_position)
             self.screen.blit(rotated, rect)
+
+    def draw_health_bar(self, center_x, top_y, current_health, max_health, width=40):
+        height = 5
+
+        if max_health <= 0:
+            return
+
+        health_ratio = max(0, min(1, current_health / max_health))
+
+        background_rect = pygame.Rect(
+            center_x - width / 2,
+            top_y,
+            width,
+            height
+        )
+
+        health_rect = pygame.Rect(
+            center_x - width / 2,
+            top_y,
+            width * health_ratio,
+            height
+        )
+
+        pygame.draw.rect(self.screen, (100, 30, 30), background_rect)
+        pygame.draw.rect(self.screen, (50, 220, 70), health_rect)
 
     def draw_debug(self, state):
         debug_values = {
@@ -274,7 +315,11 @@ class Renderer:
             state["player_y"]
         )
 
-        self.draw_player(state["player_angle"])
+        self.draw_player(
+            state["player_angle"],
+            state["player_health"],
+            state["player_max_health"]
+        )
 
         self.draw_bullets(
             state["bullet_list"],

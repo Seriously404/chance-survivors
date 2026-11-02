@@ -22,7 +22,8 @@ FRAMERATE = 60
 player_x = 0.0
 player_y = 0.0
 
-player_health = 100
+player_max_health = 100
+player_health = player_max_health
 
 
 # -------------------------
@@ -54,8 +55,9 @@ enemy_types = {
         "speed": 1.0,
         "damage": 10,
         "resistances": {},
-        "turning_speed": 2.0,
+        "turning_speed": 1.0,
         "size": 30,
+        "max_health": 10
     }
 }
 
@@ -112,6 +114,9 @@ def shoot_bullet(mouse_position):
         "dy": direction_y,
         "angle": angle,
         "speed": bullet_base_speed * basic_bullet_speed_modifier,
+        "damage": 2,
+        "piercing": 0,
+        "hit_enemies": [],
     }
 
     bullet_list.append(bullet)
@@ -158,20 +163,131 @@ def spawn_enemy():
     x /= magnitude
     y /= magnitude
 
-    x = (x * (SCREEN_WIDTH  / 2 / PIXELS_PER_UNIT ) * 1.5 ) + player_x
+    x = (x * (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT ) * 1.5 ) + player_x
     y = (y * (SCREEN_HEIGHT / 2/ PIXELS_PER_UNIT ) * 1.5 ) + player_y
 
     dx = player_x - x
     dy = y - player_y
 
     angle = math.atan2(dy, dx)
-
+    
+    magnitude = get_distance(0, 0, dx, dy)
+    dx /= magnitude
+    dy /= magnitude
+    
     enemy_list.append({
             "type": "basic",
             "x": x,
             "y": y,
-            "angle": angle
+            "dx": dx,
+            "dy": dy,
+            "angle": angle,
+            "health": enemy_types["basic"]["max_health"],
+            "max_health": enemy_types["basic"]["max_health"],
         })
+
+
+def update_enemies(dt):
+    for enemy in enemy_list[:]:
+        # sub block moves the enemy
+        speed = enemy_types[enemy["type"]]["speed"] * 0.5 * dt
+        
+        enemy["x"] += enemy["dx"] * speed
+        enemy["y"] -= enemy["dy"] * speed
+
+        # sub block turns the enemy towards the player
+        turning_speed = enemy_types[enemy["type"]]["turning_speed"]
+
+        # Direction from enemy to player
+        dx = player_x - enemy["x"]
+        dy =  enemy["y"] - player_y
+
+        if dx == 0 and dy == 0:
+            continue
+
+        target_angle = math.atan2(dy, dx)
+        current_angle = math.atan2(enemy["dy"], enemy["dx"])
+
+        # Find the shortest rotation direction
+        angle_difference = (
+            target_angle - current_angle + math.pi
+        ) % (2 * math.pi) - math.pi
+
+        max_rotation = math.radians(90) * turning_speed * dt
+
+        rotation = max(
+            -max_rotation,
+            min(max_rotation, angle_difference)
+        )
+
+        # Update the normalized direction vector
+        new_angle = current_angle + rotation
+
+        enemy["dx"] = math.cos(new_angle)
+        enemy["dy"] = math.sin(new_angle)
+        enemy["angle"] = math.atan2(enemy["dy"], enemy["dx"])
+
+# -------------------------
+# Collision detection
+# -------------------------
+def check_bullet_enemy_collisions():
+    for bullet in bullet_list[:]:
+        for enemy in enemy_list[:]:
+
+            if enemy in bullet["hit_enemies"]:
+                continue
+
+            enemy_stats = enemy_types[enemy["type"]]
+
+            collision_distance = (
+                enemy_stats["size"] / 2 + 8
+            ) / PIXELS_PER_UNIT
+
+            distance = get_distance(
+                bullet["x"], bullet["y"],
+                enemy["x"], enemy["y"]
+            )
+
+            if distance > collision_distance:
+                continue
+
+            bullet["hit_enemies"].append(enemy)
+
+            damage = min(bullet["damage"], enemy["health"])
+
+            enemy["health"] -= damage
+            bullet["damage"] -= damage
+
+            if enemy["health"] <= 0:
+                enemy_list.remove(enemy)
+
+            if bullet["piercing"] == 0 or bullet["damage"] <= 0:
+                bullet_list.remove(bullet)
+                break
+
+
+def check_enemy_player_collisions():
+    global player_health
+
+    player_size = 30
+
+    for enemy in enemy_list[:]:
+        enemy_stats = enemy_types[enemy["type"]]
+
+        collision_distance = (
+            enemy_stats["size"] / 2 + player_size / 2
+        ) / PIXELS_PER_UNIT
+
+        distance = get_distance(
+            enemy["x"], enemy["y"],
+            player_x, player_y
+        )
+
+        if distance <= collision_distance:
+            player_health -= enemy_stats["damage"]
+            player_health = max(0, player_health)
+
+            enemy_list.remove(enemy)
 
 # -------------------------
 # Main loop
@@ -205,7 +321,11 @@ def main():
             # Update game logic
             update_player(dt, player_dx, player_dy)
             update_bullets(dt)
+            update_enemies(dt)
 
+            check_bullet_enemy_collisions()
+            check_enemy_player_collisions()
+              
             # Player rotation
             player_angle = get_player_rotation(
                 renderer.get_mouse_position()
@@ -216,6 +336,7 @@ def main():
                 "player_x": player_x,
                 "player_y": player_y,
                 "player_health": player_health,
+                "player_max_health": player_max_health,
                 "player_angle": player_angle,
 
                 "bullet_list": bullet_list,
