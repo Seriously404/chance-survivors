@@ -35,6 +35,7 @@ class Renderer:
     def process_events(self):
         running = True
         shots = []
+        actions = []
 
         for event in pygame.event.get():
 
@@ -50,6 +51,14 @@ class Renderer:
                     self.player_dx -= 1
                 elif event.key == pygame.K_d:
                     self.player_dx += 1
+                if event.key == pygame.K_RETURN:
+                    actions.append("confirm")
+
+                elif event.key == pygame.K_ESCAPE:
+                    actions.append("back")
+
+                elif event.key == pygame.K_q:
+                    actions.append("open_settings")
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_w:
@@ -67,7 +76,7 @@ class Renderer:
 
         self.mouse_position = pygame.mouse.get_pos()
 
-        return running, shots
+        return running, shots, actions
 
     def get_movement(self):
         return self.player_dx, self.player_dy
@@ -83,6 +92,9 @@ class Renderer:
 
     def get_fps(self):
         return self.clock.get_fps()
+
+    def reset_timer(self):
+        self.start_time = pygame.time.get_ticks()
 
     # -------------------------
     # Coordinate conversion
@@ -305,6 +317,30 @@ class Renderer:
 
         rect = text.get_rect(topleft=(20, 20))
         self.screen.blit(text, rect)
+
+    # --------------------
+    # Draw placeholders, remove these later
+    # --------------------
+
+    def draw_placeholder(self, message):
+        self.screen.fill((30, 30, 30))
+
+        text = self.font.render(
+            message,
+            True,
+            (255, 255, 255)
+        )
+
+        rect = text.get_rect(
+            center=(
+                self.screen_width // 2,
+                self.screen_height // 2
+            )
+        )
+
+        self.screen.blit(text, rect)
+
+        pygame.display.flip()
 
     def draw(self, state):
         self.screen.fill((30, 30, 30))

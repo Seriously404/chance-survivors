@@ -2,7 +2,8 @@ import random
 import math
 
 from client.render import Renderer
-
+from game.core.game import Game
+from game.core.states import GameState
 
 # -------------------------
 # Display and world settings
@@ -76,10 +77,12 @@ renderer = Renderer(
     PIXELS_PER_UNIT
 )
 
+game = Game()
 
 # -------------------------
 # Helper functions
 # -------------------------
+
 
 def get_distance(x1, y1, x2, y2):
     return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
@@ -163,35 +166,35 @@ def spawn_enemy():
     x /= magnitude
     y /= magnitude
 
-    x = (x * (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT ) * 1.5 ) + player_x
-    y = (y * (SCREEN_HEIGHT / 2/ PIXELS_PER_UNIT ) * 1.5 ) + player_y
+    x = (x * (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT) * 1.5) + player_x
+    y = (y * (SCREEN_HEIGHT / 2 / PIXELS_PER_UNIT) * 1.5) + player_y
 
     dx = player_x - x
     dy = y - player_y
 
     angle = math.atan2(dy, dx)
-    
+
     magnitude = get_distance(0, 0, dx, dy)
     dx /= magnitude
     dy /= magnitude
-    
+
     enemy_list.append({
-            "type": "basic",
-            "x": x,
-            "y": y,
-            "dx": dx,
-            "dy": dy,
-            "angle": angle,
-            "health": enemy_types["basic"]["max_health"],
-            "max_health": enemy_types["basic"]["max_health"],
-        })
+        "type": "basic",
+        "x": x,
+        "y": y,
+        "dx": dx,
+        "dy": dy,
+        "angle": angle,
+        "health": enemy_types["basic"]["max_health"],
+        "max_health": enemy_types["basic"]["max_health"],
+    })
 
 
 def update_enemies(dt):
     for enemy in enemy_list[:]:
         # sub block moves the enemy
         speed = enemy_types[enemy["type"]]["speed"] * 0.5 * dt
-        
+
         enemy["x"] += enemy["dx"] * speed
         enemy["y"] -= enemy["dy"] * speed
 
@@ -200,7 +203,7 @@ def update_enemies(dt):
 
         # Direction from enemy to player
         dx = player_x - enemy["x"]
-        dy =  enemy["y"] - player_y
+        dy = enemy["y"] - player_y
 
         if dx == 0 and dy == 0:
             continue
@@ -230,6 +233,8 @@ def update_enemies(dt):
 # -------------------------
 # Collision detection
 # -------------------------
+
+
 def check_bullet_enemy_collisions():
     for bullet in bullet_list[:]:
         for enemy in enemy_list[:]:
@@ -289,6 +294,28 @@ def check_enemy_player_collisions():
 
             enemy_list.remove(enemy)
 
+
+# --------------------------
+# Game reset function
+# --------------------------
+
+
+def reset_game():
+    global player_x, player_y
+    global player_health
+    global total_score, absolute_score
+
+    player_x = 0.0
+    player_y = 0.0
+
+    player_health = player_max_health
+
+    total_score = 0
+    absolute_score = 0
+
+    enemy_list.clear()
+    bullet_list.clear()
+
 # -------------------------
 # Main loop
 # -------------------------
@@ -297,59 +324,109 @@ def check_enemy_player_collisions():
 def main():
     running = True
     enemy_spawn_timer = 0
-    
+
     try:
         while running:
 
-            # Input handling
-            running, shots = renderer.process_events()
+            # -------------------------
+            # Input
+            # -------------------------
 
-            for mouse_position in shots:
-                shoot_bullet(mouse_position)
+            running, shots, actions = renderer.process_events()
 
+            if not running:
+                break
+
+            # -------------------------
+            # State transitions
+            # -------------------------
+
+            if game.state == GameState.MENU:
+
+                if "confirm" in actions:
+                    reset_game()
+                    renderer.reset_timer()
+                    enemy_spawn_timer = 0
+                    game.start_game("Player")
+
+                elif "open_settings" in actions:
+                    game.change_state(GameState.SETTINGS)
+
+            elif game.state == GameState.SETTINGS:
+
+                if "back" in actions:
+                    game.change_state(GameState.MENU)
+
+            elif game.state == GameState.PLAYING:
+
+                if "back" in actions:
+                    game.change_state(GameState.MENU)
+
+            elif game.state == GameState.GAME_OVER:
+
+                if "confirm" in actions:
+                    game.change_state(GameState.MENU)
+
+            # -------------------------
             # Time
+            # -------------------------
+
             dt = renderer.tick(FRAMERATE)
-            elapsed_ms = renderer.get_elapsed_ms()
-            enemy_spawn_timer += dt * 1000
-            if enemy_spawn_timer >= enemy_spawn_delay:
-                enemy_spawn_timer -= enemy_spawn_delay
-                spawn_enemy()
 
-            # Movement input
-            player_dx, player_dy = renderer.get_movement()
+            # -------------------------
+            # Gameplay update
+            # -------------------------
 
-            # Update game logic
-            update_player(dt, player_dx, player_dy)
-            update_bullets(dt)
-            update_enemies(dt)
+            if game.state == GameState.PLAYING:
 
-            check_bullet_enemy_collisions()
-            check_enemy_player_collisions()
-              
-            # Player rotation
-            player_angle = get_player_rotation(
-                renderer.get_mouse_position()
-            )
+                for mouse_position in shots:
+                    shoot_bullet(mouse_position)
 
-            # Prepare state for rendering
-            game_state = {
-                "player_x": player_x,
-                "player_y": player_y,
-                "player_health": player_health,
-                "player_max_health": player_max_health,
-                "player_angle": player_angle,
+                elapsed_ms = renderer.get_elapsed_ms()
 
-                "bullet_list": bullet_list,
-                "enemy_list": enemy_list,
-                "enemy_types": enemy_types,
+                enemy_spawn_timer += dt * 1000
 
-                "total_score": total_score,
-                "elapsed_ms": elapsed_ms,
-                "fps": renderer.get_fps(),
-                "delta_time": dt,
-            }
+                if enemy_spawn_timer >= enemy_spawn_delay:
+                    enemy_spawn_timer -= enemy_spawn_delay
+                    spawn_enemy()
 
-            renderer.draw(game_state)
+                player_dx, player_dy = renderer.get_movement()
+
+                update_player(dt, player_dx, player_dy)
+                update_bullets(dt)
+                update_enemies(dt)
+
+                check_bullet_enemy_collisions()
+                check_enemy_player_collisions()
+
+                if player_health <= 0:
+                    game.change_state(GameState.GAME_OVER)
+
+                player_angle = get_player_rotation(
+                    renderer.get_mouse_position()
+                )
+
+                game_state = {
+                    "player_x": player_x,
+                    "player_y": player_y,
+                    "player_health": player_health,
+                    "player_max_health": player_max_health,
+                    "player_angle": player_angle,
+                    "bullet_list": bullet_list,
+                    "enemy_list": enemy_list,
+                    "enemy_types": enemy_types,
+                    "total_score": total_score,
+                    "elapsed_ms": elapsed_ms,
+                    "fps": renderer.get_fps(),
+                    "delta_time": dt,
+                }
+
+                renderer.draw(game_state)
+
+            else:
+                renderer.draw_placeholder(
+                    game.state.name.replace("_", " ").title()
+                )
 
     finally:
         renderer.close()
