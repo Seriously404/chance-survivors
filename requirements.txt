@@ -1,3 +1,5 @@
 pygame
 autopep8
 pylint
+fastapi
+uvicorn

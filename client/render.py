@@ -176,7 +176,6 @@ class Renderer:
         for enemy in enemy_list:
             stats = enemy_types[enemy["type"]]
             size = stats["size"]
-            max_health = enemy["max_health"]
 
             enemy_surface = pygame.Surface(
                 (size, size),
@@ -205,12 +204,12 @@ class Renderer:
             self.screen.blit(rotated, rect)
 
             # Only show the enemy's healthbar when damaged
-            if enemy["health"] < max_health:
+            if enemy["health"] < enemy["max_health"]:
                 self.draw_health_bar(
                     screen_position[0],
                     screen_position[1] - size / 2 - 8,
                     enemy["health"],
-                    max_health
+                    enemy["max_health"],
                 )
 
     def draw_bullets(self, bullet_list, player_x, player_y):
