@@ -2,9 +2,6 @@ import pygame
 
 from client.input import InputHandler
 
-from game.core.game import Game
-from game.core.states import GameState
-
 
 class Renderer:
     """Handles all rendering and display operations."""
@@ -157,7 +154,7 @@ class Renderer:
 
     def draw_enemies(self, enemy_list, enemy_types, player_x, player_y):
         for enemy in enemy_list:
-            stats = enemy_types[enemy["type"]]
+            stats = enemy_types[enemy.type]
             size = stats["size"]
 
             enemy_surface = pygame.Surface(
@@ -173,12 +170,12 @@ class Renderer:
 
             rotated = pygame.transform.rotate(
                 enemy_surface,
-                -enemy["angle"] * 57.295779513
+                enemy.angle * 57.295779513
             )
 
             screen_position = self.world_to_screen(
-                enemy["x"],
-                enemy["y"],
+                enemy.x,
+                enemy.y,
                 player_x,
                 player_y
             )
@@ -187,12 +184,12 @@ class Renderer:
             self.screen.blit(rotated, rect)
 
             # Only show the enemy's healthbar when damaged
-            if enemy["health"] < enemy["max_health"]:
+            if enemy.health < enemy.max_health:
                 self.draw_health_bar(
                     screen_position[0],
                     screen_position[1] - size / 2 - 8,
-                    enemy["health"],
-                    enemy["max_health"],
+                    enemy.health,
+                    enemy.max_health,
                 )
 
     def draw_bullets(self, bullet_list, player_x, player_y):
@@ -210,12 +207,12 @@ class Renderer:
 
             rotated = pygame.transform.rotate(
                 bullet_surface,
-                bullet["angle"] * 57.295779513
+                bullet.angle * 57.295779513
             )
 
             screen_position = self.world_to_screen(
-                bullet["x"],
-                bullet["y"],
+                bullet.x,
+                bullet.y,
                 player_x,
                 player_y
             )

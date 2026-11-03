@@ -3,8 +3,6 @@
 This module contains the main game loop and coordinates all game systems.
 """
 
-import sys
-
 from client.render import Renderer
 from game.config.settings import (
     SCREEN_WIDTH,
@@ -21,7 +19,7 @@ from game.entities.player import Player
 from game.entities.projectile import Projectile
 from game.systems.collision import CollisionSystem
 from game.systems.spawner import SpawnerSystem
-from game.systems.game_state import GameStateManager
+from game.systems.game_state import GameStateManager, GameState
 from game.utils.helpers import get_player_rotation
 
 

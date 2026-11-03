@@ -69,9 +69,9 @@ class SpawnerSystem:
         x = x * spawn_distance + player_x
         y = y * spawn_distance + player_y
 
-        # Calculate direction towards player
+        # Calculate direction towards player (positive y = up)
         dx = player_x - x
-        dy = y - player_y
+        dy = player_y - y
 
         magnitude = math.sqrt(dx**2 + dy**2)
         dx /= magnitude

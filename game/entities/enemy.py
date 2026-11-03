@@ -39,9 +39,9 @@ class Enemy:
         dt: float,
     ) -> None:
         """Move the enemy towards the player with rotation."""
-        # Move the enemy
+        # Move the enemy (positive y = up)
         self.x += self.dx * speed * dt
-        self.y -= self.dy * speed * dt
+        self.y += self.dy * speed * dt
 
         # Turn towards player
         dx = player_x - self.x
