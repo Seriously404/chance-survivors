@@ -34,6 +34,25 @@
       "supplement_types": ["weapon"],
       "add_tags": ["hybrid_damage"],
       "behaviors": ["weapon_damage_component"]
+    },
+    {
+      "id": "fire-teleport-trail",
+      "base_types": ["ability"],
+      "base_tags": ["fire"],
+      "supplement_tags": ["teleportation"],
+      "add_tags": ["burning_trail"],
+      "behaviors": ["burning_teleport_trail"],
+      "stat_modifiers": [
+        {"stat": "trail_damage", "operation": "add", "value": "2"}
+      ]
+    },
+    {
+      "id": "firearm-element",
+      "base_types": ["weapon"],
+      "supplement_types": ["ability"],
+      "supplement_tags": ["elemental"],
+      "add_tags": ["hybrid_damage"],
+      "behaviors": ["ability_damage_component"]
     }
   ]
 }

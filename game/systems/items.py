@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from game.systems.combinations import CombinationEngine
 from game.systems.inventory import Inventory, _item
+from game.systems.item_catalog import load_item_definitions
 from game.utils.large_number import LargeNumber
 
 
@@ -16,28 +16,25 @@ MIN_PLAYER_SPEED_MULTIPLIER = 0.1
 
 
 def create_item_catalog() -> list[dict[str, Any]]:
-    """Return fresh starter/test items suitable for inventory or Bazaar spawns."""
-    definitions = [
-        ("starter-vest", "Copper Vest", "armor", "common", {"defense": 2, "health": 12}),
-        ("starter-boots", "Scout Boots", "armor", "uncommon", {"defense": 1, "speed_pct": 8}),
-        ("starter-plate", "Iron Plate", "armor", "rare", {"defense": 4, "health": 20}),
-        ("starter-hood", "Lucky Hood", "armor", "epic", {"defense": 2, "luck": 3}),
-        ("starter-gloves", "Swift Gloves", "armor", "legendary", {"defense": 2, "speed_pct": 12}),
-        ("starter-rapid", "Rapid Carbine", "weapon", "uncommon", {
-            "bullet_type": "rapid_fire", "damage": 7, "cooldown": 0.14,
-            "speed_modifier": 3.0, "piercing": 0,
-        }),
-        ("starter-heavy", "Heavy Pistol", "weapon", "rare", {
-            "bullet_type": "heavy_shot", "damage": 18, "cooldown": 0.68,
-            "speed_modifier": 2.2, "piercing": 2,
-        }),
-        ("starter-charm", "Lucky Charm", "ability", "rare", {"luck": 2, "cooldown": 8}),
-        ("starter-core", "Vitality Core", "ability", "epic", {"health": 10, "cooldown": 12}),
-        ("starter-relic", "Fortune Relic", "misc", "common", {"luck": 2, "damage_pct": 5}),
-        ("starter-token", "Copper Token", "misc", "uncommon", {"health": 5, "speed_pct": 2}),
-    ]
-    return [_item(item_id, name, kind, rarity, 1, deepcopy(stats))
-            for item_id, name, kind, rarity, stats in definitions]
+    """Return fresh item instances built from the validated asset catalog."""
+    catalog = []
+    for definition in load_item_definitions():
+        item = _item(
+            definition["id"], definition["name"], definition["type"],
+            definition["rarity"], definition["level"], dict(definition["stats"]),
+        )
+        item.update({
+            "definition_version": 1,
+            "combination_slots": definition["combination_slots"],
+            "tags": list(definition["tags"]),
+            "behaviors": list(definition["behaviors"]),
+            "currency_preferences": dict(definition["currency_preferences"]),
+            "acquisition": dict(definition["acquisition"]),
+            "base": definition["base"],
+            "fusion_only": definition["fusion_only"],
+        })
+        catalog.append(item)
+    return catalog
 
 
 def create_initial_inventory() -> Inventory:

@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "starter-vest", "name": "Copper Vest", "type": "armor", "rarity": "common", "level": 1,
+      "stats": {"defense": 2, "health": 12}, "tags": ["armor", "copper"], "behaviors": [],
+      "combination_slots": 1, "currency_preferences": {"Copper": 1},
+      "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-boots", "name": "Scout Boots", "type": "armor", "rarity": "uncommon", "level": 1,
+      "stats": {"defense": 1, "speed_pct": 8}, "tags": ["armor", "movement"], "behaviors": [],
+      "combination_slots": 2, "currency_preferences": {"Copper": 1},
+      "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-plate", "name": "Iron Plate", "type": "armor", "rarity": "rare", "level": 1,
+      "stats": {"defense": 4, "health": 20}, "tags": ["armor", "tank"], "behaviors": [],
+      "combination_slots": 3, "currency_preferences": {"Gold": 1},
+      "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-hood", "name": "Lucky Hood", "type": "armor", "rarity": "epic", "level": 1,
+      "stats": {"defense": 2, "luck": 3}, "tags": ["armor", "luck"], "behaviors": [],
+      "combination_slots": 3, "currency_preferences": {"Gold": 1},
+      "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-gloves", "name": "Swift Gloves", "type": "armor", "rarity": "legendary", "level": 1,
+      "stats": {"defense": 2, "speed_pct": 12}, "tags": ["armor", "movement"], "behaviors": [],
+      "combination_slots": 4, "currency_preferences": {"Gold": 1},
+      "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-rapid", "name": "Rapid Carbine", "type": "weapon", "rarity": "uncommon", "level": 1,
+      "stats": {"bullet_type": "rapid_fire", "damage": 7, "cooldown": 0.14, "speed_modifier": 3.0, "piercing": 0, "automatic": true},
+      "tags": ["rifle", "rapid_fire"], "behaviors": [], "combination_slots": 2,
+      "currency_preferences": {"Copper": 1}, "acquisition": {"sources": ["starter"], "drop_weight": 0},
+      "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-heavy", "name": "Heavy Pistol", "type": "weapon", "rarity": "rare", "level": 1,
+      "stats": {"bullet_type": "heavy_shot", "damage": 18, "cooldown": 0.68, "speed_modifier": 2.2, "piercing": 2, "automatic": false},
+      "tags": ["pistol", "heavy_projectile"], "behaviors": [], "combination_slots": 3,
+      "currency_preferences": {"Gold": 1}, "acquisition": {"sources": ["starter"], "drop_weight": 0},
+      "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-charm", "name": "Lucky Charm", "type": "ability", "rarity": "rare", "level": 1,
+      "stats": {"luck": 2, "cooldown": 8}, "tags": ["luck"], "behaviors": ["fortune_pulse"],
+      "combination_slots": 3, "currency_preferences": {"Gold": 1},
+      "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-core", "name": "Vitality Core", "type": "ability", "rarity": "epic", "level": 1,
+      "stats": {"health": 10, "cooldown": 12}, "tags": ["healing", "vitality"], "behaviors": ["restore_health"],
+      "combination_slots": 3, "currency_preferences": {"Gold": 1},
+      "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-relic", "name": "Fortune Relic", "type": "misc", "rarity": "common", "level": 1,
+      "stats": {"luck": 2, "damage_pct": 5}, "tags": ["luck"], "behaviors": [],
+      "combination_slots": 1, "currency_preferences": {"Copper": 1},
+      "acquisition": {"sources": ["starter", "bazaar"], "drop_weight": 10}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-token", "name": "Copper Token", "type": "misc", "rarity": "uncommon", "level": 1,
+      "stats": {"health": 5, "speed_pct": 2}, "tags": ["copper", "movement"], "behaviors": [],
+      "combination_slots": 2, "currency_preferences": {"Copper": 1},
+      "acquisition": {"sources": ["starter", "bazaar"], "drop_weight": 8}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-grenade", "name": "Blast Capsule", "type": "relic", "rarity": "rare", "level": 1,
+      "stats": {"area_radius": 2, "damage": 1}, "tags": ["explosive"], "behaviors": ["area_explosion"],
+      "combination_slots": 3, "currency_preferences": {"Gold": 1},
+      "acquisition": {"sources": ["bazaar"], "drop_weight": 4}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-homing-lens", "name": "Seeking Lens", "type": "relic", "rarity": "rare", "level": 1,
+      "stats": {"homing_strength": 1}, "tags": ["homing"], "behaviors": ["homing_guidance"],
+      "combination_slots": 3, "currency_preferences": {"Gold": 1},
+      "acquisition": {"sources": ["bazaar"], "drop_weight": 4}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-ricochet-chip", "name": "Ricochet Chip", "type": "relic", "rarity": "epic", "level": 1,
+      "stats": {"bounce_count": 1}, "tags": ["ricochet"], "behaviors": ["ricochet"],
+      "combination_slots": 3, "currency_preferences": {"Gold": 1},
+      "acquisition": {"sources": ["bazaar"], "drop_weight": 2}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-fire-rune", "name": "Ember Rune", "type": "ability", "rarity": "common", "level": 1,
+      "stats": {"damage": 3, "cooldown": 5}, "tags": ["elemental", "fire"], "behaviors": ["single_target_projectile"],
+      "combination_slots": 1, "currency_preferences": {"Copper": 1},
+      "acquisition": {"sources": ["bazaar"], "drop_weight": 12}, "base": true, "fusion_only": false
+    },
+    {
+      "id": "starter-teleport-sigil", "name": "Blink Sigil", "type": "ability", "rarity": "uncommon", "level": 1,
+      "stats": {"range": 3, "cooldown": 6}, "tags": ["teleportation"], "behaviors": ["blink"],
+      "combination_slots": 2, "currency_preferences": {"Copper": 1},
+      "acquisition": {"sources": ["bazaar"], "drop_weight": 10}, "base": true, "fusion_only": false
+    }
+  ]
+}

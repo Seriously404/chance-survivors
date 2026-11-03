@@ -4,7 +4,7 @@ import unittest
 
 from game.systems.combinations import CombinationEngine
 from game.systems.inventory import Inventory
-from game.systems.items import player_bonuses, player_speed_multiplier
+from game.systems.items import create_item_catalog, player_bonuses, player_speed_multiplier
 from game.utils.large_number import LargeNumber
 
 
@@ -65,6 +65,34 @@ class CombinationEngineTests(unittest.TestCase):
         self.assertIn("elemental-firearm", firearm.rules_applied)
         self.assertIn("weapon_damage_component", firearm.behaviors)
         self.assertIn("hybrid_damage", firearm.tags)
+
+    def test_fire_and_teleport_create_a_burning_trail(self):
+        combined = self.engine.evaluate(
+            item("fire", "ability", stats={"damage": 3}, tags=["elemental", "fire"]),
+            [item("blink", "ability", stats={"range": 3}, tags=["teleportation"])],
+        )
+
+        self.assertIn("fire-teleport-trail", combined.rules_applied)
+        self.assertIn("burning_teleport_trail", combined.behaviors)
+        self.assertIn("burning_trail", combined.tags)
+        self.assertEqual(combined.stats["trail_damage"], LargeNumber(2))
+
+    def test_catalog_components_activate_combination_rules(self):
+        catalog = {entry["id"]: entry for entry in create_item_catalog()}
+
+        explosive = self.engine.evaluate(
+            catalog["starter-fire-rune"], [catalog["starter-grenade"]]
+        )
+        teleport = self.engine.evaluate(
+            catalog["starter-fire-rune"], [catalog["starter-teleport-sigil"]]
+        )
+
+        self.assertEqual(explosive.stats["area_radius"], LargeNumber("6.5"))
+        self.assertIn("area_explosion", explosive.behaviors)
+        self.assertIn("burning_teleport_trail", teleport.behaviors)
+        self.assertIn("homing_guidance", self.engine.evaluate(
+            catalog["starter-rapid"], [catalog["starter-homing-lens"]]
+        ).behaviors)
 
     def test_rarity_and_ultimate_subtier_scale_all_stat_contributions(self):
         combined = self.engine.evaluate(
