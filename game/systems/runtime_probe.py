@@ -18,6 +18,7 @@ from game.systems.bullets import load_bullet_types
 from game.systems.collision import CollisionSystem
 from game.systems.currency import CurrencyWallet
 from game.systems.items import create_initial_inventory, player_bonuses, spawnable_items
+from game.systems.numbers import LargeNumber
 from game.systems.progression import PlayerProgress, award_enemy_kill
 from game.systems.weapons import projectile_for_weapon
 
@@ -26,21 +27,21 @@ class RuntimeProbe:
     """Inspectable and controllable instance built from the game's systems."""
 
     def __init__(self) -> None:
-        self.player=Player(health=player_max_health,max_health=player_max_health)
-        self.inventory=create_initial_inventory()
-        self.player.max_health=player_max_health+int(player_bonuses(self.inventory)["health"])
-        self.player.health=self.player.max_health
-        self.bullet_types=load_bullet_types()
-        self.collision=CollisionSystem(200)
-        self.wallet=CurrencyWallet()
-        self.progress=PlayerProgress()
-        self.bullets=[]
-        self.enemies=[]
-        self.weapon_cooldowns=[0.0,0.0]
-        self.score=0
-        self.elapsed=0.0
-        self._spawned=0
-        self._catalog=spawnable_items()
+        self.player = Player(health=player_max_health, max_health=player_max_health)
+        self.inventory = create_initial_inventory()
+        self.player.max_health = player_max_health + int(player_bonuses(self.inventory)["health"])
+        self.player.health = self.player.max_health
+        self.bullet_types = load_bullet_types()
+        self.collision = CollisionSystem(200)
+        self.wallet = CurrencyWallet()
+        self.progress = PlayerProgress()
+        self.bullets = []
+        self.enemies = []
+        self.weapon_cooldowns = [0.0, 0.0]
+        self.score = LargeNumber(0)
+        self.elapsed = 0.0
+        self._spawned = 0
+        self._catalog = spawnable_items()
 
     def status(self) -> dict[str, Any]:
         return {
@@ -50,8 +51,11 @@ class RuntimeProbe:
                           "bonuses":player_bonuses(self.inventory)},
             "bullets":[{"type":b.bullet_type,"damage":b.damage,"piercing":b.piercing} for b in self.bullets],
             "enemies":[{"type":e.type,"x":e.x,"y":e.y,"health":e.health} for e in self.enemies],
-            "currency":self.wallet.amounts,"score":self.score,"level":self.progress.level,
-            "experience":self.progress.current_exp,"elapsed":self.elapsed,
+            "currency":{k: v.format() for k, v in self.wallet.amounts.items()},
+            "score": self.score.format(),
+            "level": self.progress.level,
+            "experience": self.progress.current_exp.format(),
+            "elapsed": self.elapsed,
         }
 
     def execute(self, command: dict[str, Any]) -> dict[str, Any]:
@@ -86,12 +90,12 @@ class RuntimeProbe:
             for bullet in self.bullets: bullet.move(dt)
             self.bullets,self.enemies=self.collision.check_bullet_enemy_collisions(
                 self.bullets,self.enemies,enemy_types)
-            killed=len(self.collision.killed_enemies)
+            killed = len(self.collision.killed_enemies)
             for _ in range(killed):
-                self.score+=10
+                self.score = self.score + LargeNumber(10)
                 self.wallet.reward_for_kill(luck=player_bonuses(self.inventory)["luck"])
                 award_enemy_kill(self.progress)
-            return {"killed":killed,"state":self.status()}
+            return {"killed": killed, "state": self.status()}
         if action=="move_player":
             dt=float(command.get("dt",1/60))
             bonuses=player_bonuses(self.inventory)
