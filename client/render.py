@@ -1,9 +1,22 @@
-
 import pygame
+
+from client.input import InputHandler
+
+from game.core.game import Game
+from game.core.states import GameState
 
 
 class Renderer:
-    def __init__(self, screen_width, screen_height, pixels_per_unit):
+    """Handles all rendering and display operations."""
+
+    def __init__(self, screen_width: int, screen_height: int, pixels_per_unit: int):
+        """Initialize the renderer.
+
+        Args:
+            screen_width: Width of the screen in pixels.
+            screen_height: Height of the screen in pixels.
+            pixels_per_unit: Conversion factor from world units to pixels.
+        """
         pygame.init()
 
         self.screen_width = screen_width
@@ -23,66 +36,24 @@ class Renderer:
 
         self.start_time = pygame.time.get_ticks()
 
-        # Input state
-        self.player_dx = 0
-        self.player_dy = 0
-        self.mouse_position = (screen_width // 2, screen_height // 2)
+        # Input handler
+        self.input_handler = InputHandler()
 
-    # -------------------------
-    # Client / input management
-    # -------------------------
+    def process_events(self) -> tuple[bool, list[tuple[float, float]], list[str]]:
+        """Process all pygame events.
 
-    def process_events(self):
-        running = True
-        shots = []
-        actions = []
+        Returns:
+            Tuple of (running, shots, actions).
+        """
+        return self.input_handler.process_events()
 
-        for event in pygame.event.get():
+    def get_movement(self) -> tuple[float, float]:
+        """Get player movement."""
+        return self.input_handler.get_movement()
 
-            if event.type == pygame.QUIT:
-                running = False
-
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_w:
-                    self.player_dy += 1
-                elif event.key == pygame.K_s:
-                    self.player_dy -= 1
-                elif event.key == pygame.K_a:
-                    self.player_dx -= 1
-                elif event.key == pygame.K_d:
-                    self.player_dx += 1
-                if event.key == pygame.K_RETURN:
-                    actions.append("confirm")
-
-                elif event.key == pygame.K_ESCAPE:
-                    actions.append("back")
-
-                elif event.key == pygame.K_q:
-                    actions.append("open_settings")
-
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_w:
-                    self.player_dy -= 1
-                elif event.key == pygame.K_s:
-                    self.player_dy += 1
-                elif event.key == pygame.K_a:
-                    self.player_dx += 1
-                elif event.key == pygame.K_d:
-                    self.player_dx -= 1
-
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button in (1, 3):
-                    shots.append(event.pos)
-
-        self.mouse_position = pygame.mouse.get_pos()
-
-        return running, shots, actions
-
-    def get_movement(self):
-        return self.player_dx, self.player_dy
-
-    def get_mouse_position(self):
-        return self.mouse_position
+    def get_mouse_position(self) -> tuple[float, float]:
+        """Get mouse position."""
+        return self.input_handler.get_mouse_position()
 
     def tick(self, framerate):
         return self.clock.tick(framerate) / 1000.0
@@ -277,15 +248,19 @@ class Renderer:
         pygame.draw.rect(self.screen, (100, 30, 30), background_rect)
         pygame.draw.rect(self.screen, (50, 220, 70), health_rect)
 
-    def draw_debug(self, state):
+    def draw_debug(self, state: dict) -> None:
+        """Draw debug information on screen.
+
+        Args:
+            state: Dictionary containing game state information.
+        """
+        player = state["player"]
         debug_values = {
-            "player x": state["player_x"],
-            "player y": state["player_y"],
-            "score": state["total_score"],
-            "FPS": state["fps"],
-            "player health": state["player_health"],
-            "bullets": len(state["bullet_list"]),
-            "delta time": state["delta_time"],
+            "player x": player.x,
+            "player y": player.y,
+            "FPS": self.get_fps(),
+            "player health": player.health,
+            "bullets": len(state["bullets"]),
         }
 
         for i, (key, value) in enumerate(debug_values.items()):
@@ -342,34 +317,24 @@ class Renderer:
 
         pygame.display.flip()
 
-    def draw(self, state):
+    def draw(self, state: dict) -> None:
+        """Draw the current game state.
+
+        Args:
+            state: Dictionary containing player, bullets, enemies, and enemy_types.
+        """
         self.screen.fill((30, 30, 30))
 
-        self.draw_grid(
-            state["player_x"],
-            state["player_y"]
-        )
+        player = state["player"]
+        bullets = state["bullets"]
+        enemies = state["enemies"]
+        enemy_types = state["enemy_types"]
 
-        self.draw_player(
-            state["player_angle"],
-            state["player_health"],
-            state["player_max_health"]
-        )
-
-        self.draw_bullets(
-            state["bullet_list"],
-            state["player_x"],
-            state["player_y"]
-        )
-
-        self.draw_enemies(
-            state["enemy_list"],
-            state["enemy_types"],
-            state["player_x"],
-            state["player_y"]
-        )
-
-        self.draw_timer(state["elapsed_ms"])
+        self.draw_grid(player.x, player.y)
+        self.draw_player(player.angle, player.health, player.max_health)
+        self.draw_bullets(bullets, player.x, player.y)
+        self.draw_enemies(enemies, enemy_types, player.x, player.y)
+        self.draw_timer(self.get_elapsed_ms())
         self.draw_debug(state)
 
         pygame.display.flip()
