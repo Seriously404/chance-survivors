@@ -172,3 +172,724 @@ this is entirely optional, add it only after the game is already in a very polis
 oh and by the way, when you are in a menu, the main timer doesnt tick, so only your active gameplay is added to the running total.
 always look out to make the actual best looking result, make sure that UI scales properly with different resolutions, and let your creativity shine! do not EVER stop at my examples, add as much as you can possibly think of. make lists first, of ideas you have, and add more and more, as much as you can.
 final notes: make sure that player level holds actual value, and properly gates new features, not only to not overwhelm the player, but to also ensure normal scaling. reaching level 50 is when the real game truly can begin.
+
+
+# TECHNICAL REQUIREMENTS AND ADDITIONAL DESIGN CLARIFICATIONS
+
+This section supplements the existing design document. It establishes technical expectations and clarifies important implementation details without replacing the original gameplay vision.
+
+The original design remains authoritative wherever this section does not explicitly clarify a technical requirement.
+
+---
+
+# 1. NUMERICAL SYSTEM AND EXTREME SCALING
+
+## 1.1 Large-number representation
+
+The game is intended to support extremely large values.
+
+The previously mentioned value of approximately 1.797 × 10^308 refers to the maximum finite IEEE-754 double value, not the 64-bit integer limit.
+
+The numerical system must not rely exclusively on ordinary 64-bit integers or floating-point values.
+
+Implement a dedicated large-number representation appropriate for an incremental game.
+
+Consider using a representation based on:
+
+- A significand.
+- A magnitude or exponent.
+- Explicit handling of zero.
+- Explicit handling of negative values where applicable.
+- Reliable comparison and arithmetic operations.
+- Stable serialization and deserialization.
+
+The implementation should support values far beyond ordinary integer and floating-point limits where practical.
+
+It should also avoid unnecessary precision loss when comparing, multiplying, dividing, and formatting extremely large values.
+
+## 1.2 Numerical consistency
+
+The same numerical system should be used consistently for:
+
+- Score.
+- Damage.
+- Enemy health.
+- Currency.
+- Item statistics.
+- Multipliers.
+- Upgrade costs.
+- Reward calculations.
+- Scaling curves.
+- Other progression-related quantities.
+
+Avoid converting large values into ordinary floating-point numbers unless the conversion is safe and necessary.
+
+## 1.3 Display formatting
+
+Large numbers should be displayed in a readable format.
+
+Examples of possible formatting styles:
+
+- Standard notation.
+- Scientific notation.
+- Engineering notation.
+- Shortened suffix notation.
+
+The UI should use a consistent formatting system and avoid displaying unnecessarily long numbers.
+
+The formatting system should preserve meaningful distinctions between values.
+
+## 1.4 Scaling architecture
+
+Time-based scaling and player-controlled difficulty scaling must be separate systems.
+
+A player should be able to deliberately increase enemy difficulty and corresponding rewards without necessarily increasing the elapsed gameplay time.
+
+Scaling should be modular, configurable, and capable of interacting with:
+
+- Player level.
+- Enemy type.
+- Current difficulty.
+- Time elapsed.
+- Player equipment.
+- Player luck.
+- Active quests.
+- Special abilities.
+- Relics.
+- Other scaling modifiers.
+
+Avoid arbitrary hardcoded scaling values scattered throughout the project.
+
+---
+
+# 2. GAME TIME, RUNS, AND SCORE
+
+## 2.1 Active gameplay time
+
+The main run timer measures active gameplay time.
+
+Time spent in menus, inventory, quests, upgrades, the bazaar, and other paused interfaces must not contribute to the run timer.
+
+The timer should not reset simply because the player opens or closes a menu.
+
+Store gameplay time independently from wall-clock time.
+
+## 2.2 Run lifecycle
+
+A run should have a clearly defined lifecycle:
+
+1. Player enters a name.
+2. Player starts a run.
+3. The game initializes the run state.
+4. Gameplay proceeds.
+5. The player reaches the end of the run.
+6. The final score and statistics are calculated.
+7. The player may choose whether to upload the result.
+
+A run should not be uploaded automatically without the player's choice.
+
+## 2.3 Score calculation
+
+Score should support extremely large values.
+
+Quest percentage bonuses and other score modifiers must be applied consistently.
+
+Document the order in which score modifiers are applied.
+
+Avoid calculating score through multiple unrelated implementations in different parts of the game.
+
+The game should distinguish between:
+
+- Base score.
+- Bonus score.
+- Final score.
+- Any relevant score multipliers.
+
+The leaderboard should rank entries using the final score.
+
+## 2.4 Reaching infinity
+
+The design describes reaching infinity as the ultimate objective.
+
+Since infinity is not a finite representable number, define a clear gameplay completion threshold or milestone that represents reaching the practical numerical limit of the chosen score system.
+
+The UI should distinguish between an actual finite score and a special completion state.
+
+Do not silently treat floating-point overflow as a successful gameplay achievement.
+
+---
+
+# 3. LUCK AND RANDOMNESS
+
+Luck is one of the defining characteristics of Chance Survivors.
+
+It must be treated as a central gameplay stat.
+
+## 3.1 Separate probability systems
+
+Different systems should be able to use luck differently.
+
+Examples include:
+
+- Crate rewards.
+- Item rarity generation.
+- Rarity upgrades.
+- Rerolls.
+- Random stat generation.
+- Special ability procs.
+- Relic effects.
+- Currency drops.
+- Enemy rewards.
+- Random events.
+
+Avoid using one universal luck formula for every random calculation.
+
+Each system should define how luck influences its outcomes.
+
+## 3.2 Probability safety
+
+Random calculations must remain numerically stable at extremely high luck values.
+
+Probabilities must not accidentally exceed their valid range.
+
+Avoid implementations where sufficiently high luck causes every random event to become identical unless that is an explicitly intended mechanic.
+
+## 3.3 Randomness and reproducibility
+
+Where practical, use a controllable random number generator for gameplay systems.
+
+Support deterministic seeds in testing so bugs involving random outcomes can be reproduced.
+
+This is especially useful for testing combinations, rarity upgrades, and unusual interactions.
+
+---
+
+# 4. ITEM SYSTEM AND SERIALIZATION
+
+All items should have a consistent identity and data representation.
+
+An item instance should distinguish between its definition and its individual state.
+
+The definition describes what the item is.
+
+The instance describes the particular item the player owns.
+
+Relevant instance information may include:
+
+- Unique instance identifier.
+- Item definition identifier.
+- Item type.
+- Rarity.
+- Ultimate rarity sub-tier, if applicable.
+- Level.
+- Rolled statistics.
+- Attached supplemental items.
+- Fusion information.
+- Relevant progression state.
+
+## 4.1 Data-driven definitions
+
+Whenever practical, item definitions should be stored in structured asset files.
+
+Definitions should support:
+
+- Base statistics.
+- Applicable modifiers.
+- Rarity scaling.
+- Level scaling.
+- Combination slots.
+- Compatibility rules.
+- Elemental properties.
+- Drop information.
+- Currency preferences.
+- Special behavior references.
+- Acquisition restrictions.
+
+Use custom behavior scripts when an item's functionality cannot reasonably be expressed through generic data.
+
+## 4.2 Stable identifiers
+
+Items must use stable identifiers rather than relying exclusively on display names.
+
+Changing an item's display name should not invalidate saved inventories or leaderboard builds.
+
+## 4.3 Versioning
+
+Saved item instances and run data should support versioning.
+
+This is important because the game will evolve, and future updates may change item definitions or statistics.
+
+Historical leaderboard entries should remain interpretable even when the current balance of an item changes.
+
+---
+
+# 5. COMBINATION SYSTEM
+
+The combination system is the central item customization mechanic.
+
+It must be designed as a reusable system rather than a collection of unrelated special cases.
+
+## 5.1 Combination structure
+
+A combination consists of:
+
+- One base item.
+- Zero or more supplemental items.
+
+The base item's available combination slots determine how many supplemental items it can hold.
+
+Supplemental items cannot simultaneously belong to multiple base items.
+
+Armor follows the armor-specific combination restrictions described in the main design.
+
+## 5.2 Combination rules
+
+The combination engine should support multiple types of interactions.
+
+### Generic stat interactions
+
+When two items do not require a unique interaction, their relevant statistics can be combined using generic rules.
+
+### Type-based interactions
+
+Some item types should interact through shared rules.
+
+For example, adding an explosive component to an elemental ability may introduce an area-of-effect behavior.
+
+### Custom interactions
+
+Specific combinations may have unique behavior.
+
+For example, combining teleportation and fire could create a burning trail along the teleport path.
+
+Custom interactions should be implemented in a modular manner.
+
+They should not require rewriting the entire combination engine.
+
+## 5.3 Combination validation
+
+The system must prevent:
+
+- Invalid item types from being combined.
+- Supplemental items from being attached to multiple bases.
+- Exceeding available slots.
+- Invalid circular references.
+- Invalid item ownership states.
+- Unsupported combinations.
+- Corrupted combination data.
+
+The system must also support safely removing or replacing supplemental items.
+
+## 5.4 Combination evaluation
+
+Combination effects should be calculated consistently.
+
+Avoid applying the same modifier multiple times accidentally.
+
+Make it possible to inspect how a final statistic was calculated, including contributions from:
+
+- Base item.
+- Supplemental items.
+- Rarity.
+- Level.
+- Armor sets.
+- Player statistics.
+- Other effects.
+
+This is important for debugging and making the upgrade interface understandable.
+
+---
+
+# 6. RARITY AND LEVEL SCALING
+
+Rarity and level have different purposes.
+
+## 6.1 Rarity
+
+Rarity is multiplicative.
+
+Higher rarity should multiply relevant statistics, including appropriate statistics introduced by supplemental items.
+
+Rarity tiers:
+
+- Common.
+- Uncommon.
+- Rare.
+- Epic.
+- Legendary.
+- Mythical.
+- Ultimate.
+
+Ultimate rarity additionally supports sub-tiers from Ultimate 1 through Ultimate 100.
+
+The exact multipliers should be configurable rather than scattered throughout gameplay code.
+
+## 6.2 Level
+
+Item level is additive.
+
+Items should support extremely high levels.
+
+Level increases should not simply multiply all statistics.
+
+The level progression formula should be configurable and designed to remain meaningful at very high levels.
+
+## 6.3 Calculation order
+
+Define and document the order in which base statistics, additive bonuses, multiplicative rarity modifiers, combination effects, and other modifiers are evaluated.
+
+All systems that calculate item statistics must use the same calculation pipeline.
+
+---
+
+# 7. FUSION SYSTEM
+
+Fusion creates a new, permanent item from multiple source items.
+
+Fused items must be distinguishable from ordinary items.
+
+A fusion result should have:
+
+- A unique definition.
+- Its own statistics.
+- Its own rarity and level rules.
+- Its own behavior.
+- Its own combination compatibility.
+- A record of its fusion origin where appropriate.
+
+Fusion results must not be obtainable through ordinary item drops or crates unless explicitly specified by a future design decision.
+
+Fusion recipes and requirements should be data-driven where practical.
+
+The system should validate source items and prevent accidental duplication or loss.
+
+---
+
+# 8. ENEMY AND DIFFICULTY SYSTEMS
+
+Enemy behavior should be modular.
+
+Enemies should be able to differ through:
+
+- Health.
+- Damage.
+- Movement speed.
+- Turning behavior.
+- Resistances.
+- Attack patterns.
+- Target selection.
+- Abilities.
+- Special effects.
+- Rewards.
+- Scaling behavior.
+
+Enemy definitions should be configurable.
+
+Difficulty scaling should not be restricted to increasing health and damage.
+
+It may also affect:
+
+- Enemy composition.
+- Spawn rates.
+- Enemy abilities.
+- Enemy coordination.
+- Special enemy frequency.
+- Rewards.
+- Other relevant mechanics.
+
+Player-controlled difficulty modifiers should be distinguishable from ordinary time-based scaling.
+
+Enemies that summon non-rewarding minions should not accidentally generate unlimited experience or currency through those minions.
+
+---
+
+# 9. CURRENCY AND REWARD SYSTEM
+
+Currencies should use stable identifiers and configurable definitions.
+
+Different enemies and gameplay events may produce different currencies.
+
+Reward sources should be extensible.
+
+Support:
+
+- Ordinary enemy drops.
+- Special enemy drops.
+- Conditional kill rewards.
+- Ability-specific rewards.
+- Damage-triggered rewards.
+- Relic-triggered rewards.
+- Quest rewards.
+- Other special acquisition methods.
+
+Reward calculations must not accidentally duplicate rewards.
+
+Currency values must support the same large-number requirements as score and damage.
+
+---
+
+# 10. QUEST SYSTEM
+
+Quest definitions should be modular and data-driven where practical.
+
+A quest should define:
+
+- Unique identifier.
+- Name.
+- Description.
+- Quest type.
+- Unlock requirements.
+- Completion conditions.
+- Failure conditions, if applicable.
+- Rewards.
+- Score bonus.
+- Relevant restrictions.
+
+Main quests and side quests must retain their different behavior.
+
+Main quests may impose restrictions that the player can optionally lock.
+
+Side quests cannot be failed and should support progression into further quests.
+
+Quest progress must be tracked independently of UI presentation.
+
+Quest state should be serializable.
+
+---
+
+# 11. BAZAAR AND ECONOMY
+
+The bazaar should be modular.
+
+Each feature should be implemented as a separate system with clear interfaces.
+
+Required systems include:
+
+- Fusion.
+- Rarity upgrading.
+- Level upgrading.
+- Crates and shops.
+- Selling.
+
+Additional features may be added when they improve gameplay.
+
+## 11.1 Crates
+
+Crates should support configurable item pools and drop probabilities.
+
+Player spending should influence outcomes according to the crate's rules.
+
+Luck should influence appropriate random outcomes.
+
+Crate generation should be reproducible in tests where practical.
+
+## 11.2 Rarity upgrading
+
+Rarity upgrades should consider:
+
+- Current rarity.
+- Item-specific currency preferences.
+- Currency quantity.
+- Player luck.
+- Upgrade rules.
+
+Ultimate sub-tiers must be supported.
+
+## 11.3 Level upgrading
+
+Level upgrades should support large item levels and currency costs.
+
+Costs and rewards must use the large-number system.
+
+## 11.4 Economy safety
+
+Prevent unintended currency duplication, negative balances, invalid purchases, and inconsistent item ownership.
+
+All economic transactions should validate their requirements before applying changes.
+
+---
+
+# 12. LEADERBOARD WEBSITE AND API
+
+The game requires a FastAPI application served through Uvicorn.
+
+The API must use persistent storage.
+
+The leaderboard website should initially display:
+
+| Place | Name | Score | Time |
+|---|---|---|---|
+
+Selecting an entry should open a detailed view showing the player's build and relevant statistics.
+
+## 12.1 Stored run information
+
+At minimum, store:
+
+- Player name.
+- Final score.
+- Active gameplay time.
+- Inventory.
+- Player level.
+- Active weapons.
+- Active abilities.
+- Active armor.
+- Relevant player statistics, especially luck.
+- Relevant combination and fusion information.
+
+Store sufficient item-definition identifiers and version information to reconstruct historical builds.
+
+## 12.2 API requirements
+
+Support:
+
+- Run submission.
+- Leaderboard retrieval.
+- Individual run detail retrieval.
+- Administrative database clearing.
+
+Validate incoming data.
+
+Prevent malformed or excessively large submissions from causing instability.
+
+## 12.3 Administrative security
+
+Database clearing must be restricted to an authenticated administrative operation.
+
+Never expose an unrestricted public endpoint that deletes leaderboard data.
+
+Do not hardcode administrative credentials into publicly distributed source code.
+
+## 12.4 Website presentation
+
+The main leaderboard should remain clean and simple.
+
+Detailed run information should be displayed in a structured interface consistent with the game's visual style.
+
+The website should work at different screen sizes.
+
+---
+
+# 13. SAVE DATA AND PERSISTENCE
+
+Run state and persistent player data should be handled carefully.
+
+Implement reliable serialization and deserialization.
+
+Save data should account for:
+
+- Inventory.
+- Item instances.
+- Combinations.
+- Fusions.
+- Player statistics.
+- Level.
+- Currency.
+- Quest progress.
+- Relevant progression state.
+- Other persistent systems.
+
+Validate loaded data.
+
+Handle missing, outdated, or malformed data gracefully.
+
+Avoid making saved data dependent on transient runtime object references.
+
+---
+
+# 14. USER INTERFACE AND ACCESSIBILITY
+
+The UI should scale properly across supported resolutions.
+
+Maintain consistent visual language.
+
+The intended accent color is green.
+
+Pay attention to:
+
+- Readability.
+- Navigation.
+- Inventory management.
+- Item comparisons.
+- Combination editing.
+- Quest tracking.
+- Upgrade interfaces.
+- Bazaar usability.
+- Notifications.
+- Visual feedback.
+- Animations.
+- Ability effects.
+- Rarity presentation.
+
+Avoid unnecessary clutter.
+
+Important statistics should be understandable and easy to inspect.
+
+Where appropriate, provide explanations of how an item's statistics and combinations affect its final behavior.
+
+---
+
+# 15. TESTING AND DEVELOPMENT QUALITY
+
+The project must have a functional headless testing interface.
+
+Tests must exercise actual game logic rather than merely importing modules.
+
+Test important interactions between systems.
+
+Use deterministic random seeds where practical.
+
+Add regression tests for bugs.
+
+Test serialization and deserialization.
+
+Test extreme numerical values.
+
+Test invalid inputs and corrupted data.
+
+Test API behavior independently of the game client.
+
+Do not fabricate test results.
+
+Do not remove tests simply to make the suite pass.
+
+---
+
+# 16. MULTIPLAYER
+
+Multiplayer remains optional.
+
+It must not delay or compromise the single-player game.
+
+The architecture may be designed with future multiplayer support in mind, but actual implementation should only begin once the single-player experience is stable and polished.
+
+If multiplayer is considered, first produce a technical proposal covering:
+
+- Networking architecture.
+- Server authority.
+- Synchronization.
+- Player state.
+- Enemy behavior.
+- Shared objectives.
+- Trading.
+- Disconnect handling.
+- Security.
+- Performance.
+
+Do not introduce multiplayer complexity prematurely.
+
+---
+
+# 17. DEVELOPMENT PHILOSOPHY
+
+The game is not finished when its basic loop works.
+
+It should offer substantial progression, interesting decisions, extensive build customization, powerful synergies, and a long-term gameplay experience.
+
+Build reusable systems before expanding content.
+
+Prioritize correctness and integration over the quantity of code.
+
+Be creative, but remain disciplined.
+
+The goal is to create a cohesive game whose systems work together and can continue expanding without requiring constant architectural rewrites.
