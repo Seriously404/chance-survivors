@@ -34,7 +34,7 @@ class CollisionRewardTests(unittest.TestCase):
         result = probe.execute({"action": "step", "dt": 0.01})
 
         self.assertEqual(result["killed"], 1)
-        self.assertEqual(probe.score, 10)
+        self.assertEqual(probe.score.total_score, 10)
         self.assertEqual(probe.progress.total_exp, 1)
         self.assertEqual(reward_calls, 1)
         self.assertEqual(probe.enemies, [])

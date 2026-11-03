@@ -26,6 +26,7 @@ from game.systems.bullets import load_bullet_types
 from game.systems.currency import CurrencyWallet, CurrencyNotifications
 from game.systems.inventory import Inventory
 from game.systems.progression import PlayerProgress, award_enemy_kill
+from game.systems.scoring import RunScore
 from game.systems.items import create_initial_inventory, spawnable_items, player_bonuses
 from game.systems.weapons import projectile_for_weapon
 from copy import deepcopy
@@ -89,7 +90,7 @@ def main() -> None:
     spawn_catalog = spawnable_items()
     spawn_counter = 0
     progress = PlayerProgress()
-    absolute_score = 0
+    run_score = RunScore(mission_score_bonus_pct)
     game_state = GameStateManager()
     collision_system = CollisionSystem(PIXELS_PER_UNIT)
     spawner = SpawnerSystem(enemy_types, enemy_spawn_delay)
@@ -130,7 +131,7 @@ def main() -> None:
                         player, bullets, spawner)
                     renderer.reset_timer()
                     enemy_spawn_timer = 0
-                    absolute_score = 0
+                    run_score = RunScore(mission_score_bonus_pct)
                     wallet = CurrencyWallet()
                     notifications = CurrencyNotifications()
                     inventory = create_initial_inventory()
@@ -302,7 +303,7 @@ def main() -> None:
                     enemy_types,
                 )
                 for _enemy in collision_system.killed_enemies:
-                    absolute_score += 10
+                    run_score.award(10)
                     currency, amount = wallet.reward_for_kill(luck=bonuses["luck"])
                     notifications.add(currency, amount)
                     award_enemy_kill(progress)
@@ -330,8 +331,8 @@ def main() -> None:
                     "bullets": bullets,
                     "enemies": enemies,
                     "enemy_types": enemy_types,
-                    "absolute_score": absolute_score,
-                    "total_score": int(absolute_score * (1 + mission_score_bonus_pct / 100)),
+                    "absolute_score": str(run_score.base_score),
+                    "total_score": str(run_score.total_score),
                     "currency": wallet.amounts,
                     "notifications": notifications.items,
                     "paused": paused,
@@ -361,7 +362,7 @@ def main() -> None:
             elif game_state.is_playing():
                 bonuses=player_bonuses(inventory)
                 renderer.draw({"player": player, "bullets": bullets, "enemies": enemies, "enemy_types": enemy_types,
-                               "absolute_score": absolute_score, "total_score": int(absolute_score * (1 + mission_score_bonus_pct / 100)), "currency": wallet.amounts,
+                               "absolute_score": str(run_score.base_score), "total_score": str(run_score.total_score), "currency": wallet.amounts,
                                "notifications": notifications.items, "paused": paused, "actions": actions,
                                "items":inventory.items,"active_slots":inventory.active_slots,"level":progress.level,
                                "experience":progress.current_exp,"next_level_exp":progress.exp_to_next_level,

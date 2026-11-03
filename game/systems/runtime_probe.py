@@ -19,6 +19,7 @@ from game.systems.collision import CollisionSystem
 from game.systems.currency import CurrencyWallet
 from game.systems.items import create_initial_inventory, player_bonuses, spawnable_items
 from game.systems.progression import PlayerProgress, award_enemy_kill
+from game.systems.scoring import RunScore
 from game.systems.weapons import projectile_for_weapon
 
 
@@ -37,7 +38,7 @@ class RuntimeProbe:
         self.bullets=[]
         self.enemies=[]
         self.weapon_cooldowns=[0.0,0.0]
-        self.score=0
+        self.score=RunScore()
         self.elapsed=0.0
         self._spawned=0
         self._catalog=spawnable_items()
@@ -50,7 +51,7 @@ class RuntimeProbe:
                           "bonuses":player_bonuses(self.inventory)},
             "bullets":[{"type":b.bullet_type,"damage":b.damage,"piercing":b.piercing} for b in self.bullets],
             "enemies":[{"type":e.type,"x":e.x,"y":e.y,"health":e.health} for e in self.enemies],
-            "currency":self.wallet.amounts,"score":self.score,"level":self.progress.level,
+            "currency":self.wallet.amounts,"score":str(self.score.total_score),"level":self.progress.level,
             "experience":self.progress.current_exp,"elapsed":self.elapsed,
         }
 
@@ -88,7 +89,7 @@ class RuntimeProbe:
                 self.bullets,self.enemies,enemy_types)
             killed=len(self.collision.killed_enemies)
             for _ in range(killed):
-                self.score+=10
+                self.score.award(10)
                 self.wallet.reward_for_kill(luck=player_bonuses(self.inventory)["luck"])
                 award_enemy_kill(self.progress)
             return {"killed":killed,"state":self.status()}
@@ -147,7 +148,7 @@ class RuntimeProbe:
         self.execute({"action":"step","dt":0.02})
         assert rapid["type"]=="rapid_fire" and rapid["automatic"] and rapid["piercing"]==0
         assert heavy["type"]=="heavy_shot" and not heavy["automatic"] and heavy["piercing"]>0
-        assert self.score==10 and self.progress.current_exp==1 and not self.enemies
+        assert self.score.total_score==10 and self.progress.current_exp==1 and not self.enemies
         self._assert_invariants()
         return {"rapid_fire":rapid,"heavy_shot":heavy,"state":self.status(),"invariants":"passed"}
 
