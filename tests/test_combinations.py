@@ -4,6 +4,7 @@ import unittest
 
 from game.systems.combinations import CombinationEngine
 from game.systems.inventory import Inventory
+from game.systems.items import player_bonuses, player_speed_multiplier
 from game.utils.large_number import LargeNumber
 
 
@@ -90,6 +91,21 @@ class CombinationEngineTests(unittest.TestCase):
         self.assertEqual(inventory.items, original)
         serialized = combined.to_dict()
         self.assertEqual(LargeNumber.from_dict(serialized["stats"]["damage"]), combined.stats["damage"])
+
+    def test_equipped_armor_combinations_change_player_bonuses_once(self):
+        inventory = Inventory([
+            item("plate", "armor", "rare", stats={"defense": 10}),
+            item("guard", "armor", "common", stats={"defense": 2, "health": 3}),
+        ])
+        inventory.equip("plate", "armor", 0)
+        inventory.assign_combination("plate", 0, "guard")
+
+        bonuses = player_bonuses(inventory)
+
+        self.assertEqual(bonuses["defense"], LargeNumber("27"))
+        self.assertEqual(bonuses["health"], LargeNumber("6.75"))
+        self.assertEqual(player_speed_multiplier(LargeNumber("1e1000")), 100.0)
+        self.assertEqual(player_speed_multiplier(-100), 0.1)
 
     def test_invalid_levels_slots_types_rules_and_ultimate_tiers_are_rejected(self):
         with self.assertRaises(ValueError):

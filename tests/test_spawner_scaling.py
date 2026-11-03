@@ -48,9 +48,11 @@ class SpawnerScalingTests(unittest.TestCase):
 
     def test_kill_reward_uses_large_scaled_currency(self) -> None:
         class FixedRandom:
-            @staticmethod
-            def random() -> float:
-                return 0.99
+            def __init__(self, roll=0.99):
+                self.roll = roll
+
+            def random(self) -> float:
+                return self.roll
 
             @staticmethod
             def randint(_low: int, _high: int) -> int:
@@ -64,6 +66,29 @@ class SpawnerScalingTests(unittest.TestCase):
         self.assertEqual(currency, "Copper")
         self.assertEqual(amount, LargeNumber("3e1000"))
         self.assertEqual(wallet.amounts["Copper"], LargeNumber("3e1000"))
+
+    def test_extreme_luck_saturates_at_a_valid_probability(self) -> None:
+        wallet = CurrencyWallet()
+
+        class FixedRandom:
+            def __init__(self, roll):
+                self.roll = roll
+
+            def random(self) -> float:
+                return self.roll
+
+            @staticmethod
+            def randint(_low: int, _high: int) -> int:
+                return 3
+
+        currency, _ = wallet.reward_for_kill(
+            rng=FixedRandom(0.49), luck=LargeNumber("1e10000")
+        )
+        self.assertEqual(currency, "Gold")
+        currency, _ = wallet.reward_for_kill(
+            rng=FixedRandom(0.51), luck=LargeNumber("1e10000")
+        )
+        self.assertEqual(currency, "Copper")
 
 
 if __name__ == "__main__":

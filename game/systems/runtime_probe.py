@@ -17,9 +17,10 @@ from game.entities.player import Player
 from game.systems.bullets import load_bullet_types
 from game.systems.collision import CollisionSystem
 from game.systems.currency import CurrencyWallet
-from game.systems.items import create_initial_inventory, player_bonuses, spawnable_items
+from game.systems.items import create_initial_inventory, player_bonuses, player_speed_multiplier, spawnable_items
 from game.systems.progression import PlayerProgress, award_enemy_kill
 from game.systems.scoring import RunScore
+from game.systems.combinations import CombinationEngine
 from game.systems.weapons import projectile_for_weapon
 from game.utils.large_number import LargeNumber
 
@@ -30,7 +31,8 @@ class RuntimeProbe:
     def __init__(self) -> None:
         self.player=Player(health=player_max_health,max_health=player_max_health)
         self.inventory=create_initial_inventory()
-        self.player.max_health=player_max_health+int(player_bonuses(self.inventory)["health"])
+        self.combination_engine = CombinationEngine()
+        self.player.max_health=LargeNumber(player_max_health)+player_bonuses(self.inventory)["health"]
         self.player.health=self.player.max_health
         self.bullet_types=load_bullet_types()
         self.collision=CollisionSystem(200)
@@ -49,7 +51,7 @@ class RuntimeProbe:
             "player":{"x":self.player.x,"y":self.player.y,"health":str(self.player.health),
                       "max_health":str(self.player.max_health),"angle":self.player.angle},
             "inventory":{"count":len(self.inventory.items),"active_slots":self.inventory.active_slots,
-                          "bonuses":player_bonuses(self.inventory)},
+                          "bonuses":{name: str(value) for name, value in player_bonuses(self.inventory).items()}},
             "bullets":[{"type":b.bullet_type,"damage":str(b.damage),"piercing":b.piercing} for b in self.bullets],
             "enemies":[{"type":e.type,"x":e.x,"y":e.y,"health":str(e.health)} for e in self.enemies],
             "currency":{name: str(amount) for name, amount in self.wallet.amounts.items()},
@@ -75,8 +77,9 @@ class RuntimeProbe:
             if self.weapon_cooldowns[slot]>0: return {"fired":False,"cooldown":self.weapon_cooldowns[slot]}
             item_id=self.inventory.active_slots["weapons"][slot]
             item=next((i for i in self.inventory.items if i["id"]==item_id),None)
+            combined_item = self.combination_engine.evaluate_inventory(self.inventory, item_id) if item else None
             projectile,cooldown,automatic=projectile_for_weapon(
-                self.player,float(command.get("angle",0)),item,slot,self.bullet_types,bullet_base_speed,
+                self.player,float(command.get("angle",0)),combined_item,slot,self.bullet_types,bullet_base_speed,
                 player_bonuses(self.inventory)["damage_pct"])
             self.bullets.append(projectile); self.weapon_cooldowns[slot]=cooldown
             return {"fired":True,"type":projectile.bullet_type,"damage":str(projectile.damage),
@@ -102,8 +105,8 @@ class RuntimeProbe:
             dt=float(command.get("dt",1/60))
             bonuses=player_bonuses(self.inventory)
             self.player.move(float(command.get("dx",0)),float(command.get("dy",0)),dt,
-                             1+bonuses["speed_pct"]/100)
-            return {"x":self.player.x,"y":self.player.y,"speed_multiplier":1+bonuses["speed_pct"]/100}
+                             player_speed_multiplier(bonuses["speed_pct"]))
+            return {"x":self.player.x,"y":self.player.y,"speed_multiplier":player_speed_multiplier(bonuses["speed_pct"])}
         if action=="enemy_attack":
             index=int(command.get("index",0))
             if not 0<=index<len(self.enemies): raise IndexError("enemy index out of range")

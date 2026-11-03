@@ -840,6 +840,22 @@ class Renderer:
         self._text("Inventory · drag a supplement to a combination slot",(right.left+8,right.top+7))
         self._draw_inventory_grid(items,right)
         if base:
+            preview = state.get("combined_item")
+            if preview and preview.get("base_id") == str(base.get("id")):
+                preview_y = left.bottom-86
+                self._text("Evaluated combination",(left.left+12,preview_y))
+                preview_y += 20
+                contributions = preview.get("contributions",{})
+                for stat_name,stat_value in list(preview.get("stats",{}).items())[:3]:
+                    sources = " + ".join(contributions.get(stat_name,[]))
+                    text = f"{stat_name}: {stat_value} ({sources})"
+                    while text and self.font.size(text)[0] > left.width-24:
+                        text = text[:-4] + "…" if len(text) > 4 else text[:-1]
+                    self._text(text,(left.left+12,preview_y))
+                    preview_y += 18
+                behaviors = ", ".join(preview.get("behaviors",[]))
+                if behaviors:
+                    self._text(f"Effects: {behaviors}"[:64],(left.left+12,left.bottom-18))
             for slot_index,combo_id in enumerate(base.get("combinations",[])):
                 if combo_id is None: continue
                 item_rect=self._item_rects.get(str(combo_id)); slot_rect=self._drop_targets.get(f"combo:{base['id']}:{slot_index}")

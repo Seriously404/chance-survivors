@@ -30,6 +30,8 @@ from game.systems.scoring import RunScore
 from game.systems.items import create_initial_inventory, spawnable_items, player_bonuses
 from game.systems.weapons import projectile_for_weapon
 from game.utils.large_number import LargeNumber
+from game.systems.combinations import CombinationEngine
+from game.systems.items import player_speed_multiplier
 from copy import deepcopy
 
 
@@ -78,6 +80,25 @@ def create_bullet(
     )
 
 
+def _combination_preview(engine: CombinationEngine, inventory: Inventory, item_id: str | None) -> dict | None:
+    if not item_id:
+        return None
+    try:
+        combined = engine.evaluate_inventory(inventory, item_id)
+    except (KeyError, ValueError):
+        return None
+    return {
+        "base_id": combined.base_id,
+        "stats": {name: str(value) for name, value in combined.stats.items()},
+        "behaviors": list(combined.behaviors),
+        "rules_applied": list(combined.rules_applied),
+        "contributions": {
+            name: [f"{part['source_id']}: {part['amount']}" for part in parts]
+            for name, parts in combined.contributions.items()
+        },
+    }
+
+
 def main() -> None:
     """Main game loop."""
     # Initialize systems
@@ -92,6 +113,7 @@ def main() -> None:
     spawn_counter = 0
     progress = PlayerProgress()
     run_score = RunScore(mission_score_bonus_pct)
+    combination_engine = CombinationEngine()
     game_state = GameStateManager()
     collision_system = CollisionSystem(PIXELS_PER_UNIT)
     spawner = SpawnerSystem(enemy_types, enemy_spawn_delay)
@@ -139,9 +161,9 @@ def main() -> None:
                     weapon_cooldowns = [0.0, 0.0]
                     ability_cooldowns = [0.0] * 10
                     bonuses = player_bonuses(inventory)
-                    player.max_health = player_max_health + int(bonuses["health"])
+                    player.max_health = LargeNumber(player_max_health) + bonuses["health"]
                     player.health = player.max_health
-                    applied_health_bonus=int(bonuses["health"])
+                    applied_health_bonus=bonuses["health"]
                     paused = False
                     menu_error = ""
                     game_state.start_game(renderer.get_player_name())
@@ -237,10 +259,10 @@ def main() -> None:
             # -------------------------
             if game_state.is_playing() and not paused and not game_state.active_panel:
                 bonuses=player_bonuses(inventory)
-                current_health_bonus=int(bonuses["health"])
+                current_health_bonus=bonuses["health"]
                 if current_health_bonus != applied_health_bonus:
-                    player.max_health=player_max_health+current_health_bonus
-                    player.health=max(0,min(player.max_health,player.health+current_health_bonus-applied_health_bonus))
+                    player.max_health=LargeNumber(player_max_health)+current_health_bonus
+                    player.health=max(LargeNumber(0),min(player.max_health,player.health+current_health_bonus-applied_health_bonus))
                     applied_health_bonus=current_health_bonus
                 weapon_cooldowns=[max(0.0,value-dt) for value in weapon_cooldowns]
                 ability_cooldowns=[max(0.0,value-dt) for value in ability_cooldowns]
@@ -264,8 +286,12 @@ def main() -> None:
                     if fire_position is None or weapon_cooldowns[slot_index]>0:
                         continue
                     player_angle=get_player_rotation(fire_position,renderer.screen_width,renderer.screen_height)
+                    combined_weapon = (
+                        combination_engine.evaluate_inventory(inventory, str(weapon_id))
+                        if weapon is not None else None
+                    )
                     projectile,cooldown,_=projectile_for_weapon(
-                        player,player_angle,weapon,slot_index,bullet_types,
+                        player,player_angle,combined_weapon,slot_index,bullet_types,
                         bullet_base_speed,bonuses["damage_pct"])
                     bullets.append(projectile)
                     weapon_cooldowns[slot_index]=cooldown
@@ -278,7 +304,8 @@ def main() -> None:
 
                 # Get player movement
                 player_dx, player_dy = renderer.get_movement()
-                player.move(player_dx, player_dy, dt,1+bonuses["speed_pct"]/100)
+                speed_multiplier = player_speed_multiplier(bonuses["speed_pct"])
+                player.move(player_dx, player_dy, dt, speed_multiplier)
 
                 # Update bullets
                 despawn_distance = (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT) * 1.5
@@ -331,6 +358,11 @@ def main() -> None:
                 )
 
                 # Prepare game state for rendering
+                preview = (
+                    _combination_preview(combination_engine, inventory, renderer.selected_base_id)
+                    if renderer.menu_tab == "upgrades" and renderer.upgrade_tab == "combination"
+                    else None
+                )
                 game_state_dict = {
                     "player": player,
                     "bullets": bullets,
@@ -349,12 +381,13 @@ def main() -> None:
                     "next_level_exp": progress.exp_to_next_level,
                     "total_experience": progress.total_exp,
                     "luck": bonuses["luck"],
-                    "speed": 1+bonuses["speed_pct"]/100,
+                    "speed": speed_multiplier,
                     "weapon_cooldowns": weapon_cooldowns,
                     "ability_cooldowns": ability_cooldowns,
                     "spawn_catalog": spawn_catalog,
                     "difficulty_level": spawner.difficulty_level,
                     "active_scaling_time": spawner.scaling.active_time_seconds,
+                    "combined_item": preview,
                 }
 
                 renderer.draw(game_state_dict)
@@ -368,14 +401,20 @@ def main() -> None:
                     "Game Over — Enter to return to menu")
             elif game_state.is_playing():
                 bonuses=player_bonuses(inventory)
+                preview = (
+                    _combination_preview(combination_engine, inventory, renderer.selected_base_id)
+                    if renderer.menu_tab == "upgrades" and renderer.upgrade_tab == "combination"
+                    else None
+                )
                 renderer.draw({"player": player, "bullets": bullets, "enemies": enemies, "enemy_types": enemy_types,
                                "absolute_score": str(run_score.base_score), "total_score": str(run_score.total_score), "currency": wallet.amounts,
                                "notifications": notifications.items, "paused": paused, "actions": actions,
                                "items":inventory.items,"active_slots":inventory.active_slots,"level":progress.level,
                                "experience":progress.current_exp,"next_level_exp":progress.exp_to_next_level,
-                               "total_experience":progress.total_exp,"luck":bonuses["luck"],"speed":1+bonuses["speed_pct"]/100,
+                               "total_experience":progress.total_exp,"luck":bonuses["luck"],"speed":player_speed_multiplier(bonuses["speed_pct"]),
                                "weapon_cooldowns":weapon_cooldowns,"ability_cooldowns":ability_cooldowns,"spawn_catalog":spawn_catalog,
-                               "difficulty_level":spawner.difficulty_level,"active_scaling_time":spawner.scaling.active_time_seconds})
+                               "difficulty_level":spawner.difficulty_level,"active_scaling_time":spawner.scaling.active_time_seconds,
+                               "combined_item":preview})
 
     finally:
         renderer.close()
