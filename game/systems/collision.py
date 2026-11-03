@@ -100,6 +100,11 @@ class CollisionSystem:
 
         for i, bullet in enumerate(bullets):
             for j, enemy in enumerate(enemies):
+                # Later projectiles in this same pass may overlap an enemy
+                # that an earlier projectile already killed. Treat it as
+                # removed immediately so the kill/reward is only reported once.
+                if j in enemies_to_remove:
+                    continue
                 if enemy in bullet.hit_enemies:
                     continue
 
