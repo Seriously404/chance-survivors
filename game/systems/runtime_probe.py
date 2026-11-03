@@ -89,7 +89,9 @@ class RuntimeProbe:
             if not 0 < dt <= 10: raise ValueError("dt must be greater than 0 and at most 10 seconds")
             self.elapsed+=dt
             self.weapon_cooldowns=[max(0,v-dt) for v in self.weapon_cooldowns]
-            for bullet in self.bullets: bullet.move(dt)
+            for bullet in self.bullets:
+                bullet.steer_towards(self.enemies, dt)
+                bullet.move(dt)
             self.bullets,self.enemies=self.collision.check_bullet_enemy_collisions(
                 self.bullets,self.enemies,enemy_types)
             killed=len(self.collision.killed_enemies)

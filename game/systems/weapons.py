@@ -30,15 +30,17 @@ def _number(value: Any, label: str) -> LargeNumber:
         raise ValueError(f"Weapon {label} must be a finite numeric value") from exc
 
 
-def _weapon_sources(weapon: Mapping[str, Any] | CombinedItem | None) -> tuple[Mapping[str, Any], Mapping[str, Any], int]:
+def _weapon_sources(
+    weapon: Mapping[str, Any] | CombinedItem | None,
+) -> tuple[Mapping[str, Any], Mapping[str, Any], int, frozenset[str]]:
     if weapon is None:
-        return {}, {}, 1
+        return {}, {}, 1, frozenset()
     if isinstance(weapon, CombinedItem):
         if weapon.item_type != "weapon":
             raise ValueError("Combined item is not a weapon")
         if not isinstance(weapon.stats, Mapping) or not isinstance(weapon.metadata, Mapping):
             raise ValueError("Combined weapon stats and metadata must be objects")
-        return weapon.stats, weapon.metadata, 1
+        return weapon.stats, weapon.metadata, 1, frozenset(weapon.behaviors)
     if not isinstance(weapon, Mapping):
         raise ValueError("Weapon must be an item object or CombinedItem")
     if weapon.get("type") not in (None, "weapon"):
@@ -49,7 +51,10 @@ def _weapon_sources(weapon: Mapping[str, Any] | CombinedItem | None) -> tuple[Ma
     level = weapon.get("level", 1)
     if type(level) is not int or level < 1:
         raise ValueError("Weapon level must be a positive integer")
-    return stats, stats, level
+    behaviors = weapon.get("behaviors", ())
+    if not isinstance(behaviors, (list, tuple)) or any(not isinstance(value, str) for value in behaviors):
+        raise ValueError("Weapon behaviors must be a sequence of strings")
+    return stats, stats, level, frozenset(behaviors)
 
 
 def _stat_value(
@@ -129,7 +134,7 @@ def projectile_for_weapon(
     if isinstance(angle, bool) or not math.isfinite(angle_value):
         raise ValueError("Projectile angle must be finite")
 
-    stats, metadata, item_level = _weapon_sources(weapon)
+    stats, metadata, item_level, behaviors = _weapon_sources(weapon)
     if "bullet_type" in metadata:
         bullet_name = metadata["bullet_type"]
         if not isinstance(bullet_name, str) or not bullet_name:
@@ -182,6 +187,26 @@ def projectile_for_weapon(
     else:
         automatic = default_automatic
 
+    explosion_radius = LargeNumber(0)
+    if "area_explosion" in behaviors:
+        explosion_radius = _stat_value(stats, "area_radius", 0, item_level)
+    explosion_radius_float = _bounded_float(
+        explosion_radius, "explosion radius", 0.0, 1_000.0
+    )
+
+    homing_strength = LargeNumber(0)
+    if "homing_guidance" in behaviors:
+        homing_strength = _stat_value(stats, "homing_strength", 1, item_level)
+    homing_strength_float = _bounded_float(
+        homing_strength, "homing strength", 0.0, 100.0
+    )
+
+    bounces_remaining = 0
+    if "ricochet" in behaviors:
+        bounces_remaining = _bounded_piercing(
+            _stat_value(stats, "bounce_count", 1, item_level)
+        )
+
     projectile = Projectile.create_from_player(
         player.x,
         player.y,
@@ -191,5 +216,8 @@ def projectile_for_weapon(
         damage,
         piercing,
         bullet_name,
+        explosion_radius_float,
+        bounces_remaining,
+        homing_strength_float,
     )
     return projectile, cooldown, automatic

@@ -68,6 +68,33 @@ class WeaponCombinationAdapterTests(unittest.TestCase):
         self.assertIsInstance(projectile.damage, LargeNumber)
         self.assertEqual(projectile.damage, LargeNumber("1e1000"))
 
+    def test_combination_behaviors_populate_projectile_effects(self) -> None:
+        base = weapon("base", {
+            "damage": 10,
+            "speed_modifier": 1,
+            "cooldown": 0.2,
+            "bullet_type": "rapid_fire",
+        })
+        base["combinations"] = [None] * 3
+        explosive = {"id": "grenade", "type": "relic", "rarity": "common", "level": 1,
+                     "stats": {"area_radius": 2}, "tags": ["explosive"], "behaviors": [],
+                     "combinations": [None]}
+        homing = {"id": "lens", "type": "relic", "rarity": "common", "level": 1,
+                  "stats": {"homing_strength": 1}, "tags": ["homing"], "behaviors": [],
+                  "combinations": [None]}
+        ricochet = {"id": "chip", "type": "relic", "rarity": "common", "level": 1,
+                    "stats": {"bounce_count": 1}, "tags": ["ricochet"], "behaviors": [],
+                    "combinations": [None]}
+        combined = CombinationEngine().evaluate(base, [explosive, homing, ricochet])
+
+        projectile, _, _ = projectile_for_weapon(
+            PLAYER, 0.0, combined, 0, self.bullet_types, 1.0
+        )
+
+        self.assertEqual(projectile.explosion_radius, 4.0)
+        self.assertEqual(projectile.homing_strength, 2.0)
+        self.assertEqual(projectile.bounces_remaining, 2)
+
     def test_existing_dictionary_callers_keep_item_level_and_damage_bonus(self) -> None:
         item = weapon("legacy", {
             "damage": 10,

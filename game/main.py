@@ -314,6 +314,7 @@ def main() -> None:
                     if not bullet.should_despawn(player.x, player.y, despawn_distance)
                 ]
                 for bullet in bullets:
+                    bullet.steer_towards(enemies, dt)
                     bullet.move(dt)
 
                 # Update enemies
