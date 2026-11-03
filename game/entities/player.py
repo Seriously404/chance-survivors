@@ -15,12 +15,12 @@ class Player:
     max_health: int = 100
     angle: float = 0.0
 
-    def move(self, dx: float, dy: float, dt: float) -> None:
+    def move(self, dx: float, dy: float, dt: float, speed_multiplier: float = 1.0) -> None:
         """Move the player by the given delta, normalized by magnitude."""
         magnitude = math.sqrt(dx**2 + dy**2)
         if magnitude > 0:
-            self.x += (dx / magnitude) * dt
-            self.y += (dy / magnitude) * dt
+            self.x += (dx / magnitude) * dt * speed_multiplier
+            self.y += (dy / magnitude) * dt * speed_multiplier
 
     def set_rotation(self, mouse_position: Tuple[float, float], screen_width: int, screen_height: int) -> None:
         """Calculate and set the player's rotation based on mouse position."""

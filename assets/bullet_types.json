@@ -1,0 +1,4 @@
+{
+  "rapid_fire": {"cooldown": 0.16, "damage": 3, "speed_modifier": 3.0, "piercing": 0, "automatic": true},
+  "heavy_shot": {"cooldown": 0.75, "damage": 8, "speed_modifier": 2.0, "piercing": 2, "automatic": false}
+}

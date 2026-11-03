@@ -7,9 +7,10 @@ from typing import Dict, Any
 # -------------------------
 
 SCREEN_WIDTH: int = 800
-SCREEN_HEIGHT: int = 600
+SCREEN_HEIGHT: int = 450
 PIXELS_PER_UNIT: int = 200
 FRAMERATE: int = 60
+mission_score_bonus_pct: float = 0.0
 
 # -------------------------
 # Player settings

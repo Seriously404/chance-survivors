@@ -21,6 +21,7 @@ class CollisionSystem:
             pixels_per_unit: Conversion factor from world units to pixels.
         """
         self.pixels_per_unit = pixels_per_unit
+        self.killed_enemies: list[Enemy] = []
 
     def _calculate_collision_distance(
         self,
@@ -95,6 +96,7 @@ class CollisionSystem:
         """
         bullets_to_remove = set()
         enemies_to_remove = set()
+        self.killed_enemies = []
 
         for i, bullet in enumerate(bullets):
             for j, enemy in enumerate(enemies):
@@ -107,17 +109,18 @@ class CollisionSystem:
                 bullet.hit_enemies.append(enemy)
 
                 # Apply damage
-                damage_dealt = enemy.take_damage(bullet.damage)
-                bullet.damage -= damage_dealt
+                enemy.take_damage(bullet.damage)
 
                 # Check if enemy dies
                 if enemy.is_dead():
                     enemies_to_remove.add(j)
+                    self.killed_enemies.append(enemy)
 
                 # Check if bullet should be removed
-                if bullet.piercing == 0 or bullet.damage <= 0:
+                if bullet.piercing <= 0:
                     bullets_to_remove.add(i)
                     break
+                bullet.piercing -= 1
 
         # Remove dead enemies and spent bullets
         remaining_enemies = [
@@ -134,6 +137,7 @@ class CollisionSystem:
         enemies: List[Enemy],
         player: Player,
         enemy_types: dict,
+        defense: float = 0.0,
     ) -> Player:
         """Check all enemy-player collisions and update player health.
 
@@ -150,7 +154,8 @@ class CollisionSystem:
                 continue
 
             # Apply damage and remove enemy
-            player.take_damage(enemy_types[enemy.type]["damage"])
+            damage=enemy_types[enemy.type]["damage"]
+            player.take_damage(max(1,int(damage-max(0,defense))))
             enemies.remove(enemy)
 
         return player

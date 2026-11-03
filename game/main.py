@@ -14,6 +14,7 @@ from game.config.settings import (
     enemy_spawn_delay,
     bullet_base_speed,
     basic_bullet_speed_modifier,
+    mission_score_bonus_pct,
 )
 from game.entities.player import Player
 from game.entities.projectile import Projectile
@@ -21,6 +22,13 @@ from game.systems.collision import CollisionSystem
 from game.systems.spawner import SpawnerSystem
 from game.systems.game_state import GameStateManager, GameState
 from game.utils.helpers import get_player_rotation
+from game.systems.bullets import load_bullet_types
+from game.systems.currency import CurrencyWallet, CurrencyNotifications
+from game.systems.inventory import Inventory
+from game.systems.progression import PlayerProgress, award_enemy_kill
+from game.systems.items import create_initial_inventory, spawnable_items, player_bonuses
+from game.systems.weapons import projectile_for_weapon
+from copy import deepcopy
 
 
 def reset_game(
@@ -72,24 +80,38 @@ def main() -> None:
     """Main game loop."""
     # Initialize systems
     renderer = Renderer(SCREEN_WIDTH, SCREEN_HEIGHT, PIXELS_PER_UNIT)
+    bullet_types = load_bullet_types()
+    weapon_cooldowns = [0.0, 0.0]
+    ability_cooldowns = [0.0] * 10
+    wallet = CurrencyWallet()
+    notifications = CurrencyNotifications()
+    inventory = create_initial_inventory()
+    spawn_catalog = spawnable_items()
+    spawn_counter = 0
+    progress = PlayerProgress()
+    absolute_score = 0
     game_state = GameStateManager()
     collision_system = CollisionSystem(PIXELS_PER_UNIT)
     spawner = SpawnerSystem(enemy_types, enemy_spawn_delay)
 
     # Initialize game entities
     player = Player(health=player_max_health, max_health=player_max_health)
+    applied_health_bonus=0
     bullets: list[Projectile] = []
     enemies: list = []
 
     # Game state
     running = True
     enemy_spawn_timer = 0
+    menu_error = ""
+    paused = False
 
     try:
         while running:
             # -------------------------
             # Input
             # -------------------------
+            renderer.set_view(game_state.state.name, game_state.active_panel)
             running, shots, actions = renderer.process_events()
 
             if not running:
@@ -99,21 +121,101 @@ def main() -> None:
             # State transitions
             # -------------------------
             if game_state.is_menu():
-                if "confirm" in actions:
-                    player, bullets, spawner = reset_game(player, bullets, spawner)
+                if "play" in actions or "confirm" in actions:
+                    if not renderer.get_player_name():
+                        menu_error = "Enter a name before playing."
+                        renderer.input_handler.name_error = menu_error
+                        continue
+                    player, bullets, spawner = reset_game(
+                        player, bullets, spawner)
                     renderer.reset_timer()
                     enemy_spawn_timer = 0
-                    game_state.start_game("Player")
+                    absolute_score = 0
+                    wallet = CurrencyWallet()
+                    notifications = CurrencyNotifications()
+                    inventory = create_initial_inventory()
+                    weapon_cooldowns = [0.0, 0.0]
+                    ability_cooldowns = [0.0] * 10
+                    bonuses = player_bonuses(inventory)
+                    player.max_health = player_max_health + int(bonuses["health"])
+                    player.health = player.max_health
+                    applied_health_bonus=int(bonuses["health"])
+                    paused = False
+                    menu_error = ""
+                    game_state.start_game(renderer.get_player_name())
 
-                elif "open_settings" in actions:
+                elif "settings" in actions or "open_settings" in actions:
                     game_state.change_state(GameState.SETTINGS)
+                elif "exit" in actions:
+                    running = False
 
             elif game_state.is_settings():
-                if "back" in actions:
+                if "resolution" in actions:
+                    renderer.set_resolution(renderer.resolution_index + 1)
+                if "fullscreen" in actions:
+                    renderer.fullscreen = not renderer.fullscreen
+                if "apply_settings" in actions:
+                    renderer.apply_display()
+                if "back" in actions or "close_panel" in actions:
                     game_state.change_state(GameState.MENU)
 
             elif game_state.is_playing():
-                if "back" in actions:
+                if "pause" in actions:
+                    paused = not paused
+                for panel in ("inventory", "quests", "upgrades", "bazaar"):
+                    if panel in actions:
+                        game_state.open_panel(panel)
+                        renderer.menu_tab = panel
+                for action in actions:
+                    if action.startswith("spawn_item:"):
+                        template_id=action.split(":",1)[1]
+                        template=next((item for item in spawn_catalog if item["id"]==template_id),None)
+                        if template and len(inventory.items)<Inventory.CAPACITY:
+                            spawned=deepcopy(template)
+                            spawn_counter+=1
+                            spawned["id"]=f"bazaar-{spawn_counter}"
+                            inventory.add(spawned)
+                    elif action.startswith("tab_"):
+                        renderer.menu_tab = action[4:]
+                        game_state.open_panel(renderer.menu_tab)
+                    elif action.startswith("upgrade_"):
+                        renderer.upgrade_tab = action[8:]
+                    elif action.startswith("select:"):
+                        renderer.selected_item_id = action.split(":",1)[1]
+                    elif action.startswith("combine:"):
+                        _, base_id, combo_index, item_id = action.split(":",3)
+                        try:
+                            inventory.assign_combination(base_id,int(combo_index),item_id)
+                        except (KeyError, IndexError, ValueError):
+                            pass
+                    elif action.startswith("equip:"):
+                        _, slot_kind, slot_index, item_id = action.split(":",3)
+                        try:
+                            inventory.equip(item_id,slot_kind,int(slot_index))
+                        except (KeyError, IndexError, ValueError):
+                            pass
+                    elif action.startswith("uncombine:"):
+                        _, base_id, combo_index = action.split(":",2)
+                        try:
+                            inventory.assign_combination(base_id,int(combo_index),None)
+                        except (KeyError, IndexError, ValueError):
+                            pass
+                    elif action.startswith("unequip:"):
+                        _, slot_kind, slot_index = action.split(":",2)
+                        try:
+                            inventory.unequip(slot_kind,int(slot_index))
+                        except (KeyError, IndexError, ValueError):
+                            pass
+                    elif action == "set_base" and renderer.selected_item_id:
+                        renderer.selected_base_id = renderer.selected_item_id
+                if "close_panel" in actions:
+                    if game_state.active_panel:
+                        game_state.close_panel()
+                    else:
+                        paused = False
+                if "close_menu" in actions:
+                    game_state.close_panel()
+                if "back" in actions and not game_state.active_panel:
                     game_state.change_state(GameState.MENU)
 
             elif game_state.is_game_over():
@@ -124,20 +226,45 @@ def main() -> None:
             # Time
             # -------------------------
             dt = renderer.tick(FRAMERATE)
+            notifications.update(dt)
 
             # -------------------------
             # Gameplay update
             # -------------------------
-            if game_state.is_playing():
-                # Spawn bullets
-                for mouse_position in shots:
-                    player_angle = get_player_rotation(
-                        mouse_position,
-                        SCREEN_WIDTH,
-                        SCREEN_HEIGHT,
-                    )
-                    bullet = create_bullet(player.x, player.y, player_angle)
-                    bullets.append(bullet)
+            if game_state.is_playing() and not paused and not game_state.active_panel:
+                bonuses=player_bonuses(inventory)
+                current_health_bonus=int(bonuses["health"])
+                if current_health_bonus != applied_health_bonus:
+                    player.max_health=player_max_health+current_health_bonus
+                    player.health=max(0,min(player.max_health,player.health+current_health_bonus-applied_health_bonus))
+                    applied_health_bonus=current_health_bonus
+                weapon_cooldowns=[max(0.0,value-dt) for value in weapon_cooldowns]
+                ability_cooldowns=[max(0.0,value-dt) for value in ability_cooldowns]
+                clicks={0:None,1:None}
+                for button,position in renderer.input_handler.fire_events:
+                    if button==1: clicks[0]=position
+                    elif button==3: clicks[1]=position
+                by_id={str(item["id"]):item for item in inventory.items}
+                for slot_index,button in enumerate((1,3)):
+                    weapon_id=inventory.active_slots["weapons"][slot_index]
+                    weapon=by_id.get(str(weapon_id)) if weapon_id else None
+                    weapon_stats=weapon.get("stats",{}) if weapon else {}
+                    type_name=weapon_stats.get("bullet_type",("rapid_fire","heavy_shot")[slot_index])
+                    definition=bullet_types.get(str(type_name))
+                    if definition is None:
+                        continue
+                    automatic=bool(weapon_stats.get("automatic",definition.automatic))
+                    fire_position=clicks[slot_index]
+                    if fire_position is None and automatic and button in renderer.input_handler.mouse_buttons_held:
+                        fire_position=renderer.get_mouse_position()
+                    if fire_position is None or weapon_cooldowns[slot_index]>0:
+                        continue
+                    player_angle=get_player_rotation(fire_position,renderer.screen_width,renderer.screen_height)
+                    projectile,cooldown,_=projectile_for_weapon(
+                        player,player_angle,weapon,slot_index,bullet_types,
+                        bullet_base_speed,bonuses["damage_pct"])
+                    bullets.append(projectile)
+                    weapon_cooldowns[slot_index]=cooldown
 
                 # Update spawner
                 spawner.update(dt)
@@ -147,7 +274,7 @@ def main() -> None:
 
                 # Get player movement
                 player_dx, player_dy = renderer.get_movement()
-                player.move(player_dx, player_dy, dt)
+                player.move(player_dx, player_dy, dt,1+bonuses["speed_pct"]/100)
 
                 # Update bullets
                 despawn_distance = (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT) * 1.5
@@ -174,10 +301,16 @@ def main() -> None:
                     enemies,
                     enemy_types,
                 )
+                for _enemy in collision_system.killed_enemies:
+                    absolute_score += 10
+                    currency, amount = wallet.reward_for_kill(luck=bonuses["luck"])
+                    notifications.add(currency, amount)
+                    award_enemy_kill(progress)
                 player = collision_system.check_enemy_player_collisions(
                     enemies,
                     player,
                     enemy_types,
+                    bonuses["defense"],
                 )
 
                 # Check game over
@@ -187,8 +320,8 @@ def main() -> None:
                 # Update player rotation
                 player.set_rotation(
                     renderer.get_mouse_position(),
-                    SCREEN_WIDTH,
-                    SCREEN_HEIGHT,
+                    renderer.screen_width,
+                    renderer.screen_height,
                 )
 
                 # Prepare game state for rendering
@@ -197,12 +330,43 @@ def main() -> None:
                     "bullets": bullets,
                     "enemies": enemies,
                     "enemy_types": enemy_types,
+                    "absolute_score": absolute_score,
+                    "total_score": int(absolute_score * (1 + mission_score_bonus_pct / 100)),
+                    "currency": wallet.amounts,
+                    "notifications": notifications.items,
+                    "paused": paused,
+                    "actions": actions,
+                    "items": inventory.items,
+                    "active_slots": inventory.active_slots,
+                    "level": progress.level,
+                    "experience": progress.current_exp,
+                    "next_level_exp": progress.exp_to_next_level,
+                    "total_experience": progress.total_exp,
+                    "luck": bonuses["luck"],
+                    "speed": 1+bonuses["speed_pct"]/100,
+                    "weapon_cooldowns": weapon_cooldowns,
+                    "ability_cooldowns": ability_cooldowns,
+                    "spawn_catalog": spawn_catalog,
                 }
 
                 renderer.draw(game_state_dict)
 
-            else:
-                renderer.draw_placeholder(game_state.state.name.replace("_", " ").title())
+            elif game_state.is_menu():
+                renderer.draw_menu(menu_error)
+            elif game_state.is_settings():
+                renderer.draw_settings()
+            elif game_state.is_game_over():
+                renderer.draw_placeholder(
+                    "Game Over — Enter to return to menu")
+            elif game_state.is_playing():
+                bonuses=player_bonuses(inventory)
+                renderer.draw({"player": player, "bullets": bullets, "enemies": enemies, "enemy_types": enemy_types,
+                               "absolute_score": absolute_score, "total_score": int(absolute_score * (1 + mission_score_bonus_pct / 100)), "currency": wallet.amounts,
+                               "notifications": notifications.items, "paused": paused, "actions": actions,
+                               "items":inventory.items,"active_slots":inventory.active_slots,"level":progress.level,
+                               "experience":progress.current_exp,"next_level_exp":progress.exp_to_next_level,
+                               "total_experience":progress.total_exp,"luck":bonuses["luck"],"speed":1+bonuses["speed_pct"]/100,
+                               "weapon_cooldowns":weapon_cooldowns,"ability_cooldowns":ability_cooldowns,"spawn_catalog":spawn_catalog})
 
     finally:
         renderer.close()

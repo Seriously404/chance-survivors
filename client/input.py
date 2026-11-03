@@ -14,6 +14,15 @@ class InputHandler:
         self.mouse_position: Tuple[float, float] = (0, 0)
         self.shots: List[Tuple[float, float]] = []
         self.actions: List[str] = []
+        self.player_name = ""
+        self.name_error = ""
+        self.held_fire = False
+        self.drag_start = None
+        self.drag_release = None
+        self.drag_active = False
+        self.click_release = None
+        self.fire_events = []
+        self.mouse_buttons_held = set()
 
     def process_events(self) -> Tuple[bool, List[Tuple[float, float]], List[str]]:
         """Process all pygame events.
@@ -24,6 +33,9 @@ class InputHandler:
         running = True
         shots = []
         actions = []
+        self.fire_events = []
+        self.click_release = None
+        self.drag_release = None
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -35,9 +47,32 @@ class InputHandler:
             elif event.type == pygame.KEYUP:
                 self._handle_keyup(event.key)
 
+            elif event.type == pygame.TEXTINPUT:
+                self.player_name = (self.player_name + event.text)[:20]
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button in (1, 3):
                     shots.append(event.pos)
+                    self.fire_events.append((event.button,event.pos))
+                    self.mouse_buttons_held.add(event.button)
+                    self.held_fire = True
+                    self.drag_start = event.pos
+                    self.drag_active = False
+            elif event.type == pygame.MOUSEMOTION:
+                if self.drag_start is not None and not self.drag_active:
+                    dx=event.pos[0]-self.drag_start[0]; dy=event.pos[1]-self.drag_start[1]
+                    self.drag_active=dx*dx+dy*dy >= 64
+            elif event.type == pygame.MOUSEBUTTONUP and event.button in (1, 3):
+                self.mouse_buttons_held.discard(event.button)
+                self.held_fire = bool(self.mouse_buttons_held)
+                if self.drag_start is not None and self.drag_active:
+                    self.drag_release=(self.drag_start,event.pos)
+                elif self.drag_start is not None:
+                    self.click_release=event.pos
+                self.drag_start=None
+                self.drag_active=False
+            elif event.type == pygame.MOUSEWHEEL:
+                actions.extend(["inventory_up" if event.y > 0 else "inventory_down"] * abs(event.y))
 
         self.mouse_position = pygame.mouse.get_pos()
         return running, shots, actions
@@ -63,6 +98,8 @@ class InputHandler:
             actions.append("back")
         elif key == pygame.K_q:
             actions.append("open_settings")
+        elif key == pygame.K_BACKSPACE:
+            self.player_name = self.player_name[:-1]
 
     def _handle_keyup(self, key: int) -> None:
         """Handle key up events.
@@ -117,3 +154,10 @@ class InputHandler:
         self.player_dy = 0
         self.shots = []
         self.actions = []
+        self.drag_start = None
+        self.drag_release = None
+        self.drag_active = False
+        self.click_release = None
+        self.fire_events = []
+        self.mouse_buttons_held.clear()
+        self.held_fire = False
