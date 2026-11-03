@@ -6,6 +6,7 @@ from typing import List
 
 from game.entities.enemy import Enemy
 from game.config.settings import PIXELS_PER_UNIT, SCREEN_WIDTH, SCREEN_HEIGHT
+from game.systems.scaling import ScalingSystem
 
 
 class SpawnerSystem:
@@ -15,6 +16,8 @@ class SpawnerSystem:
         self,
         enemy_types: dict,
         spawn_delay_ms: int = 2000,
+        scaling: ScalingSystem | None = None,
+        rng: random.Random | None = None,
     ):
         """Initialize the spawner system.
 
@@ -23,8 +26,25 @@ class SpawnerSystem:
             spawn_delay_ms: Delay between enemy spawns in milliseconds.
         """
         self.enemy_types = enemy_types
+        if type(spawn_delay_ms) is not int or spawn_delay_ms <= 0:
+            raise ValueError("Spawn delay must be a positive integer number of milliseconds")
         self.spawn_delay_ms = spawn_delay_ms
         self.spawn_timer_ms = 0
+        self.scaling = scaling or ScalingSystem()
+        self.rng = rng or random.Random()
+        self._initial_rng_state = self.rng.getstate()
+
+    @property
+    def difficulty_level(self) -> int:
+        return self.scaling.difficulty_level
+
+    @property
+    def current_spawn_delay_ms(self) -> float:
+        return self.scaling.spawn_delay_seconds(self.spawn_delay_ms / 1000) * 1000
+
+    def increase_difficulty(self, steps: int = 1) -> None:
+        """Raise player-controlled difficulty without changing elapsed time."""
+        self.scaling.increase_difficulty(steps)
 
     def update(self, dt: float) -> None:
         """Update the spawn timer.
@@ -32,7 +52,10 @@ class SpawnerSystem:
         Args:
             dt: Delta time in seconds.
         """
+        if isinstance(dt, bool) or not isinstance(dt, (int, float)) or not math.isfinite(dt) or dt < 0:
+            raise ValueError("Spawner delta time must be finite and non-negative")
         self.spawn_timer_ms += dt * 1000
+        self.scaling.update_active_time(dt)
 
     def should_spawn(self) -> bool:
         """Check if it's time to spawn a new enemy.
@@ -40,7 +63,7 @@ class SpawnerSystem:
         Returns:
             True if enough time has passed since the last spawn.
         """
-        return self.spawn_timer_ms >= self.spawn_delay_ms
+        return self.spawn_timer_ms >= self.current_spawn_delay_ms
 
     def spawn(
         self,
@@ -55,14 +78,10 @@ class SpawnerSystem:
             player_y: Player's y position.
             enemies: List to append the new enemy to.
         """
-        # Generate random position around the player
-        x = random.uniform(-1, 1)
-        y = random.uniform(-1, 1)
-
-        # Normalize
-        magnitude = math.sqrt(x**2 + y**2)
-        x /= magnitude
-        y /= magnitude
+        # Sample an angle directly for uniform coverage and no zero-vector case.
+        angle = self.rng.uniform(0, math.tau)
+        x = math.cos(angle)
+        y = math.sin(angle)
 
         # Convert to world coordinates
         spawn_distance = (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT) * 1.5
@@ -80,7 +99,16 @@ class SpawnerSystem:
         angle = math.atan2(dy, dx)
 
         # Create and add enemy
-        enemy = Enemy.create_from_type("basic", self.enemy_types["basic"], x, y)
+        base_stats = self.enemy_types["basic"]
+        scaled = self.scaling.scaled_enemy_stats(
+            base_stats["max_health"], base_stats.get("damage", 0),
+            base_stats.get("reward_multiplier", 1),
+        )
+        scaled_stats = dict(base_stats)
+        scaled_stats["max_health"] = scaled["health"]
+        scaled_stats["damage"] = scaled["damage"]
+        scaled_stats["reward_multiplier"] = scaled["reward"]
+        enemy = Enemy.create_from_type("basic", scaled_stats, x, y)
         enemy.dx = dx
         enemy.dy = dy
         enemy.angle = angle
@@ -89,3 +117,5 @@ class SpawnerSystem:
     def reset(self) -> None:
         """Reset the spawn timer."""
         self.spawn_timer_ms = 0
+        self.scaling = ScalingSystem(self.scaling.config)
+        self.rng.setstate(self._initial_rng_state)

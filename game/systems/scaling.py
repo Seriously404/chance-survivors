@@ -11,7 +11,7 @@ from game.utils.large_number import LargeNumber
 
 
 SCALING_STATE_VERSION = 1
-_STATS = ("health", "damage", "spawn_rate")
+_STATS = ("health", "damage", "spawn_rate", "reward")
 
 
 def _finite_float(value: Any, label: str, *, allow_zero: bool = False) -> float:
@@ -39,9 +39,11 @@ class ScalingConfig:
     time_health_multiplier: LargeNumber | int | float | str = 1.1
     time_damage_multiplier: LargeNumber | int | float | str = 1.05
     time_spawn_rate_multiplier: LargeNumber | int | float | str = 1.05
+    time_reward_multiplier: LargeNumber | int | float | str = 1.05
     difficulty_health_multiplier: LargeNumber | int | float | str = 1.5
     difficulty_damage_multiplier: LargeNumber | int | float | str = 1.25
     difficulty_spawn_rate_multiplier: LargeNumber | int | float | str = 1.2
+    difficulty_reward_multiplier: LargeNumber | int | float | str = 1.25
     minimum_spawn_delay_seconds: float = 0.001
 
     def __post_init__(self) -> None:
@@ -134,7 +136,7 @@ class ScalingSystem:
         self._difficulty_level += steps
 
     def multipliers(self) -> dict[str, LargeNumber]:
-        """Return the current health, damage, and spawn-rate multipliers."""
+        """Return current health, damage, reward, and spawn-rate multipliers."""
         time_steps = self.active_time_steps
         result: dict[str, LargeNumber] = {}
         for stat in _STATS:
@@ -147,19 +149,24 @@ class ScalingSystem:
         return result
 
     def scaled_enemy_stats(
-        self, base_health: LargeNumber | int | float | str, base_damage: LargeNumber | int | float | str
+        self,
+        base_health: LargeNumber | int | float | str,
+        base_damage: LargeNumber | int | float | str,
+        base_reward: LargeNumber | int | float | str = 1,
     ) -> dict[str, LargeNumber]:
-        """Scale combat values and include the spawn-rate multiplier."""
-        if isinstance(base_health, bool) or isinstance(base_damage, bool):
-            raise ValueError("Enemy health and damage must be numeric values")
+        """Scale combat/reward values and include the spawn-rate multiplier."""
+        if any(isinstance(value, bool) for value in (base_health, base_damage, base_reward)):
+            raise ValueError("Enemy health, damage, and reward must be numeric values")
         health = LargeNumber(base_health)
         damage = LargeNumber(base_damage)
-        if health <= 0 or damage < 0:
-            raise ValueError("Enemy base health must be positive and damage non-negative")
+        reward = LargeNumber(base_reward)
+        if health <= 0 or damage < 0 or reward < 0:
+            raise ValueError("Enemy base health must be positive; damage/reward non-negative")
         multipliers = self.multipliers()
         return {
             "health": health * multipliers["health"],
             "damage": damage * multipliers["damage"],
+            "reward": reward * multipliers["reward"],
             "spawn_rate_multiplier": multipliers["spawn_rate"],
         }
 

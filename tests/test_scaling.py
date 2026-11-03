@@ -16,9 +16,11 @@ class ScalingSystemTests(unittest.TestCase):
             time_health_multiplier=2,
             time_damage_multiplier="1.5",
             time_spawn_rate_multiplier=3,
+            time_reward_multiplier=2,
             difficulty_health_multiplier=4,
             difficulty_damage_multiplier=2,
             difficulty_spawn_rate_multiplier=5,
+            difficulty_reward_multiplier=3,
         )
 
     def test_active_time_and_explicit_difficulty_scale_independently(self) -> None:
@@ -35,11 +37,13 @@ class ScalingSystemTests(unittest.TestCase):
             "health": LargeNumber(8),
             "damage": LargeNumber(3),
             "spawn_rate": LargeNumber(15),
+            "reward": LargeNumber(6),
         })
 
         stats = scaling.scaled_enemy_stats(100, 10)
         self.assertEqual(stats["health"], 800)
         self.assertEqual(stats["damage"], 30)
+        self.assertEqual(stats["reward"], 6)
         self.assertEqual(stats["spawn_rate_multiplier"], 15)
         self.assertAlmostEqual(scaling.spawn_delay_seconds(3), 0.2)
 
@@ -70,6 +74,7 @@ class ScalingSystemTests(unittest.TestCase):
         self.assertEqual(stats["health"], LargeNumber("7e20000"))
         self.assertEqual(stats["damage"], LargeNumber("1.1e20001"))
         self.assertEqual(stats["spawn_rate_multiplier"], LargeNumber("1e20000"))
+        self.assertEqual(stats["reward"], LargeNumber("1.1025"))
         self.assertEqual(scaling.spawn_delay_seconds(1), scaling.config.minimum_spawn_delay_seconds)
 
     def test_versioned_serialization_round_trip_preserves_config_and_state(self) -> None:

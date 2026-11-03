@@ -4,6 +4,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
+from game.utils.large_number import LargeNumber
+
 
 @dataclass
 class Enemy:
@@ -15,11 +17,17 @@ class Enemy:
     dx: float = 1.0
     dy: float = 0.0
     angle: float = 0.0
-    health: int = 10
-    max_health: int = 10
+    health: LargeNumber | int | str = 10
+    max_health: LargeNumber | int | str = 10
+    damage: LargeNumber | int | float | str = 10
+    reward_multiplier: LargeNumber | int | float | str = 1
 
     def __post_init__(self) -> None:
         """Normalize direction vector after initialization."""
+        self.health = LargeNumber(self.health)
+        self.max_health = LargeNumber(self.max_health)
+        self.damage = LargeNumber(self.damage)
+        self.reward_multiplier = LargeNumber(self.reward_multiplier)
         self._normalize_direction()
 
     def _normalize_direction(self) -> None:
@@ -65,9 +73,12 @@ class Enemy:
         self.dy = math.sin(new_angle)
         self.angle = math.atan2(self.dy, self.dx)
 
-    def take_damage(self, damage: int) -> int:
+    def take_damage(self, damage: LargeNumber | int | float | str) -> LargeNumber:
         """Apply damage to the enemy. Returns the actual damage dealt."""
-        actual_damage = min(damage, self.health)
+        amount = LargeNumber(damage)
+        if amount < 0:
+            raise ValueError("Damage must be non-negative")
+        actual_damage = min(amount, self.health)
         self.health -= actual_damage
         return actual_damage
 
@@ -93,4 +104,6 @@ class Enemy:
             angle=0.0,
             health=stats["max_health"],
             max_health=stats["max_health"],
+            damage=stats.get("damage", 10),
+            reward_multiplier=stats.get("reward_multiplier", 1),
         )

@@ -4,6 +4,7 @@ import math
 from dataclasses import dataclass, field
 from typing import List, Any
 
+from game.utils.large_number import LargeNumber
 
 @dataclass
 class Projectile:
@@ -15,10 +16,13 @@ class Projectile:
     dy: float = 0.0
     angle: float = 0.0
     speed: float = 3.0
-    damage: int = 2
+    damage: LargeNumber | int | float | str = 2
     piercing: int = 0
     hit_enemies: List[Any] = field(default_factory=list)
     bullet_type: str = "rapid_fire"
+
+    def __post_init__(self) -> None:
+        self.damage = LargeNumber(self.damage)
 
     @classmethod
     def create_from_player(
@@ -28,7 +32,7 @@ class Projectile:
         angle: float,
         speed_modifier: float,
         base_speed: float,
-        damage: int = 2,
+        damage: LargeNumber | int | float | str = 2,
         piercing: int = 0,
         bullet_type: str = "rapid_fire",
     ) -> "Projectile":
@@ -64,12 +68,12 @@ class Projectile:
         distance_y = abs(self.y - player_y)
         return distance_x > despawn_distance or distance_y > despawn_distance
 
-    def take_damage(self, enemy_health: int) -> tuple[int, int]:
+    def take_damage(self, enemy_health: LargeNumber | int | float | str) -> tuple[LargeNumber, bool]:
         """
         Apply damage to an enemy.
         Returns (damage_dealt, remaining_piercing).
         """
-        damage_dealt = min(self.damage, enemy_health)
+        damage_dealt = min(self.damage, LargeNumber(enemy_health))
         self.damage -= damage_dealt
         self.piercing -= 1
         return damage_dealt, self.piercing <= 0

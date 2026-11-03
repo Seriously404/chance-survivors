@@ -21,6 +21,7 @@ from game.systems.items import create_initial_inventory, player_bonuses, spawnab
 from game.systems.progression import PlayerProgress, award_enemy_kill
 from game.systems.scoring import RunScore
 from game.systems.weapons import projectile_for_weapon
+from game.utils.large_number import LargeNumber
 
 
 class RuntimeProbe:
@@ -45,13 +46,14 @@ class RuntimeProbe:
 
     def status(self) -> dict[str, Any]:
         return {
-            "player":{"x":self.player.x,"y":self.player.y,"health":self.player.health,
-                      "max_health":self.player.max_health,"angle":self.player.angle},
+            "player":{"x":self.player.x,"y":self.player.y,"health":str(self.player.health),
+                      "max_health":str(self.player.max_health),"angle":self.player.angle},
             "inventory":{"count":len(self.inventory.items),"active_slots":self.inventory.active_slots,
                           "bonuses":player_bonuses(self.inventory)},
-            "bullets":[{"type":b.bullet_type,"damage":b.damage,"piercing":b.piercing} for b in self.bullets],
-            "enemies":[{"type":e.type,"x":e.x,"y":e.y,"health":e.health} for e in self.enemies],
-            "currency":self.wallet.amounts,"score":str(self.score.total_score),"level":self.progress.level,
+            "bullets":[{"type":b.bullet_type,"damage":str(b.damage),"piercing":b.piercing} for b in self.bullets],
+            "enemies":[{"type":e.type,"x":e.x,"y":e.y,"health":str(e.health)} for e in self.enemies],
+            "currency":{name: str(amount) for name, amount in self.wallet.amounts.items()},
+            "score":str(self.score.total_score),"level":self.progress.level,
             "experience":self.progress.current_exp,"elapsed":self.elapsed,
         }
 
@@ -64,9 +66,9 @@ class RuntimeProbe:
             stats=enemy_types[kind]
             enemy=Enemy.create_from_type(kind,stats,float(command.get("x",0.08)),float(command.get("y",0)))
             if "health" in command:
-                enemy.health=max(1,int(command["health"])); enemy.max_health=enemy.health
+                enemy.health=LargeNumber(max(1,int(command["health"]))); enemy.max_health=enemy.health
             self.enemies.append(enemy)
-            return {"enemy_index":len(self.enemies)-1,"health":enemy.health}
+            return {"enemy_index":len(self.enemies)-1,"health":str(enemy.health)}
         if action=="fire":
             slot=int(command.get("slot",0))
             if slot not in (0,1): raise ValueError("weapon slot must be 0 or 1")
@@ -77,7 +79,7 @@ class RuntimeProbe:
                 self.player,float(command.get("angle",0)),item,slot,self.bullet_types,bullet_base_speed,
                 player_bonuses(self.inventory)["damage_pct"])
             self.bullets.append(projectile); self.weapon_cooldowns[slot]=cooldown
-            return {"fired":True,"type":projectile.bullet_type,"damage":projectile.damage,
+            return {"fired":True,"type":projectile.bullet_type,"damage":str(projectile.damage),
                     "piercing":projectile.piercing,"cooldown":cooldown,"automatic":automatic}
         if action=="step":
             dt=float(command.get("dt",1/60))
@@ -88,9 +90,12 @@ class RuntimeProbe:
             self.bullets,self.enemies=self.collision.check_bullet_enemy_collisions(
                 self.bullets,self.enemies,enemy_types)
             killed=len(self.collision.killed_enemies)
-            for _ in range(killed):
-                self.score.award(10)
-                self.wallet.reward_for_kill(luck=player_bonuses(self.inventory)["luck"])
+            for enemy in self.collision.killed_enemies:
+                self.score.award(LargeNumber(10) * enemy.reward_multiplier)
+                self.wallet.reward_for_kill(
+                    luck=player_bonuses(self.inventory)["luck"],
+                    reward_multiplier=enemy.reward_multiplier,
+                )
                 award_enemy_kill(self.progress)
             return {"killed":killed,"state":self.status()}
         if action=="move_player":
@@ -106,7 +111,7 @@ class RuntimeProbe:
             health_before=self.player.health
             self.player=self.collision.check_enemy_player_collisions(
                 self.enemies,self.player,enemy_types,player_bonuses(self.inventory)["defense"])
-            return {"damage_taken":health_before-self.player.health,"health":self.player.health}
+            return {"damage_taken":str(health_before-self.player.health),"health":str(self.player.health)}
         if action=="spawn_item":
             template=next((i for i in self._catalog if i["id"]==command.get("item_id")),None)
             if template is None: raise ValueError("Unknown catalog item_id")

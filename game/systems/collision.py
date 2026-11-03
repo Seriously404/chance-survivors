@@ -6,6 +6,7 @@ from typing import List, Tuple, Any
 from game.entities.projectile import Projectile
 from game.entities.enemy import Enemy
 from game.entities.player import Player
+from game.utils.large_number import LargeNumber
 
 
 class CollisionSystem:
@@ -159,8 +160,9 @@ class CollisionSystem:
                 continue
 
             # Apply damage and remove enemy
-            damage=enemy_types[enemy.type]["damage"]
-            player.take_damage(max(1,int(damage-max(0,defense))))
+            defense_value = max(LargeNumber(0), LargeNumber(defense))
+            damage = max(LargeNumber(1), enemy.damage - defense_value)
+            player.take_damage(damage)
             enemies.remove(enemy)
 
         return player

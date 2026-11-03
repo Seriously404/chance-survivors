@@ -24,10 +24,10 @@ class CollisionRewardTests(unittest.TestCase):
         reward_calls = 0
         reward_for_kill = probe.wallet.reward_for_kill
 
-        def count_reward(*, luck: float = 0.0):
+        def count_reward(*, luck: float = 0.0, reward_multiplier: int = 1):
             nonlocal reward_calls
             reward_calls += 1
-            return reward_for_kill(luck=luck)
+            return reward_for_kill(luck=luck, reward_multiplier=reward_multiplier)
 
         probe.wallet.reward_for_kill = count_reward
 

@@ -29,6 +29,7 @@ from game.systems.progression import PlayerProgress, award_enemy_kill
 from game.systems.scoring import RunScore
 from game.systems.items import create_initial_inventory, spawnable_items, player_bonuses
 from game.systems.weapons import projectile_for_weapon
+from game.utils.large_number import LargeNumber
 from copy import deepcopy
 
 
@@ -179,6 +180,8 @@ def main() -> None:
                     elif action.startswith("tab_"):
                         renderer.menu_tab = action[4:]
                         game_state.open_panel(renderer.menu_tab)
+                    elif action == "increase_difficulty":
+                        spawner.increase_difficulty()
                     elif action.startswith("upgrade_"):
                         renderer.upgrade_tab = action[8:]
                     elif action.startswith("select:"):
@@ -303,8 +306,10 @@ def main() -> None:
                     enemy_types,
                 )
                 for _enemy in collision_system.killed_enemies:
-                    run_score.award(10)
-                    currency, amount = wallet.reward_for_kill(luck=bonuses["luck"])
+                    run_score.award(LargeNumber(10) * _enemy.reward_multiplier)
+                    currency, amount = wallet.reward_for_kill(
+                        luck=bonuses["luck"], reward_multiplier=_enemy.reward_multiplier
+                    )
                     notifications.add(currency, amount)
                     award_enemy_kill(progress)
                 player = collision_system.check_enemy_player_collisions(
@@ -348,6 +353,8 @@ def main() -> None:
                     "weapon_cooldowns": weapon_cooldowns,
                     "ability_cooldowns": ability_cooldowns,
                     "spawn_catalog": spawn_catalog,
+                    "difficulty_level": spawner.difficulty_level,
+                    "active_scaling_time": spawner.scaling.active_time_seconds,
                 }
 
                 renderer.draw(game_state_dict)
@@ -367,7 +374,8 @@ def main() -> None:
                                "items":inventory.items,"active_slots":inventory.active_slots,"level":progress.level,
                                "experience":progress.current_exp,"next_level_exp":progress.exp_to_next_level,
                                "total_experience":progress.total_exp,"luck":bonuses["luck"],"speed":1+bonuses["speed_pct"]/100,
-                               "weapon_cooldowns":weapon_cooldowns,"ability_cooldowns":ability_cooldowns,"spawn_catalog":spawn_catalog})
+                               "weapon_cooldowns":weapon_cooldowns,"ability_cooldowns":ability_cooldowns,"spawn_catalog":spawn_catalog,
+                               "difficulty_level":spawner.difficulty_level,"active_scaling_time":spawner.scaling.active_time_seconds})
 
     finally:
         renderer.close()

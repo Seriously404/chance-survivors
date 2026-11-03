@@ -1,6 +1,7 @@
 import pygame
 
 from client.input import InputHandler
+from game.utils.large_number import LargeNumber
 
 
 class Renderer:
@@ -365,7 +366,11 @@ class Renderer:
         if max_health <= 0:
             return
 
-        health_ratio = max(0, min(1, current_health / max_health))
+        ratio = current_health / max_health
+        if isinstance(ratio, LargeNumber):
+            health_ratio = min(1.0, max(0.0, ratio.to_float()))
+        else:
+            health_ratio = max(0.0, min(1.0, ratio))
 
         background_rect = pygame.Rect(
             center_x - width / 2,
@@ -935,6 +940,9 @@ class Renderer:
                 self._draw_combo_markers(rect,item)
                 self._draw_cooldown_overlay(rect,state.get("weapon_cooldowns",[0,0])[i])
         self._button("pause", "Resume" if state.get("paused") else "Pause", (right-60,top+18),100,34)
+        self._button("increase_difficulty",
+                     f"Difficulty {state.get('difficulty_level', 0)} +",
+                     (right-75,top+58),130,32)
         self._text("Quests",(right-105,self.screen_height//2-75))
         self._text("- No active quests",(right-105,self.screen_height//2-48))
         self._text("- Quest list placeholder",(right-105,self.screen_height//2-26))
