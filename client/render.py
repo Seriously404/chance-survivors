@@ -3,12 +3,9 @@ import math
 import pygame
 
 from client.input import InputHandler
-<<<<<<< HEAD
 from game.systems.elements import ELEMENTS, element_label, normalize_element
 from game.systems.enemy_visibility import enemy_visibility_alpha
-=======
 from game.utils.large_number import LargeNumber
->>>>>>> birch/projectile-collision-effects
 
 
 class Renderer:
@@ -1937,7 +1934,9 @@ class Renderer:
                 self._draw_combo_markers(rect,item)
                 self._draw_cooldown_overlay(rect,state.get("weapon_cooldowns",[0,0])[i])
         self._button("pause", "Resume" if state.get("paused") else "Pause", (right-60,top+18),100,34)
-<<<<<<< HEAD
+        self._button("increase_difficulty",
+                     f"Difficulty {state.get('difficulty_level', 0)} +",
+                     (right-75,top+58),130,32)
         quest_checks = [
             quest for quest in state.get("quests", [])
             if quest.get("status") == "active"
@@ -1951,14 +1950,6 @@ class Renderer:
                 target = float(quest.get("target", 1.0))
                 label = f"{quest.get('name', 'Quest')}: {progress:.0f}/{target:.0f}"
                 self._text(f"- {label}", (right-170, self.screen_height//2-48 + index * 28))
-=======
-        self._button("increase_difficulty",
-                     f"Difficulty {state.get('difficulty_level', 0)} +",
-                     (right-75,top+58),130,32)
-        self._text("Quests",(right-105,self.screen_height//2-75))
-        self._text("- No active quests",(right-105,self.screen_height//2-48))
-        self._text("- Quest list placeholder",(right-105,self.screen_height//2-26))
->>>>>>> birch/projectile-collision-effects
         self._button("inventory","Inventory",(right-60,bottom-100),100,34)
         self._button("upgrades","Upgrades",(right-60,bottom-58),100,34)
         wallet=state.get("currency",{})
