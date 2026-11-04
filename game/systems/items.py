@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
 from copy import deepcopy
 import math
 from typing import Any
@@ -65,41 +64,6 @@ def create_item_catalog() -> list[dict[str, Any]]:
         items.append(inventory_item)
 
     return items
-=======
-from typing import Any
-
-from game.systems.combinations import CombinationEngine
-from game.systems.inventory import Inventory, _item
-from game.systems.item_catalog import load_item_definitions
-from game.utils.large_number import LargeNumber
-
-
-_COMBINATION_ENGINE = CombinationEngine()
-MAX_PLAYER_SPEED_MULTIPLIER = 100.0
-MIN_PLAYER_SPEED_MULTIPLIER = 0.1
-
-
-def create_item_catalog() -> list[dict[str, Any]]:
-    """Return fresh item instances built from the validated asset catalog."""
-    catalog = []
-    for definition in load_item_definitions():
-        item = _item(
-            definition["id"], definition["name"], definition["type"],
-            definition["rarity"], definition["level"], dict(definition["stats"]),
-        )
-        item.update({
-            "definition_version": 1,
-            "combination_slots": definition["combination_slots"],
-            "tags": list(definition["tags"]),
-            "behaviors": list(definition["behaviors"]),
-            "currency_preferences": dict(definition["currency_preferences"]),
-            "acquisition": dict(definition["acquisition"]),
-            "base": definition["base"],
-            "fusion_only": definition["fusion_only"],
-        })
-        catalog.append(item)
-    return catalog
->>>>>>> birch/projectile-collision-effects
 
 
 def create_initial_inventory() -> Inventory:
@@ -153,7 +117,6 @@ def item_stat(item: dict[str, Any], name: str, default: float = 0.0) -> float:
     return result
 
 
-<<<<<<< HEAD
 def player_bonuses(inventory: Inventory) -> dict[str, float]:
     """Aggregate equipped armor plus passive owned relic/misc bonuses."""
     by_id = {str(item["id"]): item for item in inventory.items}
@@ -176,6 +139,23 @@ def player_bonuses(inventory: Inventory) -> dict[str, float]:
     return result
 
 
+def player_speed_multiplier(speed: float | int | LargeNumber) -> float:
+    """Calculate player speed multiplier with clamping.
+    
+    Args:
+        speed: Speed value which can be positive, negative, or very large.
+        
+    Returns:
+        Clamped speed multiplier between 0.1 and 100.0.
+    """
+    if isinstance(speed, LargeNumber):
+        speed = speed.to_float()
+    
+    # Clamp between 0.1 and 100.0
+    multiplier = max(0.1, min(100.0, 1.0 + speed / 100.0))
+    return multiplier
+
+
 def armor_set_status(inventory: Inventory) -> list[dict[str, Any]]:
     """Return display-ready set progress and active bonuses for equipped armor."""
     by_id = {str(item["id"]): item for item in inventory.items}
@@ -184,40 +164,6 @@ def armor_set_status(inventory: Inventory) -> list[dict[str, Any]]:
         if item_id is not None
     ]
     return calculate_armor_set_status(equipped_armor, _ARMOR_SETS)
-=======
-def player_bonuses(inventory: Inventory) -> dict[str, LargeNumber]:
-    """Aggregate evaluated equipped armor plus passive owned misc items.
-
-    Supplemental misc items contribute through their base item and are not
-    counted a second time as independent passive items.
-    """
-    by_id = {str(item["id"]): item for item in inventory.items}
-    contributors = [by_id[str(item_id)] for item_id in inventory.active_slots["armor"]
-                    if item_id is not None]
-    contributors.extend(
-        item for item in inventory.items
-        if item.get("type") == "misc" and not inventory.is_combination_supplement(str(item["id"]))
-    )
-    result = {"defense": LargeNumber(0), "health": LargeNumber(0),
-              "speed_pct": LargeNumber(0), "luck": LargeNumber(0),
-              "damage_pct": LargeNumber(0)}
-    for item in contributors:
-        combined = _COMBINATION_ENGINE.evaluate_inventory(inventory, str(item["id"]))
-        for stat_name, value in combined.stats.items():
-            if stat_name in result:
-                result[stat_name] += value
-    return result
-
-
-def player_speed_multiplier(speed_bonus_pct: LargeNumber | int | float | str) -> float:
-    """Convert a large speed bonus to a bounded physics multiplier."""
-    bonus = LargeNumber(speed_bonus_pct)
-    if bonus >= (MAX_PLAYER_SPEED_MULTIPLIER - 1) * 100:
-        return MAX_PLAYER_SPEED_MULTIPLIER
-    if bonus <= (MIN_PLAYER_SPEED_MULTIPLIER - 1) * 100:
-        return MIN_PLAYER_SPEED_MULTIPLIER
-    return max(MIN_PLAYER_SPEED_MULTIPLIER, 1 + bonus.to_float() / 100)
->>>>>>> birch/projectile-collision-effects
 
 
 def spawnable_items() -> list[dict[str, Any]]:

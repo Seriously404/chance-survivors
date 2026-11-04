@@ -26,7 +26,6 @@ class CollisionRewardTests(unittest.TestCase):
         reward_calls = 0
         reward_for_enemy = probe.wallet.reward_for_enemy
 
-<<<<<<< HEAD
         def count_reward(
             currency: str,
             amount: int,
@@ -42,26 +41,15 @@ class CollisionRewardTests(unittest.TestCase):
                 luck=luck,
                 multiplier=multiplier,
             )
-=======
-        def count_reward(*, luck: float = 0.0, reward_multiplier: int = 1):
-            nonlocal reward_calls
-            reward_calls += 1
-            return reward_for_kill(luck=luck, reward_multiplier=reward_multiplier)
->>>>>>> birch/projectile-collision-effects
 
         probe.wallet.reward_for_enemy = count_reward
 
         result = probe.execute({"action": "step", "dt": 0.01})
 
         self.assertEqual(result["killed"], 1)
-<<<<<<< HEAD
         self.assertEqual(probe.score, 10)
         self.assertEqual(probe.progress.total_exp, 10)
         self.assertGreaterEqual(probe.wallet.get("Copper"), 5)
-=======
-        self.assertEqual(probe.score.total_score, 10)
-        self.assertEqual(probe.progress.total_exp, 1)
->>>>>>> birch/projectile-collision-effects
         self.assertEqual(reward_calls, 1)
         self.assertEqual(probe.enemies, [])
 

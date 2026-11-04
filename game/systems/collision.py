@@ -7,11 +7,7 @@ from game.entities.projectile import Projectile
 from game.entities.enemy_projectile import EnemyProjectile
 from game.entities.enemy import Enemy
 from game.entities.player import Player
-<<<<<<< HEAD
 from game.systems.elements import apply_elemental_damage
-=======
-from game.utils.large_number import LargeNumber
->>>>>>> birch/projectile-collision-effects
 
 
 class CollisionSystem:
@@ -230,14 +226,8 @@ class CollisionSystem:
                 continue
 
             # Apply damage and remove enemy
-<<<<<<< HEAD
             damage=getattr(enemy, "damage", enemy_types[enemy.type]["damage"])
             player.take_damage(max(1,int(damage-max(0,defense))))
-=======
-            defense_value = max(LargeNumber(0), LargeNumber(defense))
-            damage = max(LargeNumber(1), enemy.damage - defense_value)
-            player.take_damage(damage)
->>>>>>> birch/projectile-collision-effects
             enemies.remove(enemy)
 
         return player

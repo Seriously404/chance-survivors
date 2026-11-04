@@ -4,7 +4,6 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
-<<<<<<< HEAD
 from functools import lru_cache
 
 
@@ -26,9 +25,6 @@ REWARD_DEFINITION_ALIASES = {
     "ranged": "shooter",
     "shadow": "elemental-shadow",
 }
-=======
-from game.utils.large_number import LargeNumber
->>>>>>> birch/projectile-collision-effects
 
 
 @dataclass
@@ -41,7 +37,6 @@ class Enemy:
     dx: float = 1.0
     dy: float = 0.0
     angle: float = 0.0
-<<<<<<< HEAD
     health: int = 10
     max_health: int = 10
     damage: int = 10
@@ -55,19 +50,9 @@ class Enemy:
     summon_timer_seconds: float = 0.0
     ranged_attack_timer_seconds: float = 0.0
     summoner_id: int | None = None
-=======
-    health: LargeNumber | int | str = 10
-    max_health: LargeNumber | int | str = 10
-    damage: LargeNumber | int | float | str = 10
-    reward_multiplier: LargeNumber | int | float | str = 1
->>>>>>> birch/projectile-collision-effects
 
     def __post_init__(self) -> None:
         """Normalize direction vector after initialization."""
-        self.health = LargeNumber(self.health)
-        self.max_health = LargeNumber(self.max_health)
-        self.damage = LargeNumber(self.damage)
-        self.reward_multiplier = LargeNumber(self.reward_multiplier)
         self._normalize_direction()
 
     def _normalize_direction(self) -> None:
@@ -113,12 +98,9 @@ class Enemy:
         self.dy = math.sin(new_angle)
         self.angle = math.atan2(self.dy, self.dx)
 
-    def take_damage(self, damage: LargeNumber | int | float | str) -> LargeNumber:
+    def take_damage(self, damage: int) -> int:
         """Apply damage to the enemy. Returns the actual damage dealt."""
-        amount = LargeNumber(damage)
-        if amount < 0:
-            raise ValueError("Damage must be non-negative")
-        actual_damage = min(amount, self.health)
+        actual_damage = min(damage, self.health)
         self.health -= actual_damage
         return actual_damage
 
@@ -147,7 +129,6 @@ class Enemy:
             angle=0.0,
             health=stats["max_health"],
             max_health=stats["max_health"],
-<<<<<<< HEAD
             damage=int(stats.get("damage", 10)),
             speed=float(stats.get("speed", 1.0)),
             turning_speed=float(stats.get("turning_speed", 1.0)),
@@ -167,10 +148,6 @@ class Enemy:
                 if reward_definition is not None
                 else 1
             ),
-=======
-            damage=stats.get("damage", 10),
-            reward_multiplier=stats.get("reward_multiplier", 1),
->>>>>>> birch/projectile-collision-effects
         )
 
     @classmethod

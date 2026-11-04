@@ -2,9 +2,8 @@
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Iterable, List
+from typing import List, Any
 
-from game.utils.large_number import LargeNumber
 
 @dataclass
 class Projectile:
@@ -16,35 +15,16 @@ class Projectile:
     dy: float = 0.0
     angle: float = 0.0
     speed: float = 3.0
-    damage: LargeNumber | int | float | str = 2
+    damage: int = 2
     piercing: int = 0
     hit_enemies: List[Any] = field(default_factory=list)
     bullet_type: str = "rapid_fire"
-<<<<<<< HEAD
     element: str = "physical"
     # Projectile effect fields
-=======
->>>>>>> birch/projectile-collision-effects
     explosion_radius: float = 0.0
     bounces_remaining: int = 0
     homing_strength: float = 0.0
     exploded: bool = False
-<<<<<<< HEAD
-=======
-
-    def __post_init__(self) -> None:
-        self.damage = LargeNumber(self.damage)
-        if (isinstance(self.explosion_radius, bool)
-                or not isinstance(self.explosion_radius, (int, float))
-                or not math.isfinite(self.explosion_radius) or self.explosion_radius < 0):
-            raise ValueError("Projectile explosion radius must be finite and non-negative")
-        if type(self.bounces_remaining) is not int or self.bounces_remaining < 0:
-            raise ValueError("Projectile bounces_remaining must be a non-negative integer")
-        if (isinstance(self.homing_strength, bool)
-                or not isinstance(self.homing_strength, (int, float))
-                or not math.isfinite(self.homing_strength) or self.homing_strength < 0):
-            raise ValueError("Projectile homing_strength must be finite and non-negative")
->>>>>>> birch/projectile-collision-effects
 
     @classmethod
     def create_from_player(
@@ -54,16 +34,10 @@ class Projectile:
         angle: float,
         speed_modifier: float,
         base_speed: float,
-        damage: LargeNumber | int | float | str = 2,
+        damage: int = 2,
         piercing: int = 0,
         bullet_type: str = "rapid_fire",
-<<<<<<< HEAD
         element: str = "physical",
-=======
-        explosion_radius: float = 0.0,
-        bounces_remaining: int = 0,
-        homing_strength: float = 0.0,
->>>>>>> birch/projectile-collision-effects
     ) -> "Projectile":
         """Create a projectile from player position and angle."""
         direction_x = math.cos(angle)
@@ -79,47 +53,13 @@ class Projectile:
             damage=damage,
             piercing=piercing,
             bullet_type=bullet_type,
-<<<<<<< HEAD
             element=element,
-=======
-            explosion_radius=explosion_radius,
-            bounces_remaining=bounces_remaining,
-            homing_strength=homing_strength,
->>>>>>> birch/projectile-collision-effects
         )
 
     def move(self, dt: float) -> None:
         """Move the projectile by its speed and direction."""
         self.x += self.dx * self.speed * dt
         self.y += self.dy * self.speed * dt
-
-    def steer_towards(self, enemies: Iterable[Any], dt: float) -> None:
-        """Turn toward the closest living, not-yet-hit enemy."""
-        if self.homing_strength <= 0 or dt <= 0:
-            return
-        candidates = [
-            enemy for enemy in enemies
-            if enemy not in self.hit_enemies and not enemy.is_dead()
-        ]
-        if not candidates:
-            return
-        target = min(
-            candidates,
-            key=lambda enemy: (enemy.x-self.x)**2 + (enemy.y-self.y)**2,
-        )
-        dx = target.x-self.x
-        dy = target.y-self.y
-        if dx == 0 and dy == 0:
-            return
-        target_angle = math.atan2(dy, dx)
-        current_angle = math.atan2(self.dy, self.dx)
-        difference = (target_angle-current_angle+math.pi) % (2*math.pi)-math.pi
-        turn_rate = min(6.0, self.homing_strength)
-        rotation = max(-turn_rate*dt, min(turn_rate*dt, difference))
-        new_angle = current_angle+rotation
-        self.dx = math.cos(new_angle)
-        self.dy = math.sin(new_angle)
-        self.angle = new_angle
 
     def should_despawn(
         self,
@@ -132,12 +72,67 @@ class Projectile:
         distance_y = abs(self.y - player_y)
         return distance_x > despawn_distance or distance_y > despawn_distance
 
-    def take_damage(self, enemy_health: LargeNumber | int | float | str) -> tuple[LargeNumber, bool]:
+    def take_damage(self, enemy_health: int) -> tuple[int, int]:
         """
         Apply damage to an enemy.
         Returns (damage_dealt, remaining_piercing).
         """
-        damage_dealt = min(self.damage, LargeNumber(enemy_health))
+        damage_dealt = min(self.damage, enemy_health)
         self.damage -= damage_dealt
         self.piercing -= 1
         return damage_dealt, self.piercing <= 0
+
+    def steer_towards(self, enemies: List[Any], dt: float) -> None:
+        """Steer the projectile towards the nearest living unhit enemy.
+        
+        Args:
+            enemies: List of enemy objects to check.
+            dt: Delta time for steering strength.
+        """
+        import math
+        nearest = None
+        nearest_dist = float("inf")
+        for enemy in enemies:
+            if enemy.is_dead() or enemy in self.hit_enemies:
+                continue
+            dist = math.hypot(enemy.x - self.x, enemy.y - self.y)
+            if dist < nearest_dist:
+                nearest_dist = dist
+                nearest = enemy
+        
+        if nearest is None:
+            return
+        
+        angle = math.atan2(nearest.y - self.y, nearest.x - self.x)
+        blend = min(1.0, self.homing_strength * dt)
+        self.dx = self.dx * (1 - blend) + math.cos(angle) * blend
+        self.dy = self.dy * (1 - blend) + math.sin(angle) * blend
+        mag = math.hypot(self.dx, self.dy)
+        if mag > 0:
+            self.dx /= mag
+            self.dy /= mag
+
+    def detonate(self, enemies: List[Any], collision_system) -> List[Any]:
+        """Detonate explosive projectile, damaging all enemies in radius.
+        
+        Args:
+            enemies: List of enemy objects.
+            collision_system: CollisionSystem instance for distance checks.
+            
+        Returns:
+            List of enemies damaged by explosion.
+        """
+        if self.explosion_radius <= 0 or self.exploded:
+            return []
+        
+        self.exploded = True
+        damaged = []
+        for enemy in enemies:
+            if enemy in self.hit_enemies:
+                continue
+            dist = collision_system._get_distance(self.x, self.y, enemy.x, enemy.y)
+            hit_dist = (10.0 + 5.0) / collision_system.pixels_per_unit  # enemy size + bullet radius
+            if dist <= min(self.explosion_radius, hit_dist):
+                self.hit_enemies.append(enemy)
+                damaged.append(enemy)
+        return damaged
