@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "level_add_fraction": "0.1",
+  "ultimate_tier_step_multiplier": "1.1",
+  "multipliers": {
+    "common": "1",
+    "uncommon": "1.5",
+    "rare": "2.25",
+    "epic": "3.5",
+    "legendary": "6",
+    "mythical": "10",
+    "ultimate": "20"
+  }
+}

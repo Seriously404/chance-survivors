@@ -1,0 +1,552 @@
+{
+  "armor": [
+    {
+      "id": "starter-vest",
+      "name": "Copper Vest",
+      "type": "armor",
+      "rarity": "common",
+      "level": 1,
+      "armor_slot": "chestplate",
+      "stats": {
+        "defense": 2,
+        "health": 12
+      },
+      "description": "A basic vest for new survivors."
+    },
+    {
+      "id": "starter-boots",
+      "name": "Scout Boots",
+      "type": "armor",
+      "rarity": "uncommon",
+      "level": 1,
+      "armor_slot": "boots",
+      "stats": {
+        "defense": 1,
+        "speed_pct": 8
+      },
+      "description": "Light boots that increase movement speed."
+    },
+    {
+      "id": "starter-plate",
+      "name": "Iron Plate",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_slot": "pants",
+      "stats": {
+        "defense": 4,
+        "health": 20
+      },
+      "description": "A sturdy plate armor for better protection."
+    },
+    {
+      "id": "starter-hood",
+      "name": "Lucky Hood",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_slot": "headpiece",
+      "stats": {
+        "defense": 2,
+        "luck": 3
+      },
+      "description": "A hood that enhances fortune."
+    },
+    {
+      "id": "starter-gloves",
+      "name": "Swift Gloves",
+      "type": "armor",
+      "rarity": "legendary",
+      "level": 1,
+      "armor_slot": "accessory",
+      "stats": {
+        "defense": 2,
+        "speed_pct": 12
+      },
+      "description": "Legendary gloves with exceptional speed."
+    },
+    {
+      "id": "titan-plate",
+      "name": "Titan Plate",
+      "type": "armor",
+      "rarity": "uncommon",
+      "level": 1,
+      "armor_slot": "chestplate",
+      "stats": {
+        "defense": 5,
+        "health": 20
+      },
+      "description": "Heavy plate armor for tank builds."
+    },
+    {
+      "id": "starlit-hood",
+      "name": "Starlit Hood",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_slot": "headpiece",
+      "stats": {
+        "luck": 4,
+        "defense": 3
+      },
+      "description": "A hood blessed by the stars."
+    },
+    {
+      "id": "ghost-boots",
+      "name": "Ghost Boots",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_slot": "boots",
+      "stats": {
+        "speed_pct": 16,
+        "defense": 2
+      },
+      "description": "Boots that make you move like a ghost."
+    },
+    {
+      "id": "sunforge-plate",
+      "name": "Sunforge Plate",
+      "type": "armor",
+      "rarity": "legendary",
+      "level": 1,
+      "armor_slot": "chestplate",
+      "stats": {
+        "defense": 9,
+        "health": 48
+      },
+      "description": "Plate forged in solar flames."
+    },
+    {
+      "id": "gale-sandals",
+      "name": "Gale Sandals",
+      "type": "armor",
+      "rarity": "legendary",
+      "level": 1,
+      "armor_slot": "boots",
+      "stats": {
+        "speed_pct": 18,
+        "luck": 2
+      },
+      "description": "Sandals infused with wind spirits."
+    },
+    {
+      "id": "sunspire-shield",
+      "name": "Sunspire Shield",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_slot": "accessory",
+      "stats": {
+        "defense": 6,
+        "health": 24
+      },
+      "description": "A shield radiating solar energy."
+    },
+    {
+      "id": "sentinel-heart",
+      "name": "Sentinel Heart",
+      "type": "armor",
+      "rarity": "legendary",
+      "level": 1,
+      "armor_slot": "accessory",
+      "stats": {
+        "health": 60,
+        "defense": 7
+      },
+      "description": "A heart-shaped armor piece with massive health."
+    },
+    {
+      "id": "bulwark-helm",
+      "name": "Bulwark Helm",
+      "type": "armor",
+      "rarity": "uncommon",
+      "level": 1,
+      "armor_set": "bulwark",
+      "armor_slot": "headpiece",
+      "stats": {
+        "defense": 2,
+        "health": 8
+      },
+      "description": "A reinforced helm from the Bulwark set."
+    },
+    {
+      "id": "bulwark-chest",
+      "name": "Bulwark Cuirass",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "bulwark",
+      "armor_slot": "chestplate",
+      "stats": {
+        "defense": 4,
+        "health": 20
+      },
+      "description": "A heavy cuirass from the Bulwark set."
+    },
+    {
+      "id": "bulwark-greaves",
+      "name": "Bulwark Greaves",
+      "type": "armor",
+      "rarity": "uncommon",
+      "level": 1,
+      "armor_set": "bulwark",
+      "armor_slot": "pants",
+      "stats": {
+        "defense": 2,
+        "health": 12
+      },
+      "description": "Sturdy greaves from the Bulwark set."
+    },
+    {
+      "id": "bulwark-charm",
+      "name": "Bulwark Charm",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "bulwark",
+      "armor_slot": "accessory",
+      "stats": {
+        "health": 18,
+        "damage_pct": 3
+      },
+      "description": "A protective charm completing the Bulwark set."
+    },
+    {
+      "id": "windrunner-hood",
+      "name": "Windrunner Hood",
+      "type": "armor",
+      "rarity": "uncommon",
+      "level": 1,
+      "armor_set": "windrunner",
+      "armor_slot": "headpiece",
+      "stats": {
+        "luck": 2,
+        "speed_pct": 3
+      },
+      "description": "A light hood from the Windrunner set."
+    },
+    {
+      "id": "windrunner-coat",
+      "name": "Windrunner Coat",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "windrunner",
+      "armor_slot": "chestplate",
+      "stats": {
+        "speed_pct": 4,
+        "defense": 1
+      },
+      "description": "A flexible coat from the Windrunner set."
+    },
+    {
+      "id": "windrunner-boots",
+      "name": "Windrunner Boots",
+      "type": "armor",
+      "rarity": "uncommon",
+      "level": 1,
+      "armor_set": "windrunner",
+      "armor_slot": "boots",
+      "stats": {
+        "speed_pct": 5,
+        "luck": 1
+      },
+      "description": "Responsive boots from the Windrunner set."
+    },
+    {
+      "id": "windrunner-token",
+      "name": "Windrunner Token",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "windrunner",
+      "armor_slot": "accessory",
+      "stats": {
+        "crit_chance": 2,
+        "speed_pct": 2
+      },
+      "description": "A charm that completes the Windrunner set."
+    },
+    {
+      "id": "speedster-helm",
+      "name": "Speedster Helm",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "speedster",
+      "armor_slot": "headpiece",
+      "stats": {
+        "speed_pct": 5,
+        "luck": 1
+      },
+      "description": "A helmet designed for maximum speed."
+    },
+    {
+      "id": "speedster-vest",
+      "name": "Speedster Vest",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "speedster",
+      "armor_slot": "chestplate",
+      "stats": {
+        "speed_pct": 8,
+        "defense": 2
+      },
+      "description": "A lightweight vest that enhances movement."
+    },
+    {
+      "id": "speedster-boots",
+      "name": "Speedster Boots",
+      "type": "armor",
+      "rarity": "legendary",
+      "level": 1,
+      "armor_set": "speedster",
+      "armor_slot": "boots",
+      "stats": {
+        "speed_pct": 12,
+        "luck": 2
+      },
+      "description": "Boots that allow near-instant movement."
+    },
+    {
+      "id": "speedster-gloves",
+      "name": "Speedster Gloves",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "speedster",
+      "armor_slot": "accessory",
+      "stats": {
+        "speed_pct": 4,
+        "crit_chance": 3
+      },
+      "description": "Gloves that complete the speedster set."
+    },
+    {
+      "id": "tank-helm",
+      "name": "Tank Helm",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "tank",
+      "armor_slot": "headpiece",
+      "stats": {
+        "defense": 5,
+        "health": 30
+      },
+      "description": "A heavy helmet for maximum protection."
+    },
+    {
+      "id": "tank-plate",
+      "name": "Tank Plate",
+      "type": "armor",
+      "rarity": "legendary",
+      "level": 1,
+      "armor_set": "tank",
+      "armor_slot": "chestplate",
+      "stats": {
+        "defense": 10,
+        "health": 50
+      },
+      "description": "Immovable chest armor."
+    },
+    {
+      "id": "tank-leggings",
+      "name": "Tank Leggings",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "tank",
+      "armor_slot": "pants",
+      "stats": {
+        "defense": 6,
+        "health": 35
+      },
+      "description": "Heavy leg armor."
+    },
+    {
+      "id": "tank-amulet",
+      "name": "Tank Amulet",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "tank",
+      "armor_slot": "accessory",
+      "stats": {
+        "defense": 3,
+        "health": 20
+      },
+      "description": "An amulet that completes the tank set."
+    },
+    {
+      "id": "ranged-helm",
+      "name": "Ranged Helm",
+      "type": "armor",
+      "rarity": "uncommon",
+      "level": 1,
+      "armor_set": "ranged",
+      "armor_slot": "headpiece",
+      "stats": {
+        "damage_pct": 3,
+        "luck": 1
+      },
+      "description": "A helmet that enhances ranged attacks."
+    },
+    {
+      "id": "ranged-vest",
+      "name": "Ranged Vest",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "ranged",
+      "armor_slot": "chestplate",
+      "stats": {
+        "damage_pct": 5,
+        "speed_pct": 2
+      },
+      "description": "A vest optimized for mobility and damage."
+    },
+    {
+      "id": "ranged-boots",
+      "name": "Ranged Boots",
+      "type": "armor",
+      "rarity": "uncommon",
+      "level": 1,
+      "armor_set": "ranged",
+      "armor_slot": "boots",
+      "stats": {
+        "speed_pct": 4,
+        "crit_chance": 2
+      },
+      "description": "Boots for quick repositioning."
+    },
+    {
+      "id": "ranged-ring",
+      "name": "Ranged Ring",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "ranged",
+      "armor_slot": "accessory",
+      "stats": {
+        "damage_pct": 4,
+        "crit_chance": 3
+      },
+      "description": "A ring that completes the ranged set."
+    },
+    {
+      "id": "sneaky-hood",
+      "name": "Sneaky Hood",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "sneaky",
+      "armor_slot": "headpiece",
+      "stats": {
+        "luck": 4,
+        "crit_chance": 2
+      },
+      "description": "A hood that enhances stealth."
+    },
+    {
+      "id": "sneaky-robe",
+      "name": "Sneaky Robe",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "sneaky",
+      "armor_slot": "chestplate",
+      "stats": {
+        "luck": 3,
+        "crit_chance": 4
+      },
+      "description": "A robe that increases critical hits."
+    },
+    {
+      "id": "sneaky-boots",
+      "name": "Sneaky Boots",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "sneaky",
+      "armor_slot": "boots",
+      "stats": {
+        "speed_pct": 6,
+        "luck": 2
+      },
+      "description": "Silent boots for stealth builds."
+    },
+    {
+      "id": "sneaky-amulet",
+      "name": "Sneaky Amulet",
+      "type": "armor",
+      "rarity": "legendary",
+      "level": 1,
+      "armor_set": "sneaky",
+      "armor_slot": "accessory",
+      "stats": {
+        "luck": 5,
+        "crit_chance": 5
+      },
+      "description": "An amulet that completes the sneaky set."
+    },
+    {
+      "id": "elemental-helm",
+      "name": "Elemental Helm",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "elemental",
+      "armor_slot": "headpiece",
+      "stats": {
+        "damage_pct": 4,
+        "elemental_dmg": 5
+      },
+      "description": "A helm infused with elemental power."
+    },
+    {
+      "id": "elemental-robe",
+      "name": "Elemental Robe",
+      "type": "armor",
+      "rarity": "legendary",
+      "level": 1,
+      "armor_set": "elemental",
+      "armor_slot": "chestplate",
+      "stats": {
+        "damage_pct": 6,
+        "elemental_dmg": 8
+      },
+      "description": "A robe that channels elemental forces."
+    },
+    {
+      "id": "elemental-boots",
+      "name": "Elemental Boots",
+      "type": "armor",
+      "rarity": "epic",
+      "level": 1,
+      "armor_set": "elemental",
+      "armor_slot": "boots",
+      "stats": {
+        "speed_pct": 3,
+        "elemental_dmg": 4
+      },
+      "description": "Boots that enhance elemental attacks."
+    },
+    {
+      "id": "elemental-ring",
+      "name": "Elemental Ring",
+      "type": "armor",
+      "rarity": "rare",
+      "level": 1,
+      "armor_set": "elemental",
+      "armor_slot": "accessory",
+      "stats": {
+        "damage_pct": 3,
+        "elemental_dmg": 3
+      },
+      "description": "A ring that completes the elemental set."
+    }
+  ]
+}

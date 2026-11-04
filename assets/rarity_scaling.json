@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "multipliers": {
+    "common": 1.0,
+    "uncommon": 1.4,
+    "rare": 1.8,
+    "epic": 2.5,
+    "legendary": 3.5,
+    "mythical": 5.0,
+    "ultimate": 8.0
+  },
+  "ultimate_tier_growth": 1.02
+}

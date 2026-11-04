@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "sets": [
+    {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "bonuses": {
+        "2": {
+          "defense": 3,
+          "health": 20
+        },
+        "4": {
+          "defense": 5,
+          "health": 40,
+          "damage_pct": 8
+        }
+      }
+    },
+    {
+      "id": "windrunner",
+      "name": "Windrunner",
+      "bonuses": {
+        "2": {
+          "speed_pct": 8,
+          "luck": 2
+        },
+        "4": {
+          "speed_pct": 12,
+          "luck": 3
+        }
+      }
+    },
+    {
+      "id": "speedster",
+      "name": "Speedster",
+      "bonuses": {
+        "2": {
+          "speed_pct": 10,
+          "luck": 2
+        },
+        "3": {
+          "speed_pct": 18,
+          "luck": 3,
+          "crit_chance": 5
+        },
+        "4": {
+          "speed_pct": 25,
+          "luck": 5,
+          "crit_chance": 8
+        }
+      }
+    },
+    {
+      "id": "tank",
+      "name": "Tank",
+      "bonuses": {
+        "2": {
+          "defense": 8,
+          "health": 50
+        },
+        "3": {
+          "defense": 15,
+          "health": 100,
+          "damage_pct": 5
+        },
+        "4": {
+          "defense": 20,
+          "health": 150,
+          "damage_pct": 10
+        }
+      }
+    },
+    {
+      "id": "ranged",
+      "name": "Ranged",
+      "bonuses": {
+        "2": {
+          "damage_pct": 8,
+          "speed_pct": 4
+        },
+        "3": {
+          "damage_pct": 12,
+          "speed_pct": 6,
+          "crit_chance": 4
+        },
+        "4": {
+          "damage_pct": 18,
+          "speed_pct": 8,
+          "crit_chance": 7
+        }
+      }
+    },
+    {
+      "id": "sneaky",
+      "name": "Sneaky",
+      "bonuses": {
+        "2": {
+          "luck": 6,
+          "crit_chance": 5
+        },
+        "3": {
+          "luck": 9,
+          "crit_chance": 10,
+          "speed_pct": 8
+        },
+        "4": {
+          "luck": 12,
+          "crit_chance": 15,
+          "speed_pct": 12
+        }
+      }
+    },
+    {
+      "id": "elemental",
+      "name": "Elemental",
+      "bonuses": {
+        "2": {
+          "damage_pct": 8,
+          "elemental_dmg": 10
+        },
+        "3": {
+          "damage_pct": 12,
+          "elemental_dmg": 18,
+          "speed_pct": 4
+        },
+        "4": {
+          "damage_pct": 18,
+          "elemental_dmg": 28,
+          "speed_pct": 6
+        }
+      }
+    }
+  ]
+}

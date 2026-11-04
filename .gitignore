@@ -22,6 +22,12 @@ build/
 dist/
 *.egg-info/
 
+# Local game/server databases
+/data/run_save.json
+/data/leaderboard.db
+game.db
+*.db
+
 # IDE settings
 .vscode/
 .idea/

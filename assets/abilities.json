@@ -1,0 +1,199 @@
+{
+  "abilities": [
+    {
+      "id": "starter-charm",
+      "name": "Lucky Charm",
+      "type": "ability",
+      "rarity": "rare",
+      "level": 1,
+      "stats": {
+        "luck": 2,
+        "cooldown": 8,
+        "cast_type": "nova",
+        "cast_damage": 12,
+        "cast_radius": 0.35,
+        "element": "arcane"
+      },
+      "description": "A charm that creates an arcane nova around the caster."
+    },
+    {
+      "id": "starter-core",
+      "name": "Vitality Core",
+      "type": "ability",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "health": 10,
+        "cooldown": 12,
+        "cast_type": "heal",
+        "heal_amount": 25
+      },
+      "description": "A core ability that heals allies."
+    },
+    {
+      "id": "ember-wand",
+      "name": "Ember Wand",
+      "type": "ability",
+      "rarity": "uncommon",
+      "level": 1,
+      "stats": {
+        "cooldown": 8,
+        "damage_pct": 12,
+        "burn": 2,
+        "element": "fire"
+      },
+      "description": "A wand that casts fire spells with burn effects."
+    },
+    {
+      "id": "warding-sigil",
+      "name": "Warding Sigil",
+      "type": "ability",
+      "rarity": "rare",
+      "level": 1,
+      "stats": {
+        "cooldown": 10,
+        "shield": 8,
+        "luck": 1,
+        "element": "light"
+      },
+      "description": "A sigil that creates a protective ward."
+    },
+    {
+      "id": "void-bloom",
+      "name": "Void Bloom",
+      "type": "ability",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "cooldown": 12,
+        "damage_pct": 18,
+        "crit_chance": 4,
+        "element": "shadow"
+      },
+      "description": "A void ability that increases critical chance."
+    },
+    {
+      "id": "glass-cascade",
+      "name": "Glass Cascade",
+      "type": "ability",
+      "rarity": "rare",
+      "level": 1,
+      "stats": {
+        "cooldown": 9,
+        "damage_pct": 11,
+        "luck": 2,
+        "cast_type": "projectile",
+        "cast_damage": 20,
+        "cast_speed_modifier": 2.5,
+        "element": "light"
+      },
+      "description": "A light projectile ability with luck enhancement."
+    },
+    {
+      "id": "cinder-ward",
+      "name": "Cinder Ward",
+      "type": "ability",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "cooldown": 11,
+        "health": 18,
+        "defense": 2,
+        "cast_type": "nova",
+        "cast_damage": 30,
+        "cast_radius": 0.5,
+        "element": "fire"
+      },
+      "description": "A fire nova that also provides defensive benefits."
+    },
+    {
+      "id": "frost-lantern",
+      "name": "Frost Lantern",
+      "type": "ability",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "cooldown": 9,
+        "damage_pct": 14,
+        "luck": 3,
+        "element": "frost"
+      },
+      "description": "A frost ability with luck bonuses."
+    },
+    {
+      "id": "nova-blast",
+      "name": "Nova Blast",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "cooldown": 5,
+        "cast_type": "nova",
+        "cast_damage": 8,
+        "cast_radius": 0.25,
+        "element": "physical"
+      },
+      "description": "A basic nova ability for beginners."
+    },
+    {
+      "id": "healing-light",
+      "name": "Healing Light",
+      "type": "ability",
+      "rarity": "uncommon",
+      "level": 1,
+      "stats": {
+        "cooldown": 10,
+        "cast_type": "heal",
+        "heal_amount": 15,
+        "element": "light"
+      },
+      "description": "A light-based healing ability."
+    },
+    {
+      "id": "sentinel-summon",
+      "name": "Sentinel Summon",
+      "type": "ability",
+      "rarity": "legendary",
+      "level": 1,
+      "stats": {
+        "cooldown": 15,
+        "cast_type": "summon",
+        "summon_duration": 12,
+        "summon_health": 50,
+        "summon_damage": 15,
+        "element": "light"
+      },
+      "description": "Summons a sentinel ally that fights alongside you."
+    },
+    {
+      "id": "turret-deploy",
+      "name": "Turret Deploy",
+      "type": "ability",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "cooldown": 18,
+        "cast_type": "summon",
+        "summon_duration": 10,
+        "summon_health": 30,
+        "summon_damage": 20,
+        "element": "arcane"
+      },
+      "description": "Deploys an automated turret that attacks enemies."
+    },
+    {
+      "id": "blink-step",
+      "name": "Blink Step",
+      "type": "ability",
+      "rarity": "rare",
+      "level": 1,
+      "stats": {
+        "cooldown": 6,
+        "cast_type": "teleport",
+        "teleport_range": 5,
+        "element": "shadow"
+      },
+      "description": "Teleports the caster short distance with shadow magic."
+    }
+  ]
+}
