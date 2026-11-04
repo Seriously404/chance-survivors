@@ -8,6 +8,7 @@ import math
 from decimal import Decimal, localcontext
 from typing import Any
 from game.systems.numbers import LargeNumber
+from game.utils.large_number import LargeNumber as CombatNumber
 
 from .game_definitions import load_quests
 
@@ -25,6 +26,7 @@ class Quest:
     condition: str
     target: float
     enemy_type: str | None = None
+    element: str | None = None
     restrictions: list[str] = field(default_factory=list)
     forbidden_item_tags: list[str] = field(default_factory=list)
     progress: float = 0.0
@@ -51,6 +53,7 @@ class Quest:
             "condition": self.condition,
             "target": float(self.target),
             "enemy_type": self.enemy_type,
+            "element": self.element,
             "restrictions": list(self.restrictions),
             "forbidden_item_tags": list(self.forbidden_item_tags),
             "progress": float(self.progress),
@@ -123,6 +126,7 @@ class QuestManager:
             condition=str(blueprint["condition"]),
             target=float(blueprint["target"]),
             enemy_type=blueprint.get("enemy_type"),
+            element=blueprint.get("element"),
             restrictions=list(blueprint.get("restrictions", [])),
             forbidden_item_tags=list(blueprint.get("forbidden_item_tags", [])),
             reward_power=float(blueprint.get("reward_power", 1.0)),
@@ -132,12 +136,12 @@ class QuestManager:
     def register_level(self, level: int) -> None:
         self.level = max(1, int(level))
         self._sync_unlocked_quests()
-        for quest in self.active_quests:
+        for quest in list(self.active_quests):
             if quest.condition == "level_reached":
                 quest.progress = float(self.level)
                 self._advance_quest(quest)
 
-    def register_kill(self, enemy_type: str | None = None) -> None:
+    def register_kill(self, enemy_type: str | None = None, *, has_summoned: bool = False) -> None:
         self.kills_total += 1
         if enemy_type is not None:
             self.kills_by_enemy[enemy_type] = self.kills_by_enemy.get(
@@ -147,6 +151,30 @@ class QuestManager:
                 quest.progress += 1
             elif quest.condition == "kills_enemy" and quest.enemy_type == enemy_type:
                 quest.progress += 1
+            elif (quest.condition == "kills_enemy_before_summon"
+                  and quest.enemy_type == enemy_type and not has_summoned):
+                quest.progress += 1
+            self._advance_quest(quest)
+
+    def register_event(self, condition: str) -> None:
+        """Count a completed transaction or combination on active quests."""
+        if condition not in {"bazaar_purchases", "combinations_made", "fusions_made"}:
+            raise ValueError("Unsupported quest event")
+        for quest in list(self.active_quests):
+            if quest.condition == condition:
+                quest.progress += 1
+                self._advance_quest(quest)
+
+    def register_elemental_damage(self, element: str, amount: object) -> None:
+        """Credit real post-resistance damage, capped at each quest's target."""
+        damage = CombatNumber(amount)
+        if damage <= 0 or damage.exponent < -323:
+            return
+        for quest in list(self.active_quests):
+            if quest.condition != "elemental_damage" or str(quest.element).lower() != str(element).lower():
+                continue
+            remaining = max(0.0, quest.target - quest.progress)
+            quest.progress += remaining if damage >= remaining else damage.to_float()
             self._advance_quest(quest)
 
     def register_time(self, elapsed_seconds: float) -> None:

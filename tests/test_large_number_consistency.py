@@ -45,6 +45,14 @@ class TestCurrencyWallet(unittest.TestCase):
         self.assertFalse(wallet.spend("Copper", LargeNumber(10)))
         self.assertEqual(wallet.get("Copper"), LargeNumber(5))
 
+    def test_small_spend_remains_visible_at_infinity_milestone(self):
+        wallet = CurrencyWallet()
+        wallet.add("Copper", LargeNumber("1e308"))
+        self.assertTrue(wallet.spend("Copper", LargeNumber(1)))
+        self.assertEqual(wallet.get("Copper") + LargeNumber(1),
+                         LargeNumber("1e308"))
+        self.assertLess(wallet.get("Copper"), LargeNumber("1e308"))
+
     def test_add_currency(self):
         """Can add currency to wallet."""
         wallet = CurrencyWallet()

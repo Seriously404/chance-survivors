@@ -53,9 +53,6 @@ class BazaarService:
         )
         if definition is None or definition.get("type") != "relic" or definition.get("fusion_only"):
             raise ValueError("That market item is no longer available.")
-        if self.manager.rarity_rank(definition.get("rarity", "common")) >= self.manager.rarity_rank("epic") and self.manager.elapsed_seconds < 900:
-            raise ValueError(
-                "Epic and higher market items unlock after 15 minutes.")
         cost = self.manager.catalog_price(definition)
         self._validate_purchase(wallet, inventory, item_id, cost)
         return self._add_purchase(definition, wallet, inventory, item_id, cost)

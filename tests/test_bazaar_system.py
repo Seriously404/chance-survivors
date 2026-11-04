@@ -152,7 +152,7 @@ class BazaarSystemTests(unittest.TestCase):
         self.assertEqual(after, [item['id']
                          for item in second.crate_rewards(daily)])
 
-    def test_epic_crate_rewards_wait_for_fifteen_minutes(self) -> None:
+    def test_epic_crate_rewards_depend_on_luck_not_time(self) -> None:
         catalog = [
             {'id': 'early', 'type': 'weapon', 'rarity': 'common'},
             {'id': 'late', 'type': 'weapon', 'rarity': 'epic'},
@@ -160,10 +160,9 @@ class BazaarSystemTests(unittest.TestCase):
         manager = BazaarManager(catalog, seed=3)
         crate = next(c for c in manager.crate_catalog if c.id ==
                      'mythic-crate')
-        items, weights = manager.crate_odds(crate, luck=100)
+        items, weights = manager.crate_odds(crate, luck=0)
         self.assertEqual(weights[[item['id']
                          for item in items].index('late')], 0)
-        manager.refresh_crates(900)
         items, weights = manager.crate_odds(crate, luck=100)
         self.assertGreater(weights[[item['id']
                            for item in items].index('late')], 0)
@@ -193,7 +192,7 @@ class BazaarSystemTests(unittest.TestCase):
         self.assertTrue(manager.manual_refresh_crates(1200))
         after_refresh = {crate.id for crate in manager.crates}
         self.assertNotEqual(before_refresh, after_refresh)
-        self.assertFalse(manager.manual_refresh_crates(1200))
+        self.assertTrue(manager.manual_refresh_crates(1200))
 
     def test_crate_rotation_and_manual_refresh_restore_deterministically(self) -> None:
         first = BazaarManager(seed=21)

@@ -29,6 +29,7 @@ from game.systems.items import create_initial_inventory, player_bonuses, spawnab
 from game.systems.numbers import LargeNumber
 from game.systems.progression import PlayerProgress, award_enemy_kill
 from game.systems.weapons import projectile_for_weapon
+from game.systems.score_milestone import kill_score_multiplier, score_for_kill
 
 
 enemy_types = build_enemy_roster(base_enemy_types)
@@ -53,6 +54,7 @@ class RuntimeProbe:
         self.enemies = []
         self.weapon_cooldowns = [0.0, 0.0]
         self.score = LargeNumber(0)
+        self.eligible_kills = 0
         self.elapsed = 0.0
         self._spawned = 0
         self._catalog = spawnable_items()
@@ -71,6 +73,8 @@ class RuntimeProbe:
             "enemies": [{"type": e.type, "x": e.x, "y": e.y, "health": e.health} for e in self.enemies],
             "currency": {k: v.format() for k, v in self.wallet.amounts.items()},
             "score": self.score.format(),
+            "eligible_kills": self.eligible_kills,
+            "kill_score_multiplier": kill_score_multiplier(self.eligible_kills).format(),
             "level": self.progress.level,
             "experience": self.progress.current_exp.format(),
             "elapsed": self.elapsed,
@@ -161,9 +165,8 @@ class RuntimeProbe:
             for enemy in killed_enemies:
                 if not enemy.reward_eligible:
                     continue
-                self.score = self.score + LargeNumber(10) * LargeNumber(
-                    enemy.score_multiplier
-                )
+                self.score += score_for_kill(self.eligible_kills, enemy.score_multiplier)
+                self.eligible_kills += 1
                 if enemy.currency_drop and enemy.currency_amount > 0:
                     self.wallet.reward_for_enemy(
                         enemy.currency_drop,
@@ -173,7 +176,8 @@ class RuntimeProbe:
                     )
                 else:
                     self.wallet.reward_for_kill(
-                        luck=player_bonuses(self.inventory)["luck"]
+                        luck=player_bonuses(self.inventory)["luck"],
+                        multiplier=enemy.score_multiplier,
                     )
                 award_enemy_kill(
                     self.progress,

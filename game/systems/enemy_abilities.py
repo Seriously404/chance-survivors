@@ -16,6 +16,7 @@ def update_enemy_abilities(
     player_y: float,
     *,
     pixels_per_unit: int = 200,
+    max_enemies: int | None = None,
 ) -> list[Enemy]:
     """Advance configured summoners and append capped, non-rewarding minions."""
     if not isinstance(dt, (int, float)) or not math.isfinite(dt) or dt < 0:
@@ -67,6 +68,7 @@ def update_enemy_abilities(
             summoner.summon_timer_seconds >= interval
             and len(minions) < maximum
             and spawned_this_cycle < summon_count
+            and (max_enemies is None or len(enemies) + spawned_this_cycle < max_enemies)
         ):
             summoner.summon_timer_seconds -= interval
             minions.append(
@@ -85,6 +87,7 @@ def update_enemy_abilities(
             summoner.summon_timer_seconds = float(interval)
 
         for minion in minions[-spawned_this_cycle:] if spawned_this_cycle else ():
+            summoner.has_summoned = True
             enemies.append(minion)
             spawned.append(minion)
     return spawned

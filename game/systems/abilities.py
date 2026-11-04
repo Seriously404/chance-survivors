@@ -9,10 +9,12 @@ from typing import Any
 from game.entities.enemy import Enemy
 from game.entities.player import Player
 from game.entities.projectile import Projectile
-from game.systems.elements import apply_elemental_damage, normalize_element
+from game.systems.elements import resolve_damage_components, normalize_element
 from game.systems.items import item_stat
 from game.ability_scripts.effects import Summon, teleport, ward, summon
 from game.systems.elemental_core import weakened_resistances, apply_lingering
+from game.systems.trails import trail_element
+from game.utils.large_number import LargeNumber
 
 
 @dataclass
@@ -24,6 +26,7 @@ class AbilityOutcome:
     healed: int = 0
     consumed: bool = True
     summon: Summon | None = None
+    trail_segment: tuple[tuple[float, float], tuple[float, float], str, float] | None = None
 
 
 def ability_cooldown(item: dict[str, Any]) -> float:
@@ -56,6 +59,12 @@ def cast_ability(
     if str(item.get("type", "")).lower() != "ability":
         raise ValueError("Only ability items can be cast")
     stats = item.get("stats", {})
+    damage_factor = 1.0 + max(-99.0, damage_bonus_pct) / 100.0
+    components = [
+        {"element": part["element"],
+         "damage": LargeNumber(part["damage"]) * damage_factor}
+        for part in stats.get("hybrid_damage_components", [])
+    ]
     script = stats.get("script", stats.get("cast_type", "projectile"))
     if script not in {"projectile", "nova", "heal", "teleport", "ward", "sentinel", "turret", "ember", "void", "frost", "mend_ward", "siphon", "dash", "sandevistan"}:
         raise ValueError(f"Unsupported ability script: {script!r}")
@@ -70,7 +79,15 @@ def cast_ability(
                                     time_shift=float(stats.get("time_shift_duration", 6.0)) if script == "sandevistan" else 0.0)
         return AbilityOutcome(consumed=started)
     if script == "teleport":
+        start = (player.x, player.y)
         teleport(item, player, angle)
+        element = trail_element(item.get("tags", []))
+        if element:
+            damage_stat = "trail_damage" if "trail_damage" in stats else "cast_damage"
+            damage = max(1.0, item_stat(item, damage_stat, 1))
+            damage *= 1.0 + max(-99.0, damage_bonus_pct) / 100.0
+            return AbilityOutcome(trail_segment=(
+                start, (player.x, player.y), element, damage))
         return AbilityOutcome()
     if script == "ward":
         ward(item, player)
@@ -78,9 +95,16 @@ def cast_ability(
     if script in {"sentinel", "turret"}:
         element = normalize_element(str(stats.get("element", "arcane")))
         ally = summon(item, player, element, script == "sentinel")
+        ally.damage = max(1, int(ally.damage * (
+            1.0 + max(-99.0, damage_bonus_pct) / 100.0)))
         ally.elemental_core = core
-        ally.trail_element = next((tag.split(':', 1)[1] for tag in item.get(
-            'tags', []) if tag.startswith('trail:')), None)
+        ally.heal_on_damage = bool(item.get("heal_on_damage"))
+        ally.damage_components = components
+        ally.explosion_radius = max(0.0, float(stats.get("area_radius", 0)))
+        ally.homing_strength = max(0.0, float(stats.get("homing_strength", 0)))
+        ally.piercing = max(0, int(item_stat(item, "cast_piercing", 0)))
+        ally.bounces = max(0, int(stats.get("bounce_count", 0)))
+        ally.trail_element = trail_element(item.get("tags", []))
         return AbilityOutcome(summon=ally)
 
     if script in {"heal", "mend_ward"}:
@@ -126,8 +150,8 @@ def cast_ability(
         elif script == "frost":
             projectile.piercing = max(1, projectile.piercing)
         projectile.elemental_core = core
-        projectile.trail_element = next((tag.split(':', 1)[1] for tag in item.get(
-            'tags', []) if tag.startswith('trail:')), None)
+        projectile.damage_components = components
+        projectile.trail_element = trail_element(item.get("tags", []))
         projectile.heal_on_damage = bool(item.get("heal_on_damage"))
         projectile.explosion_radius = max(
             0.0, float(stats.get("area_radius", 0)))
@@ -137,7 +161,8 @@ def cast_ability(
             0, int(stats.get("bounce_count", 0)))
         return AbilityOutcome(projectile=projectile)
 
-    radius = item_stat(item, "cast_radius", 0.5)
+    radius = max(item_stat(item, "cast_radius", 0.5),
+                 item_stat(item, "area_radius", 0))
     if radius <= 0 or not math.isfinite(radius):
         raise ValueError("Ability cast_radius must be positive and finite")
 
@@ -151,14 +176,16 @@ def cast_ability(
         if enemy_stats is None:
             raise ValueError(
                 f"Unknown enemy type for ability target: {enemy.type}")
-        effective_damage = apply_elemental_damage(
+        resolved = resolve_damage_components(
             damage,
             element,
             weakened_resistances(enemy_stats.get("resistances", {}), core)
             if core else enemy_stats.get("resistances", {}),
+            components,
         )
+        effective_damage = sum(resolved.values(), LargeNumber(0))
         health_before = enemy.health
-        enemy.take_damage(effective_damage)
+        enemy.take_damage(effective_damage, elemental_damage=resolved)
         if item.get("heal_on_damage") or script == "siphon":
             dealt = min(health_before, effective_damage)
             player.health = min(player.max_health, player.health + dealt)

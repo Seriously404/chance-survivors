@@ -179,7 +179,7 @@
       "quest_type": "side",
       "unlock_level": 9,
       "reward_pct": 16.0,
-      "condition": "kills_enemy",
+      "condition": "kills_enemy_before_summon",
       "enemy_type": "necromancer",
       "target": 5
     },

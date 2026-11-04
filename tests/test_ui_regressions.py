@@ -131,6 +131,34 @@ class UIRegressionTests(unittest.TestCase):
         self.assertAlmostEqual(r.aim_angle(
             (screen_pos[0]+10, screen_pos[1]), player.x, player.y), 0)
 
+    def test_damage_feedback_appears_and_expires(self):
+        from game.entities.enemy import Enemy
+        r = self.renderer
+        enemy = Enemy('basic', health=10, max_health=10)
+        r._draw_damage_feedback([enemy], 0, 0)
+        self.assertEqual(r._damage_feedback, [])
+        enemy.health = 6
+        r._draw_damage_feedback([enemy], 0, 0)
+        self.assertEqual(len(r._damage_feedback), 1)
+        self.assertEqual(r._damage_feedback[0]['amount'], LargeNumber(4))
+        r._frame_dt = 1.0
+        r._draw_damage_feedback([enemy], 0, 0)
+        self.assertEqual(r._damage_feedback, [])
+
+    def test_aim_telegraph_uses_combined_nova_radius(self):
+        from game.systems.inventory import _item
+        r = self.renderer
+        base = _item('nova', 'Nova', 'ability', 'common', 1,
+                     {'script': 'nova', 'cast_radius': .5})
+        supplement = _item('blast', 'Blast', 'ability', 'common', 1,
+                           {'area_radius': 1.5})
+        base['combinations'] = ['blast']
+        r.input_handler.held_abilities.add(pygame.K_1)
+        with patch('client.render.pygame.draw.circle', wraps=pygame.draw.circle) as circles:
+            r._draw_ability_aim({'items': [base, supplement],
+                                 'active_slots': {'abilities': ['nova']}}, (400, 225))
+        self.assertEqual(circles.call_args.args[3], 300)
+
     def test_new_run_equips_basic_fireball(self):
         from game.systems.items import create_initial_inventory
         inventory = create_initial_inventory()

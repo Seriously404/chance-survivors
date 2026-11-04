@@ -30,6 +30,7 @@
     },
     {
       "id": "elemental-firearm",
+      "base_types": ["ability"],
       "base_tags": ["elemental"],
       "supplement_types": ["weapon"],
       "add_tags": ["hybrid_damage"],

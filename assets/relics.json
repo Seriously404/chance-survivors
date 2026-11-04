@@ -11,7 +11,7 @@
         "crit_chance": 1,
         "score_bonus_pct": 1.5
       },
-      "description": "A small charm that quietly heightens fortune every time you cast."
+      "description": "Increases luck while owned."
     },
     {
       "id": "monkeys-paw",
@@ -25,7 +25,7 @@
         "speed_pct": 4,
         "crit_chance": 2
       },
-      "description": "Randomized blessings and penalties, all wrapped in a tremble of luck."
+      "description": "Increases luck, damage and movement speed while owned."
     },
     {
       "id": "echo-prism",
@@ -38,7 +38,7 @@
         "crit_chance": 3,
         "score_bonus_pct": 2
       },
-      "description": "Shards that repeat the last hit with a little more force."
+      "description": "Increases damage while owned."
     },
     {
       "id": "iron-nest",
@@ -64,7 +64,7 @@
         "luck": 4,
         "healing_pct": 5
       },
-      "description": "A fragile but radiant relic that rewards good fortune with resilience."
+      "description": "Increases maximum health and luck while owned."
     },
     {
       "id": "void-bell",
@@ -78,7 +78,7 @@
         "crit_chance": 4,
         "score_bonus_pct": 4
       },
-      "description": "A resonant relic that magnifies destructive momentum and luck alike."
+      "description": "Increases damage and luck while owned."
     },
     {
       "id": "lucky-box-legendary",
@@ -152,7 +152,8 @@
         "damage_pct": 10,
         "luck": 2
       },
-      "description": "An amulet that causes projectiles to ricochet."
+      "tags": ["ricochet"],
+      "description": "Increases damage and luck while owned. Combine with a weapon or projectile ability to make its shots bounce to another enemy."
     },
     {
       "id": "sentinel-heart-relic",

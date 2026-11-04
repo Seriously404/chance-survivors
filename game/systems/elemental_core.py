@@ -69,7 +69,7 @@ def tick_lingering(enemies, dt, enemy_types):
                     "resistances", {}).get(element, 0)
                 damage = damage_per_second * active * \
                     max(0.0, 1.0 - float(resistance))
-                enemy.take_damage(damage)
+                enemy.take_damage(damage, elemental_damage={element: damage})
             if seconds > dt:
                 remaining[element] = (seconds - dt, damage_per_second)
         enemy.elemental_lingering = remaining

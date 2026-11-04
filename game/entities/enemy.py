@@ -51,6 +51,8 @@ class Enemy:
     summon_timer_seconds: float = 0.0
     ranged_attack_timer_seconds: float = 0.0
     summoner_id: int | None = None
+    has_summoned: bool = False
+    damage_events: dict[str, LargeNumber] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         """Normalize direction vector after initialization."""
@@ -100,10 +102,20 @@ class Enemy:
         self.dy = math.sin(new_angle)
         self.angle = math.atan2(self.dy, self.dx)
 
-    def take_damage(self, damage: int) -> int:
+    def take_damage(self, damage: int, *, elemental_damage=None) -> int:
         """Apply damage to the enemy. Returns the actual damage dealt."""
         actual_damage = min(damage, self.health)
         self.health -= actual_damage
+        if elemental_damage and actual_damage > 0:
+            components = {str(element).lower(): LargeNumber(amount)
+                          for element, amount in elemental_damage.items()
+                          if LargeNumber(amount) > 0}
+            total = sum(components.values(), LargeNumber(0))
+            if total > 0:
+                for element, amount in components.items():
+                    dealt = LargeNumber(actual_damage) * amount / total
+                    self.damage_events[element] = self.damage_events.get(
+                        element, LargeNumber(0)) + dealt
         return actual_damage
 
     def is_dead(self) -> bool:

@@ -7,7 +7,7 @@ from game.entities.projectile import Projectile
 from game.entities.enemy_projectile import EnemyProjectile
 from game.entities.enemy import Enemy
 from game.entities.player import Player
-from game.systems.elements import apply_elemental_damage
+from game.systems.elements import resolve_damage_components
 from game.systems.elemental_core import weakened_resistances, apply_lingering
 from game.utils.large_number import LargeNumber
 
@@ -132,15 +132,17 @@ class CollisionSystem:
                 bullet.hit_enemies.append(enemy)
 
                 # Apply damage with elemental resistances.
-                effective_damage = apply_elemental_damage(
+                resolved = resolve_damage_components(
                     bullet.damage,
                     bullet.element,
                     weakened_resistances(enemy_types[enemy.type].get(
                         "resistances", {}), bullet.elemental_core)
                     if bullet.elemental_core else enemy_types[enemy.type].get("resistances", {}),
+                    bullet.damage_components,
                 )
+                effective_damage = sum(resolved.values(), LargeNumber(0))
                 health_before = enemy.health
-                enemy.take_damage(effective_damage)
+                enemy.take_damage(effective_damage, elemental_damage=resolved)
                 if player is not None and bullet.heal_on_damage:
                     dealt = min(LargeNumber(health_before),
                                 LargeNumber(effective_damage))
@@ -170,14 +172,22 @@ class CollisionSystem:
                             impact_x, impact_y, other_enemy.x, other_enemy.y)
                         if distance <= bullet.explosion_radius:
                             bullet.hit_enemies.append(other_enemy)
-                            effective_damage = apply_elemental_damage(
+                            resolved = resolve_damage_components(
                                 bullet.damage,
                                 bullet.element,
-                                enemy_types[other_enemy.type].get(
-                                    "resistances", {}),
+                                weakened_resistances(
+                                    enemy_types[other_enemy.type].get("resistances", {}),
+                                    bullet.elemental_core,
+                                ) if bullet.elemental_core else
+                                enemy_types[other_enemy.type].get("resistances", {}),
+                                bullet.damage_components,
                             )
+                            effective_damage = sum(resolved.values(), LargeNumber(0))
                             health_before = other_enemy.health
-                            other_enemy.take_damage(effective_damage)
+                            other_enemy.take_damage(effective_damage, elemental_damage=resolved)
+                            if bullet.elemental_core:
+                                apply_lingering(other_enemy, bullet.damage,
+                                                bullet.elemental_core)
                             if player is not None and bullet.heal_on_damage:
                                 dealt = min(LargeNumber(health_before),
                                             LargeNumber(effective_damage))
@@ -187,14 +197,34 @@ class CollisionSystem:
                                 enemies_to_remove.add(k)
                                 self.killed_enemies.append(other_enemy)
 
+                # A bounce changes direction at the impact point and continues
+                # on the next frame; the old swept path must not hit again.
+                if bullet.bounces_remaining > 0:
+                    progress = along_path((j, enemy))
+                    impact_x, impact_y = start_x + dx * progress, start_y + dy * progress
+                    target = min(
+                        (other for k, other in enumerate(enemies)
+                         if k not in enemies_to_remove
+                         and other not in bullet.hit_enemies
+                         and not other.is_dead()),
+                        key=lambda other: self._get_distance(
+                            impact_x, impact_y, other.x, other.y),
+                        default=None,
+                    )
+                    if target is not None:
+                        bullet.bounces_remaining -= 1
+                        bullet.x, bullet.y = impact_x, impact_y
+                        bullet.previous_x, bullet.previous_y = impact_x, impact_y
+                        bullet.angle = math.atan2(target.y - impact_y,
+                                                  target.x - impact_x)
+                        bullet.dx = math.cos(bullet.angle)
+                        bullet.dy = math.sin(bullet.angle)
+                        break
+
                 if bullet.piercing <= 0:
                     bullets_to_remove.add(i)
                     break
                 bullet.piercing -= 1
-
-                # Handle ricochet effect
-                if bullet.bounces_remaining > 0:
-                    bullet.bounces_remaining -= 1
 
                 # Handle homing effect
                 if bullet.homing_strength > 0:

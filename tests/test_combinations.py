@@ -84,6 +84,31 @@ class CombinationEngineTests(unittest.TestCase):
                      angle=0, base_speed=1, enemy_types={"test": {"resistances": {}}})
         self.assertEqual(player.health, LargeNumber(54))
 
+    def test_healing_supplement_follows_sentry_shot_to_enemy(self):
+        from game.ability_scripts.effects import update_summons
+        from game.entities.enemy import Enemy
+        from game.entities.player import Player
+        from game.systems.abilities import cast_ability
+        from game.systems.collision import CollisionSystem
+
+        inventory = Inventory([
+            item("sentry", "ability", stats={"script": "sentinel",
+                 "summon_damage": 10, "summon_duration": 5}),
+            item("heal", "ability", stats={"script": "heal"}),
+        ])
+        inventory.assign_combination("sentry", 0, "heal")
+        player = Player(health=50, max_health=100)
+        enemy = Enemy("test", x=.2, health=100, max_health=100)
+        types = {"test": {"size": 30, "resistances": {}}}
+        outcome = cast_ability(
+            effective_ability(inventory, inventory.get("sentry")), player,
+            [enemy], angle=0, base_speed=1, enemy_types=types)
+        shots = update_summons([outcome.summon], [enemy], player, .1, 1)
+        shots[0].move(.1)
+        CollisionSystem(50).check_bullet_enemy_collisions(
+            shots, [enemy], types, player)
+        self.assertEqual(player.health, LargeNumber(60))
+
     def test_generic_stats_use_additive_levels_and_both_rarities(self):
         base = item(
             "bow", "weapon", "rare", level=2,

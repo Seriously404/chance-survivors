@@ -12,6 +12,20 @@ os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 
 
 class IntroductionIntegrationTests(unittest.TestCase):
+    def test_tutorial_pages_can_be_reviewed_without_starting(self):
+        renderer = Renderer(800, 450, 200)
+        renderer.draw_introduction()
+        self.assertIn('intro_next', renderer._buttons)
+        renderer.intro_page = 1
+        renderer.draw_introduction()
+        self.assertIn('intro_prev', renderer._buttons)
+        self.assertIn('intro_next', renderer._buttons)
+        self.assertIn('start_run', renderer._buttons)
+        renderer.codex_tab = 'guide'
+        renderer.codex_page = 1
+        renderer.draw_codex([], [], [])
+        self.assertIn('codex_next', renderer._buttons)
+
     def run_sequence(self, start):
         with tempfile.TemporaryDirectory() as directory:
             save = Path(directory) / 'run.json'

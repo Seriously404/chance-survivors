@@ -47,3 +47,22 @@ def apply_elemental_damage(
     if ordinary_damage:
         return max(1, int(effective.to_float()))
     return max(LargeNumber(1), effective)
+
+
+def resolve_damage_components(base_damage, element, resistances, components=()):
+    """Resolve the separately resisted portions of a hybrid attack."""
+    from game.utils.large_number import LargeNumber
+
+    primary_element = normalize_element(element)
+    resolved = {primary_element: LargeNumber(
+        apply_elemental_damage(base_damage, element, resistances))}
+    for component in components:
+        damage = LargeNumber(component["damage"])
+        if damage <= 0:
+            continue
+        component_element = normalize_element(component.get("element"))
+        resistance = (0.0 if component_element == "physical" else
+                      float((resistances or {}).get(component_element, 0.0)))
+        resolved[component_element] = resolved.get(component_element, LargeNumber(0)) + (
+            damage * max(0.0, 1.0 - resistance))
+    return resolved

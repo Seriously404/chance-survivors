@@ -134,7 +134,6 @@ class BazaarManager:
                 cost=600,
                 bias="legendary",
                 description="A late-run crate with access to exceptional finds.",
-                unlock_seconds=600,
             ),
             BazaarCrate(
                 id="void-crate",
@@ -142,7 +141,6 @@ class BazaarManager:
                 cost=1800,
                 bias="mythical",
                 description="A deep-run gamble for rare base equipment; upgrade it to reach mythical rarity.",
-                unlock_seconds=1200,
             ),
         ]
         # Additional currency-specific boxes enter the rotating general section.
@@ -162,7 +160,6 @@ class BazaarManager:
             self.crate_catalog.append(BazaarCrate(
                 id=crate_id, name=name, cost=12, bias='rare', currency=currency,
                 description=f'A rotating mixed-equipment box purchased with {currency}.',
-                unlock_seconds=300,
             ))
         self.crates: list[BazaarCrate] = []
         self.elapsed_seconds = 0.0
@@ -188,12 +185,11 @@ class BazaarManager:
         self._select_crate_offers(elapsed_seconds)
 
     def manual_refresh_crates(self, elapsed_seconds: float) -> bool:
-        """Reroll offers once per rotation when unlocked alternatives exist."""
+        """Reroll offers whenever alternatives exist."""
         self.refresh_crates(elapsed_seconds)
         available = self.available_crates(elapsed_seconds)
         if (
             len(available) <= self.MAX_CRATE_OFFERS
-            or self.last_manual_refresh_cycle == self.current_crate_cycle
         ):
             return False
         self.refresh_count += 1
@@ -205,15 +201,11 @@ class BazaarManager:
         self.refresh_crates(elapsed_seconds)
         return (
             len(self.available_crates(elapsed_seconds)) > self.MAX_CRATE_OFFERS
-            and self.last_manual_refresh_cycle != self.current_crate_cycle
         )
 
     def available_crates(self, elapsed_seconds: float) -> list[BazaarCrate]:
-        """Return crate definitions unlocked at the supplied active-run time."""
-        return [
-            crate for crate in self.crate_catalog
-            if crate.unlock_seconds <= elapsed_seconds
-        ]
+        """Return all crates; their costs and reward requirements gate access."""
+        return list(self.crate_catalog)
 
     def _select_crate_offers(self, elapsed_seconds: float) -> None:
         available = self.available_crates(elapsed_seconds)
@@ -333,9 +325,6 @@ class BazaarManager:
         weights = []
         for item in items:
             rank = self.rarity_rank(item.get("rarity", "common"))
-            if rank >= self.rarity_rank("epic") and self.elapsed_seconds < 900:
-                weights.append(0.0)
-                continue
             if luck < CRATE_LUCK_REQUIREMENTS[rank]:
                 weights.append(0.0)
                 continue
@@ -447,10 +436,10 @@ def build_extended_catalog() -> list[dict[str, Any]]:
         {"id": "moon-sigil", "name": "Moon Sigil", "type": "relic", "rarity": "legendary",
             "level": 1, "stats": {"luck": 10, "damage_pct": 12, "speed_pct": 6}},
     ]
-    # The asset is authoritative for active behavior; old shop copies must
-    # never silently replace the scripts attached to those definitions.
-    catalog = [item for item in catalog if item.get("type") != "ability"]
+    # Assets are authoritative for active behavior and relic interactions.
+    catalog = [item for item in catalog if item.get("type") not in {"ability", "relic"}]
     catalog.extend(load_abilities())
+    catalog.extend(item for item in load_relics() if item.get("type") == "relic")
     armor_definitions = load_armor()
     armor_by_id = {str(item.get("id")): item for item in armor_definitions}
     for item in catalog:

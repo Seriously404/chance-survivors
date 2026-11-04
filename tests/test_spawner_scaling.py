@@ -24,9 +24,9 @@ class SpawnerScalingTests(unittest.TestCase):
         with patch("game.systems.spawner.random.random", return_value=0), patch("game.systems.spawner.random.uniform", return_value=1):
             spawner.spawn(0, 0, enemies, elapsed_seconds=600, scaling=scaling)
         enemy = enemies[0]
-        self.assertEqual(enemy.max_health, 162)
+        self.assertEqual(enemy.max_health, 236)
         self.assertGreater(enemy.damage, stats["damage"])
-        self.assertEqual(enemy.score_multiplier, 2)
+        self.assertEqual(enemy.score_multiplier, 3)
         self.assertEqual(stats["max_health"], 100)
         spawner.reset()
         self.assertFalse(spawner.should_spawn())

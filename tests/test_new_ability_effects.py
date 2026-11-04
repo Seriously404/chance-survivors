@@ -5,6 +5,7 @@ from game.config.settings import enemy_types
 from game.entities.enemy import Enemy
 from game.entities.player import Player
 from game.systems.abilities import cast_ability
+from game.ability_scripts.effects import update_summons
 from game.systems.bazaar import BazaarManager, build_extended_catalog
 
 
@@ -26,6 +27,23 @@ class NewAbilityEffectsTests(unittest.TestCase):
         self.assertEqual(self.cast('arcane-ricochet',
                          player).projectile.bounces_remaining, 1)
 
+    def test_summon_shots_inherit_healing_and_damage_bonus(self):
+        item = {'type': 'ability', 'heal_on_damage': True, 'stats': {
+            'script': 'sentinel', 'summon_damage': 10,
+            'summon_duration': 5, 'area_radius': .4,
+            'homing_strength': 2, 'cast_piercing': 1, 'bounce_count': 1}}
+        player = Player()
+        enemy = Enemy('basic', x=1, y=0, health=100, max_health=100)
+        outcome = cast_ability(item, player, [enemy], angle=0, base_speed=1,
+                               enemy_types=enemy_types, damage_bonus_pct=50)
+        shots = update_summons([outcome.summon], [enemy], player, .1, 1)
+        self.assertEqual(shots[0].damage, 15)
+        self.assertTrue(shots[0].heal_on_damage)
+        self.assertEqual(shots[0].explosion_radius, .4)
+        self.assertEqual(shots[0].homing_strength, 2)
+        self.assertEqual(shots[0].piercing, 1)
+        self.assertEqual(shots[0].bounces_remaining, 1)
+
     def test_ward_heals_and_shields_even_at_full_health(self):
         player = Player(health=90, max_health=100)
         outcome = self.cast('menders-ward', player)
@@ -46,6 +64,21 @@ class NewAbilityEffectsTests(unittest.TestCase):
         enemy = Enemy.create_from_type('basic', enemy_types['basic'], 4, 0)
         self.cast('shadow-siphon', player, [enemy])
         self.assertEqual(player.health, health)
+
+    def test_area_supplement_expands_nova_hit_radius(self):
+        from game.systems.inventory import Inventory, _item
+        from game.systems.items import effective_ability
+        nova = _item('nova', 'Nova', 'ability', 'common', 1, {
+            'script': 'nova', 'cast_damage': 5, 'cast_radius': .2})
+        burst = _item('burst', 'Burst', 'ability', 'common', 1, {
+            'script': 'projectile', 'area_radius': .8})
+        inventory = Inventory([nova, burst])
+        inventory.assign_combination('nova', 0, 'burst')
+        enemy = Enemy('test', x=.6, health=100, max_health=100)
+        cast_ability(effective_ability(inventory, inventory.get('nova')),
+                     Player(), [enemy], angle=0, base_speed=1,
+                     enemy_types={'test': {'resistances': {}}})
+        self.assertLess(enemy.health, 100)
 
     def test_new_abilities_appear_in_their_element_crates(self):
         for crate_id, item_id in [('ember-crate', 'cinder-burst'),

@@ -11,6 +11,17 @@ from game.systems.elements import apply_elemental_damage
 
 
 class ActiveAbilityTests(unittest.TestCase):
+    def test_equipped_ability_passives_follow_equipment(self):
+        from game.systems.inventory import Inventory, _item
+        from game.systems.items import player_bonuses
+        ability = _item('luck', 'Lucky', 'ability', 'common', 1, {'luck': 2})
+        inventory = Inventory([ability])
+        self.assertEqual(player_bonuses(inventory)['luck'], 1)
+        inventory.equip('luck', 'abilities', 0)
+        self.assertEqual(player_bonuses(inventory)['luck'], 3)
+        inventory.unequip('abilities', 0)
+        self.assertEqual(player_bonuses(inventory)['luck'], 1)
+
     def test_teleport_keeps_existing_enemies(self):
         player = Player()
         enemy = Enemy("basic", x=1, y=0)

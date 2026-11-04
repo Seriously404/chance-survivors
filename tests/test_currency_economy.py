@@ -21,6 +21,27 @@ class CurrencyEconomyTests(unittest.TestCase):
         self.assertGreater(rarity_chance(self.item, 'uncommon', {
                            'Copper': 100}), rarity_chance(self.item, 'uncommon', {'Copper': 50}))
 
+    def test_luck_increases_rarity_chance(self):
+        self.assertGreater(
+            rarity_chance(self.item, 'uncommon', {'Copper': 50}, luck=10),
+            rarity_chance(self.item, 'uncommon', {'Copper': 50}, luck=0),
+        )
+
+    def test_rarity_pool_can_exceed_float_range(self):
+        self.assertEqual(rarity_chance(self.item, 'uncommon',
+                                       {'Copper': 10 ** 309}), 0.95)
+
+    def test_large_rarity_pool_spends_and_upgrades(self):
+        class Success:
+            def random(self):
+                return 0.0
+
+        self.wallet.add('Copper', LargeNumber('1e309'))
+        self.assertTrue(gamble_rarity(self.item, 'uncommon',
+                                       {'Copper': 10 ** 309}, self.wallet,
+                                       Success()))
+        self.assertEqual(self.wallet.get('Copper'), 1000)
+
     def test_gamble_spends_on_failure_and_increases_slots_on_success(self):
         class Roll:
             def __init__(self, n): self.n = n
@@ -76,18 +97,18 @@ class CurrencyEconomyTests(unittest.TestCase):
                 item, 'uncommon~rare~30', pool, self.wallet, Rolls(roll)))
             self.assertEqual(item['rarity'], expected)
 
-    def test_high_rarity_timing_and_mythical_requirement_do_not_charge(self):
-        with self.assertRaisesRegex(ValueError, '15 minutes'):
-            gamble_rarity(self.item, 'epic', {'Copper': 10}, self.wallet, random.Random(
-                1), elapsed_seconds=899, luck=100)
+    def test_high_rarity_uses_progress_not_elapsed_time(self):
         with self.assertRaisesRegex(ValueError, 'mythical'):
             gamble_rarity(self.item, 'ultimate', {'Copper': 10}, self.wallet, random.Random(
-                1), elapsed_seconds=3600, luck=100)
+                1), elapsed_seconds=0, luck=100)
         mythic = {**self.item, 'rarity': 'mythical'}
-        with self.assertRaisesRegex(ValueError, '30 minutes'):
+        with self.assertRaisesRegex(ValueError, '20 luck'):
             gamble_rarity(mythic, 'ultimate', {'Copper': 10}, self.wallet, random.Random(
-                1), elapsed_seconds=1799, luck=100)
+                1), elapsed_seconds=3600, luck=19)
         self.assertEqual(self.wallet.get('Copper'), 1000)
+        gamble_rarity(mythic, 'ultimate', {'Copper': 10}, self.wallet,
+                      random.Random(1), elapsed_seconds=0, luck=20)
+        self.assertEqual(self.wallet.get('Copper'), 990)
 
 
 if __name__ == '__main__':

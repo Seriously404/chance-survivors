@@ -22,6 +22,16 @@ RARITY_DATA_VERSION = 1
 _NUMERIC_TYPES = (LargeNumber, int, float)
 
 
+def _json_value(value: Any) -> Any:
+    if isinstance(value, LargeNumber):
+        return value.to_dict()
+    if isinstance(value, Mapping):
+        return {key: _json_value(entry) for key, entry in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_value(entry) for entry in value]
+    return value
+
+
 def _load_json(path: Path, label: str) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -140,7 +150,7 @@ class CombinedItem:
             "level": self.level,
             "ultimate_tier": self.ultimate_tier,
             "stats": {key: value.to_dict() for key, value in self.stats.items()},
-            "metadata": dict(self.metadata),
+            "metadata": _json_value(self.metadata),
             "tags": list(self.tags),
             "behaviors": list(self.behaviors),
             "component_ids": list(self.component_ids),
@@ -321,6 +331,7 @@ class CombinationEngine:
         rule_ids: list[str] = []
         seen_ids = {base_id}
         metadata: dict[str, Any] = dict(base_metadata)
+        hybrid_components: list[dict[str, Any]] = []
         base_rarity = self.rarity_multiplier(base)
 
         for supplement in supplements:
@@ -367,6 +378,17 @@ class CombinationEngine:
                 if not rule.matches(base, supplement):
                     continue
                 rule_ids.append(rule.rule_id)
+                component_stat = None
+                if rule.rule_id == "elemental-firearm":
+                    component_stat = "damage"
+                elif rule.rule_id == "firearm-element":
+                    component_stat = "cast_damage"
+                if component_stat and component_stat in supplement_stats:
+                    hybrid_components.append({
+                        "element": supplement.get("stats", {}).get(
+                            "element", "physical"),
+                        "damage": supplement_stats[component_stat] * base_rarity,
+                    })
                 tags.update(rule.add_tags)
                 behaviors.update(rule.behaviors)
                 for modifier in rule.stat_modifiers:
@@ -381,6 +403,9 @@ class CombinationEngine:
                         "amount": modifier.value,
                         "after": updated,
                     })
+
+        if hybrid_components:
+            metadata["hybrid_damage_components"] = hybrid_components
 
         # Base rarity applies to every component and custom stat effect.
         final_stats = {stat: (max(LargeNumber("0.05"), value / base_rarity)

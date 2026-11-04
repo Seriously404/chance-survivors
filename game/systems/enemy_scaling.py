@@ -41,8 +41,9 @@ class EnemyScaling:
         if elapsed_seconds < 0:
             raise ValueError("elapsed_seconds cannot be negative")
         elapsed_minutes = int(elapsed_seconds // 60)
-        late_decades = max(0, elapsed_minutes - 15) // 5
-        return Decimal("1.05") ** elapsed_minutes * (Decimal(10) ** late_decades) * Decimal("1.25") ** self.threat_level
+        # Smooth exponential growth avoids a sudden tenfold health spike every
+        # five minutes while still letting long runs reach large numbers.
+        return Decimal("1.09") ** elapsed_minutes * Decimal("1.25") ** self.threat_level
 
     def scale_stats(self, stats: dict[str, Any], elapsed_seconds: float) -> dict[str, Any]:
         """Return a scaled copy; never mutate the shared enemy configuration."""

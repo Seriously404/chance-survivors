@@ -8,6 +8,10 @@ from game.entities.player import Player
 from game.systems.collision import CollisionSystem
 from game.systems.enemy_scaling import EnemyScaling
 from game.systems.spawner import SpawnerSystem
+from game.systems.currency import CurrencyWallet
+from game.systems.progression import PlayerProgress, award_enemy_kill
+from game.systems.numbers import LargeNumber
+from game.utils.large_number import LargeNumber as CombatNumber
 
 
 class EnemyScalingTests(unittest.TestCase):
@@ -40,6 +44,27 @@ class EnemyScalingTests(unittest.TestCase):
         scaling = EnemyScaling(threat_level=20)
         self.assertLess(scaling.spawn_delay_ms(2000, 3600), 2000)
         self.assertEqual(scaling.spawn_delay_ms(2000, 10_000_000), 100)
+
+    def test_health_growth_has_no_five_minute_cliffs(self) -> None:
+        scaling = EnemyScaling()
+        for minute in (15, 20, 25, 30):
+            before = scaling.multiplier((minute - 1) * 60)
+            after = scaling.multiplier(minute * 60)
+            self.assertAlmostEqual(float(after / before), 1.09)
+
+    def test_extreme_enemy_can_be_killed_and_rewards_survive(self) -> None:
+        scaling = EnemyScaling()
+        stats = scaling.scale_stats(enemy_types['basic'], 60 * 8300)
+        enemy = Enemy.create_from_type('basic', stats, 0, 0)
+        self.assertGreater(enemy.max_health, 10 ** 308)
+        enemy.take_damage(CombatNumber('1e320'))
+        self.assertTrue(enemy.is_dead())
+        wallet = CurrencyWallet()
+        _, amount = wallet.reward_for_kill(multiplier=enemy.score_multiplier)
+        self.assertGreater(amount, LargeNumber('1e308'))
+        progress = PlayerProgress()
+        award_enemy_kill(progress, multiplier=enemy.score_multiplier)
+        self.assertGreater(progress.total_exp, LargeNumber('1e308'))
 
     def test_spawner_creates_scaled_enemy_instances(self) -> None:
         scaling = EnemyScaling(threat_level=2)

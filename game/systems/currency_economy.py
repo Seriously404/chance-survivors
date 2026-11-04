@@ -44,7 +44,7 @@ def currency_affinity(item, currency):
     return 1.5 if definition['id'] == positive else 0.5 if definition['id'] == negative else 1.0
 
 
-def rarity_chance(item, target, pool):
+def rarity_chance(item, target, pool, luck=0.0):
     if '~' in str(target):
         parts = str(target).split('~')
         if len(parts) not in (2, 3) or any(part not in RARITY_ORDER for part in parts[:2]) or RARITY_ORDER.index(parts[1]) != RARITY_ORDER.index(parts[0]) + 1:
@@ -55,8 +55,8 @@ def rarity_chance(item, target, pool):
             raise ValueError('Invalid rarity distribution.') from exc
         if not math.isfinite(upper_weight) or not 0 <= upper_weight <= 1:
             raise ValueError('Invalid rarity distribution.')
-        return (rarity_chance(item, parts[0], pool) * (1 - upper_weight)
-                + rarity_chance(item, parts[1], pool) * upper_weight)
+        return (rarity_chance(item, parts[0], pool, luck) * (1 - upper_weight)
+                + rarity_chance(item, parts[1], pool, luck) * upper_weight)
     current = str(item.get('rarity', 'common')).lower()
     target = str(target).lower()
     if current not in RARITY_ORDER or target not in RARITY_ORDER:
@@ -64,37 +64,33 @@ def rarity_chance(item, target, pool):
     steps = RARITY_ORDER.index(target) - RARITY_ORDER.index(current)
     if steps <= 0:
         raise ValueError('Choose a rarity above the current rarity.')
-    effective = 0.0
+    luck = float(luck)
+    if not math.isfinite(luck) or luck < 0:
+        raise ValueError('Luck must be finite and non-negative.')
+    # Use decimal arithmetic: a late-run wallet can exceed float's range.
+    effective = Decimal(0)
     for name, amount in pool.items():
         definition = currency_definition(name)
         if not definition or type(amount) is not int or amount < 0:
             raise ValueError(
                 'Currency pool amounts must be non-negative whole numbers.')
-        effective += amount * \
-            float(definition['value_multiplier']) * \
-            currency_affinity(item, name)
-    if not math.isfinite(effective):
-        raise ValueError('Currency pool is too large.')
+        effective += (Decimal(amount)
+                      * Decimal(str(definition['value_multiplier']))
+                      * Decimal(str(currency_affinity(item, name))))
+    effective *= Decimal(str(1 + 0.1 * math.log1p(luck)))
     # Each skipped tier compounds the required investment by four.
-    difficulty = 400.0 * (2 ** RARITY_ORDER.index(current)
-                          ) * (4 ** (steps - 1))
-    return min(0.95, effective / (effective + difficulty)) if effective else 0.0
+    difficulty = Decimal(400 * (2 ** RARITY_ORDER.index(current))
+                         * (4 ** (steps - 1)))
+    return min(0.95, float(effective / (effective + difficulty))) if effective else 0.0
 
 
 def gamble_rarity(item, target, pool, wallet, rng, *, elapsed_seconds=None, luck=None):
     selected = str(target).split('~')[:2]
     if 'ultimate' in selected and item.get('rarity') != 'mythical':
         raise ValueError('Reach mythical rarity before attempting ultimate.')
-    if elapsed_seconds is not None:
-        ranks = [RARITY_ORDER.index(name) for name in selected]
-        if max(ranks) >= RARITY_ORDER.index('epic') and elapsed_seconds < 900:
-            raise ValueError(
-                'Epic and higher upgrades unlock after 15 minutes.')
-        if 'ultimate' in selected and elapsed_seconds < 1800:
-            raise ValueError('Ultimate upgrades unlock after 30 minutes.')
-        if 'ultimate' in selected and (luck is None or luck < 20):
-            raise ValueError('Ultimate upgrades require at least 20 luck.')
-    chance = rarity_chance(item, target, pool)
+    if 'ultimate' in selected and luck is not None and luck < 20:
+        raise ValueError('Ultimate upgrades require at least 20 luck.')
+    chance = rarity_chance(item, target, pool, 0 if luck is None else luck)
     if chance <= 0:
         raise ValueError('Add currency to the pool first.')
     for currency, amount in pool.items():

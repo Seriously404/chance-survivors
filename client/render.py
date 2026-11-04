@@ -5,6 +5,7 @@ from game.systems.json_loader import load_json_asset
 import pygame
 
 from client.input import InputHandler
+from client.tutorial import INTRO_PAGES
 from game.systems.elements import ELEMENTS, element_label, normalize_element
 from game.systems.enemy_visibility import enemy_visibility_alpha
 from game.utils.large_number import LargeNumber
@@ -58,6 +59,8 @@ class Renderer:
         self.bonus_pct = 0
         self._buttons = {}
         self._item_rects = {}
+        self._hover_slots = []
+        self._tutorial_capture = False
         self._drop_targets = {}
         self._inventory_rect = None
         self._name_entry = None
@@ -94,9 +97,13 @@ class Renderer:
         self._rarity_dropdown_scroll = 0
         self._frame_dt = 1 / 60
         self._camera = None
+        self._enemy_health_seen = {}
+        self._damage_feedback = []
         self.codex_tab = 'guide'
+        self.intro_page = 0
         self.codex_page = 0
         self.codex_selected = None
+        self.codex_detail_page = 0
         self._drag_item_id = None
         self._drop_targets = {}
         self._rarity_icon_cache = {}
@@ -115,6 +122,11 @@ class Renderer:
         """
         running, shots, actions = self.input_handler.process_events(
             self.mode, self._name_entry)
+        if self._tutorial_capture and (self.input_handler.click_release is not None
+                                       or self.input_handler.drag_release is not None):
+            self.input_handler.click_release = None
+            self.input_handler.drag_release = None
+            self._tutorial_capture = False
         if self.mode == "PLAYING" and self.panel == "bazaar":
             for pos in shots:
                 self._update_economy_slider(pos, pos)
@@ -143,6 +155,13 @@ class Renderer:
         if current_size != (self.screen_width, self.screen_height):
             self.screen_width, self.screen_height = current_size
         for pos in shots:
+            tutorial_button = next((name for name in ("tutorial_skip", "tutorial_next")
+                                    if name in self._buttons and self._buttons[name].collidepoint(pos)), None)
+            if tutorial_button:
+                actions.append(tutorial_button)
+                self._tutorial_capture = self.input_handler.click_release is None
+                self.input_handler.click_release = None
+                continue
             for name, rect in self._buttons.items():
                 if rect.collidepoint(pos):
                     actions.append(name)
@@ -247,7 +266,13 @@ class Renderer:
             self.input_handler.drag_release = None
             self._drag_item_id = None
         for action in actions:
-            if action == "fusion_codex":
+            if action == "codex_detail_prev":
+                self.codex_detail_page = max(0, self.codex_detail_page - 1)
+            elif action == "codex_detail_next":
+                self.codex_detail_page += 1
+            elif action.startswith(("codex_select:", "codex_tab:")):
+                self.codex_detail_page = 0
+            elif action == "fusion_codex":
                 self.fusion_codex = not self.fusion_codex
             elif action.startswith("fusion_select:"):
                 self.fusion_recipe_id = action.split(":", 1)[1]
@@ -336,7 +361,7 @@ class Renderer:
                 self._rarity_pool = {}
             elif action.startswith("select:"):
                 self.selected_item_id = action.split(":", 1)[1]
-                if (self.panel == "upgrades" and self.menu_tab == "combination"
+                if (self.panel and self.menu_tab == "combination"
                         and self.upgrade_tab == "combination" and not dragged_this_frame):
                     item = next((entry for entry in getattr(self, "_last_state", {}).get("items", [])
                                  if str(entry.get("id")) == self.selected_item_id), None)
@@ -424,6 +449,8 @@ class Renderer:
     def reset_timer(self):
         self.start_time = pygame.time.get_ticks()
         self._camera = None
+        self._enemy_health_seen.clear()
+        self._damage_feedback.clear()
 
     # -------------------------
     # Coordinate conversion
@@ -557,6 +584,34 @@ class Renderer:
                 self.draw_health_bar(
                     rect.centerx, rect.top - 9, enemy.health, enemy.max_health)
 
+    def _draw_damage_feedback(self, enemies, camera_x, camera_y):
+        """Show short, bounded damage popups without affecting simulation."""
+        current = {}
+        for enemy in enemies:
+            key = id(enemy)
+            health = LargeNumber(enemy.health)
+            previous = self._enemy_health_seen.get(key)
+            if previous is not None and health < previous:
+                self._damage_feedback.append({
+                    "x": enemy.x, "y": enemy.y, "amount": previous - health,
+                    "remaining": 0.7,
+                })
+            current[key] = health
+        self._enemy_health_seen = current
+        self._damage_feedback = self._damage_feedback[-50:]
+        remaining = []
+        for effect in self._damage_feedback:
+            effect["remaining"] -= self._frame_dt
+            if effect["remaining"] <= 0:
+                continue
+            remaining.append(effect)
+            x, y = self.world_to_screen(effect["x"], effect["y"], camera_x, camera_y)
+            age = 0.7 - effect["remaining"]
+            label = self.font.render(str(effect["amount"]), True, (255, 225, 145))
+            label.set_alpha(max(0, min(255, int(effect["remaining"] / 0.7 * 255))))
+            self.screen.blit(label, label.get_rect(center=(int(x), int(y - 30 - age * 25))))
+        self._damage_feedback = remaining
+
     def _draw_ability_vfx(self, effects, center=None):
         center = center or (self.screen_width // 2, self.screen_height // 2)
         for effect in effects:
@@ -590,7 +645,18 @@ class Renderer:
                     if i.get("id") == slots[index]), None)
         if not item:
             return
-        from game.systems.items import item_stat
+        from game.systems.items import effective_ability, item_stat
+        if any(item.get("combinations", [])):
+            # Build a detached inventory so aiming uses the same combined stats
+            # as the cast without changing live item status.
+            from copy import deepcopy
+            from game.systems.inventory import Inventory
+            try:
+                ids = {item["id"], *(value for value in item["combinations"] if value is not None)}
+                detached = Inventory(deepcopy([entry for entry in state.get("items", []) if entry.get("id") in ids]))
+                item = effective_ability(detached, detached.get(item["id"]))
+            except (KeyError, TypeError, ValueError):
+                pass
         stats = item.get("stats", {})
         script = stats.get("script", stats.get("cast_type", "projectile"))
         origin = (int(center[0]), int(center[1]))
@@ -607,7 +673,7 @@ class Renderer:
                                  dest, (dest[0]+dx, dest[1]+dy), 2)
         elif script in ("nova", "void", "siphon"):
             pygame.draw.circle(self.screen, (255, 180, 90), origin, max(
-                1, int(item_stat(item, "cast_radius", .5)*self.pixels_per_unit)), 2)
+                1, int(max(item_stat(item, "cast_radius", .5), item_stat(item, "area_radius", 0))*self.pixels_per_unit)), 2)
         elif script in ("projectile", "ember", "frost"):
             tip = (int(origin[0]+math.cos(angle)*95),
                    int(origin[1]+math.sin(angle)*95))
@@ -846,6 +912,8 @@ class Renderer:
 
     def draw_codex(self, catalog, recipes, crates):
         self._buttons = {}
+        self._hover_slots = []
+        self._item_rects = {}
         self.screen.fill((25, 32, 30))
         tabs = [('guide', 'Guide'), ('items', 'Items'),
                 ('fusions', 'Fusions'), ('crates', 'Crates')]
@@ -854,13 +922,13 @@ class Renderer:
                          (70 + index * 145, 28), 135, 36)
         self._button('back', 'Back', (self.screen_width-65, 28), 110, 36)
         if self.codex_tab == 'guide':
-            lines = ('Move: WASD  |  Dash: Space  |  Aim and fire: Mouse',
-                     'Hold an ability key and release to cast.',
-                     'Combine items in the Combination menu for new effects.',
-                     'The Bazaar offers rotating crates, rarity upgrades and fusions.',
-                     'Crate rewards depend on luck, active run time and base rarity.')
+            self.codex_page = max(0, min(self.codex_page, len(INTRO_PAGES) - 1))
+            heading, lines = INTRO_PAGES[self.codex_page]
+            self._text(f"{heading}  ·  {self.codex_page + 1}/{len(INTRO_PAGES)}", (25, 65))
             for index, line in enumerate(lines):
                 self._text(line, (25, 90 + index * 30))
+            self._button('codex_prev', 'Previous', (95, self.screen_height-25), 130, 30)
+            self._button('codex_next', 'Next', (255, self.screen_height-25), 130, 30)
             pygame.display.flip()
             return
         entries = {'items': catalog, 'fusions': recipes,
@@ -883,6 +951,11 @@ class Renderer:
         if selected is not None and 0 <= selected < len(entries):
             entry = entries[selected]
             x, y = 350, 78
+            if self.codex_tab == 'crates':
+                self._draw_codex_crate_details(entry, x, y)
+                self._draw_item_tooltip({})
+                pygame.display.flip()
+                return
             self._text(entry.get('name', 'Item'), (x, y))
             y += 25
             lines = [entry.get('description', '')]
@@ -892,12 +965,6 @@ class Renderer:
             elif self.codex_tab == 'fusions':
                 lines += ['Requires: ' + ', '.join(entry.get('required_elements') or entry.get('required_types', [])),
                           f"Unlock level: {entry.get('unlock_level', 1)}"]
-            else:
-                lines += [f"Cost: {', '.join(str(v)+' '+k for k, v in entry.get('costs', {}).items())}",
-                          f"Unlock: {entry.get('unlock_seconds', 0):g}s  |  Base bias: {entry.get('bias', '')}",
-                          'Current preview: luck 1; odds change with luck and time.']
-                lines += [f"{name}: {chance*100:.1f}%" for name,
-                          chance in entry.get('rewards', [])[:8]]
             max_width = self.screen_width-x-20
             for line in lines:
                 words = str(line).split()
@@ -915,6 +982,81 @@ class Renderer:
                     y += 24
         pygame.display.flip()
 
+    def _draw_codex_crate_details(self, entry, x, y):
+        """Paginate complete crate descriptions and the exact luck-one reward odds."""
+        right = self.screen_width - 18
+        width = right - x
+        rows = []
+
+        def add_wrapped(text):
+            line = ""
+            for word in str(text).split():
+                while word and self.font.size(word)[0] > width - 8:
+                    if line:
+                        rows.append((line, None))
+                        line = ""
+                    end = len(word)
+                    while end > 1 and self.font.size(word[:end])[0] > width - 8:
+                        end -= 1
+                    rows.append((word[:end], None))
+                    word = word[end:]
+                candidate = f"{line} {word}".strip()
+                if line and self.font.size(candidate)[0] > width - 8:
+                    rows.append((line, None))
+                    line = word
+                else:
+                    line = candidate
+            if line:
+                rows.append((line, None))
+
+        add_wrapped(entry.get('name', 'Crate'))
+        add_wrapped(entry.get('description', ''))
+        add_wrapped("Cost: " + ", ".join(f"{value} {name}" for name, value
+                                         in entry.get('costs', {}).items()))
+        add_wrapped(f"Bias: {entry.get('bias', 'common')}. Availability rotates in the Bazaar.")
+        add_wrapped("Preview at luck 1; odds change with luck. Hover rewards for details.")
+        rewards = entry.get('rewards', [])
+        if not rewards:
+            add_wrapped("No rewards available.")
+        for reward in rewards:
+            if isinstance(reward, dict):
+                item = reward
+                chance = reward.get('chance', 0)
+            else:
+                name, chance = reward
+                item = {'name': name, 'type': 'item', 'rarity': 'common'}
+            percentage = f"{chance * 100:.3g}%" if chance else "0%"
+            rows.append(((str(item.get('name', 'Item')), percentage), item))
+
+        row_height = 24
+        visible = max(1, (self.screen_height - y - 60) // row_height)
+        pages = max(1, (len(rows) + visible - 1) // visible)
+        self.codex_detail_page = max(0, min(self.codex_detail_page, pages - 1))
+        clip = pygame.Rect(x, y, width, visible * row_height)
+        prior_clip = self.screen.get_clip()
+        self.screen.set_clip(clip)
+        start = self.codex_detail_page * visible
+        for index, (label, item) in enumerate(rows[start:start + visible]):
+            line_y = y + index * row_height
+            if item:
+                icon = pygame.Rect(x, line_y, 20, 20)
+                self._draw_rarity_icon(item, icon)
+                self._register_item_hover(pygame.Rect(x, line_y, width, 22), item)
+                name, percentage = label
+                max_label_width = width - 35 - self.font.size(percentage)[0]
+                truncated = False
+                while name and self.font.size(name + ('…' if truncated else ''))[0] > max_label_width:
+                    name, truncated = name[:-1], True
+                self._text(name + ('…' if truncated else ''), (x + 25, line_y + 2))
+                self._text(percentage, (right - self.font.size(percentage)[0] - 3, line_y + 2))
+            else:
+                self._text(label, (x, line_y + 2))
+        self.screen.set_clip(prior_clip)
+        center = x + width // 2
+        self._button('codex_detail_prev', 'Previous', (center - 125, self.screen_height - 25), 105, 30)
+        self._text(f'{self.codex_detail_page + 1} / {pages}', (center - 18, self.screen_height - 33))
+        self._button('codex_detail_next', 'Next', (center + 125, self.screen_height - 25), 105, 30)
+
     def draw_introduction(self, error="", replacing_save=False):
         """Explain the controls and the opening choices before a new run."""
         self._buttons = {}
@@ -923,42 +1065,37 @@ class Renderer:
         title = pygame.font.Font(None, 38).render(
             "READY TO SURVIVE?", True, (245, 220, 130))
         self.screen.blit(title, title.get_rect(center=(width // 2, 30)))
-        margin, gap = 32, 18
-        card_width = (width - margin * 2 - gap) // 2
-        card_height = max(190, height - 170)
-        cards = [pygame.Rect(margin + i * (card_width + gap),
-                             58, card_width, card_height) for i in range(2)]
-        sections = (
-            ("CONTROLS", ("W A S D  Move", "SPACE  Dash (aims forward if standing still)",
-                          "Mouse  Aim    |    Left / right click  Fire weapons",
-                          "Hold 1–0 to aim an ability; release to cast",
-                          "Use the on-screen buttons for menus and pause",
-                          "ESC  Save and return to the title")),
-            ("YOUR FIRST RUN", ("Start with a rifle and a fireball in slot 1.",
-                                "Defeat enemies to earn experience and currency.",
-                                "Visit the Bazaar to buy crates and find new gear.",
-                                "Equip items and combine them to build a playstyle.",
-                                "Accept quests for goals and rewards.",
-                                "Watch cooldowns and keep moving!")),
-        )
-        for rect, (heading, lines) in zip(cards, sections):
-            pygame.draw.rect(self.screen, (38, 48, 55), rect, border_radius=8)
-            pygame.draw.rect(self.screen, (100, 145, 151),
-                             rect, 2, border_radius=8)
-            self.screen.blit(self.font.render(
-                heading, True, (246, 216, 127)), (rect.x + 14, rect.y + 12))
-            for index, line in enumerate(lines):
-                self.screen.blit(self.font.render(
-                    line, True, (225, 235, 237)), (rect.x + 14, rect.y + 42 + index * 27))
-        if replacing_save:
+        self.intro_page = max(0, min(self.intro_page, len(INTRO_PAGES) - 1))
+        heading, lines = INTRO_PAGES[self.intro_page]
+        card = pygame.Rect(32, 58, width - 64, max(190, height - 170))
+        pygame.draw.rect(self.screen, (38, 48, 55), card, border_radius=8)
+        pygame.draw.rect(self.screen, (100, 145, 151), card, 2, border_radius=8)
+        self._text(f"{heading}  ·  {self.intro_page + 1}/{len(INTRO_PAGES)}", (card.x + 14, card.y + 12))
+        y = card.y + 42
+        for line in lines:
+            current = ""
+            for word in line.split():
+                candidate = f"{current} {word}".strip()
+                if current and self.font.size(candidate)[0] > card.width - 34:
+                    self._text(current, (card.x + 16, y)); y += 21
+                    current = word
+                else:
+                    current = candidate
+            if current:
+                self._text(current, (card.x + 16, y)); y += 28
+        if self.intro_page:
+            self._button("intro_prev", "Previous", (width // 2 - 90, height - 78), 150, 30)
+        if self.intro_page < len(INTRO_PAGES) - 1:
+            self._button("intro_next", "Next", (width // 2 + 90, height - 78), 150, 30)
+        if replacing_save and not error:
             text = "Starting a new run replaces your saved run."
             warning = self.font.render(text, True, (255, 190, 135))
             self.screen.blit(warning, warning.get_rect(
-                center=(width // 2, height - 91)))
+                center=(width // 2, height - 108)))
         if error:
             message = self.font.render(error, True, (255, 120, 110))
             self.screen.blit(message, message.get_rect(
-                center=(width // 2, height - 70)))
+                center=(width // 2, height - 108)))
         self._button("back", "Back", (width // 2 - 120, height - 32), 180, 38)
         self._button("start_run", "Start Run",
                      (width // 2 + 120, height - 32), 180, 38)
@@ -989,8 +1126,10 @@ class Renderer:
 
         if self.panel:
             self._draw_game_menu(state)
+            self._draw_item_tooltip(state)
             self._draw_drag_ghost(state)
             self._draw_notifications(state)
+            self._draw_run_tutorial(state.get("tutorial"))
             pygame.display.flip()
             return
 
@@ -1027,10 +1166,37 @@ class Renderer:
             pygame.draw.circle(self.screen, (100, 220, 255) if ally.mobile else (
                 230, 190, 100), (int(x), int(y)), 8)
         self.draw_enemies(enemies, enemy_types, camera_x, camera_y)
+        self._draw_damage_feedback(enemies, camera_x, camera_y)
         self._draw_ability_aim(state, player_screen)
         self._draw_game_ui(state)
+        self._draw_run_tutorial(state.get("tutorial"))
 
         pygame.display.flip()
+
+    def _draw_run_tutorial(self, tutorial):
+        if not tutorial:
+            return
+        width = min(490, self.screen_width - 24)
+        card = pygame.Rect((self.screen_width - width) // 2,
+                           self.screen_height - 125, width, 76)
+        pygame.draw.rect(self.screen, (20, 29, 35), card, border_radius=7)
+        pygame.draw.rect(self.screen, (105, 195, 185), card, 2, border_radius=7)
+        self._text(f"Guide {tutorial['step']}/{tutorial['total']} · {tutorial['title']}",
+                   (card.left + 10, card.top + 7))
+        words = tutorial["text"].split()
+        line = ""
+        y = card.top + 27
+        for word in words:
+            candidate = f"{line} {word}".strip()
+            if line and self.font.size(candidate)[0] > width - 110:
+                self._text(line, (card.left + 10, y))
+                line, y = word, y + 18
+            else:
+                line = candidate
+        if line:
+            self._text(line, (card.left + 10, y))
+        self._button("tutorial_next", "Next", (card.right - 47, card.top + 23), 75, 24)
+        self._button("tutorial_skip", "Skip", (card.right - 47, card.top + 53), 75, 24)
 
     def draw_enemy_projectiles(self, projectiles, player_x, player_y):
         for projectile in projectiles:
@@ -1049,6 +1215,7 @@ class Renderer:
     def _draw_game_menu(self, state):
         self._buttons = {}
         self._item_rects = {}
+        self._hover_slots = []
         self._drop_targets = {}
         self._scroll_regions = {}
         self.screen.fill((24, 24, 24))
@@ -1293,6 +1460,7 @@ class Renderer:
         pygame.draw.rect(self.screen, (70, 220, 115) if item else (
             100, 100, 100), rect, 2, border_radius=3)
         if item:
+            self._hover_slots.append((rect.copy(), item))
             icon_size = min(width, height)-10
             icon = pygame.Rect(rect.centerx-icon_size//2,
                                rect.centery-icon_size//2, icon_size, icon_size)
@@ -1307,6 +1475,68 @@ class Renderer:
                     str(combo_id)) if combo_id is not None else None)
             if cooldown is not None:
                 self._draw_cooldown_overlay(rect, cooldown)
+
+    def _draw_item_tooltip(self, state):
+        """Inspect the visible item under the pointer without changing selection."""
+        if self.input_handler.drag_active:
+            return None
+        pos = self.input_handler.mouse_position
+        items = {str(item.get("id")): item for item in state.get("items", [])}
+        hovered = next((item for rect, item in reversed(self._hover_slots)
+                        if rect.collidepoint(pos)), None)
+        if hovered is None:
+            hovered = next((items[item_id] for item_id, rect in self._item_rects.items()
+                            if item_id in items and rect.collidepoint(pos)), None)
+        if hovered is None:
+            return None
+
+        width = min(300, self.screen_width - 16)
+        max_text_width = width - 24
+        subtitle_parts = [self._item_rarity_label(hovered)]
+        if "level" in hovered:
+            subtitle_parts.append(f"Lv {hovered['level']}")
+        subtitle_parts.append(str(hovered.get('type', 'item')).title())
+        subtitle = hovered.get("tooltip_subtitle") or " · ".join(subtitle_parts)
+        lines = [(str(hovered.get("name", "Item")), (255, 244, 205)),
+                 (subtitle, self._rarity_color(hovered.get("rarity", "common")))]
+        description = str(hovered.get("description") or "No description available.")
+        paragraph = ""
+        for word in description.split():
+            candidate = f"{paragraph} {word}".strip()
+            if paragraph and self.font.size(candidate)[0] > max_text_width:
+                lines.append((paragraph, (224, 229, 230)))
+                paragraph = word
+            else:
+                paragraph = candidate
+        if paragraph:
+            lines.append((paragraph, (224, 229, 230)))
+        element = hovered.get("stats", {}).get("element")
+        if element:
+            lines.append((f"Element: {element_label(str(element))}", (177, 213, 226)))
+        slot = hovered.get("armor_slot")
+        if slot:
+            lines.append((f"Armor slot: {str(slot).replace('_', ' ').title()}",
+                          (177, 213, 226)))
+        max_lines = max(1, (self.screen_height - 28) // 19)
+        if len(lines) > max_lines:
+            lines = lines[:max_lines - 1] + [("…", (224, 229, 230))]
+        height = 18 + len(lines) * 19
+        x = min(max(8, int(pos[0]) + 16), self.screen_width - width - 8)
+        y = min(max(8, int(pos[1]) + 18), self.screen_height - height - 8)
+        box = pygame.Rect(x, y, width, height)
+        pygame.draw.rect(self.screen, (18, 24, 30), box, border_radius=6)
+        pygame.draw.rect(self.screen, self._rarity_color(hovered.get("rarity", "common")),
+                         box, 2, border_radius=6)
+        for index, (text, color) in enumerate(lines):
+            self.screen.blit(self.font.render(text, True, color),
+                             (box.left + 12, box.top + 9 + index * 19))
+        return box
+
+    def _register_item_hover(self, rect, item):
+        """Track only the portion of an item visible inside the current clip."""
+        visible = rect.clip(self.screen.get_clip())
+        if visible.width and visible.height:
+            self._hover_slots.append((visible, item))
 
     def _rarity_color(self, rarity):
         return {
@@ -1736,13 +1966,15 @@ class Renderer:
                 item = items[index] if index < len(items) else None
                 rect = pygame.Rect(slots_left + col * (slot_size + gap), right.top + 30 + (
                     row - scroll_row) * (slot_size + gap), slot_size, slot_size)
-                if item:
-                    self._item_rects[str(item.get("id"))] = rect.copy()
-                    self._draw_rarity_icon(item, rect.inflate(-10, -10))
                 pygame.draw.rect(self.screen, (48, 48, 48),
                                  rect, border_radius=3)
                 pygame.draw.rect(self.screen, (100, 100, 100),
                                  rect, 1, border_radius=3)
+                if item:
+                    visible_rect = rect.clip(right)
+                    if visible_rect.width and visible_rect.height:
+                        self._item_rects[str(item.get("id"))] = visible_rect
+                    self._draw_rarity_icon(item, rect.inflate(-10, -10))
         self.screen.set_clip(prior_clip)
         self._draw_inventory_scrollbar(right, rows, visible_rows)
 
@@ -1945,14 +2177,21 @@ class Renderer:
         for key, rect in self._sliders.items():
             if not rect.inflate(10, 14).collidepoint(start):
                 continue
-            fraction = max(
-                0.0, min(1.0, (pos[0] - rect.left) / max(1, rect.width)))
+            width = max(1, rect.width)
+            offset = max(0, min(width, pos[0] - rect.left))
+            fraction = offset / width
+            def scaled_amount(value):
+                # Integer arithmetic avoids converting enormous wallets to float.
+                quotient, remainder = divmod(int(value) * offset, width)
+                if remainder * 2 > width or (remainder * 2 == width and quotient % 2):
+                    quotient += 1
+                return quotient
             if key == "exchange" and self._bazaar_tab == "exchange":
-                self._exchange_amount = round(
-                    int(wallet[names[self._exchange_source % len(names)]]) * fraction)
+                self._exchange_amount = scaled_amount(
+                    wallet[names[self._exchange_source % len(names)]])
             elif key == "pool" and self._bazaar_tab == "rarity_upgrader":
                 name = names[self._rarity_currency % len(names)]
-                self._rarity_pool[name] = round(int(wallet[name]) * fraction)
+                self._rarity_pool[name] = scaled_amount(wallet[name])
             elif key == "target" and self._bazaar_tab == "rarity_upgrader":
                 selected = next((item for item in self._last_state.get("items", []) if str(
                     item.get("id")) == str(self.selected_item_id)), None)
@@ -2072,8 +2311,9 @@ class Renderer:
             pygame.draw.rect(self.screen, (55, 55, 55), row, border_radius=4)
             pygame.draw.rect(self.screen, (110, 110, 110),
                              row, 1, border_radius=4)
-            self._draw_rarity_icon(offer, pygame.Rect(
-                row.left + 8, row.top + 8, 48, 48))
+            icon_rect = pygame.Rect(row.left + 8, row.top + 8, 48, 48)
+            self._draw_rarity_icon(offer, icon_rect)
+            self._register_item_hover(icon_rect, offer)
             self._text(offer.get("name", "Item"), (row.left + 65, row.top + 5))
             if tab == "market":
                 detail = f"{offer.get('type', 'item').title()} · {offer.get('rarity', 'common').title()}"
@@ -2181,8 +2421,10 @@ class Renderer:
             y = int(right.top + 110 + (index - reward_start) * 32)
             self._draw_rarity_icon(
                 item, pygame.Rect(right.left + 10, y, 27, 27))
+            self._register_item_hover(
+                pygame.Rect(right.left + 10, y, right.width - 20, 27), item)
             chance = item.get("chance", 0)
-            label = (f"{chance * 100:.1f}%" if chance else "Unlocks after 15 min" if item.get('time_locked')
+            label = (f"{chance * 100:.1f}%" if chance
                      else f"Requires {item.get('luck_required', 0)} luck")
             self._text(f"{item.get('name', 'Item')} · {label}",
                        (right.left + 45, y + 5))
@@ -2199,6 +2441,9 @@ class Renderer:
 
     def _draw_crate_roll(self, rect):
         roll = self._crate_roll
+        # The opening panel is modal, so the offers underneath cannot be hovered.
+        self._hover_slots = []
+        self._item_rects = {}
         roll["elapsed"] = min(3.0, roll["elapsed"] + self._frame_dt)
         elapsed = roll["elapsed"]
         panel = pygame.Rect(rect.centerx - min(300, rect.width // 2 - 8), rect.centery - 100,
@@ -2226,6 +2471,10 @@ class Renderer:
         if elapsed >= 3:
             self._text(roll["reward"].get("name", "Item"),
                        (panel.left + 15, panel.top + 121))
+            self._register_item_hover(
+                pygame.Rect(panel.centerx - 28, strip.top + 5, 56, 56),
+                roll["reward"],
+            )
         self._buttons = {}
         self._button("crate_roll_skip", "Skip" if elapsed <
                      3 else "Continue", (panel.centerx, panel.bottom - 25), 150, 30)
@@ -2317,6 +2566,8 @@ class Renderer:
                              (rect.centerx, y + 10), rect.width - 20, 25)
                 self._buttons[f"fusion_select:{entry['id']}"] = self._buttons[f"fusion_select:{entry['id']}"].clip(
                     content_clip)
+                self._register_item_hover(
+                    self._buttons[f"fusion_select:{entry['id']}"], entry)
                 requirements = entry.get(
                     "required_elements") or entry.get("required_types", [])
                 for j, requirement in enumerate(requirements):
@@ -2336,6 +2587,20 @@ class Renderer:
                         badge.left + 2, badge.top + 3, 17, 17))
                     self._text(str(requirement).title()[
                                :5], (badge.left + 20, badge.top + 5))
+                    requirement_name = (f"{str(requirement).title()} ability"
+                                        if entry.get('required_elements')
+                                        else str(requirement).title())
+                    if entry.get('required_fusion') and requirement == 'relic':
+                        requirement_name = entry['required_fusion'].replace('-', ' ').title()
+                    status = "You have a valid ingredient." if owned else "No valid ingredient owned."
+                    requirement_info = {
+                        'name': requirement_name,
+                        'rarity': entry.get('min_rarity', 'common'),
+                        'tooltip_subtitle': 'Fusion ingredient requirement',
+                        'description': (f"{status} Requires {entry.get('min_rarity', 'common')} "
+                                        f"rarity or higher and item level {entry.get('min_level', 1)} or higher."),
+                    }
+                    self._register_item_hover(badge, requirement_info)
                 description = entry.get('description', '')
                 self._text(
                     description[:max(10, (rect.width - 20) // 8)], (rect.left + 10, y + 55))
@@ -2367,6 +2632,7 @@ class Renderer:
                 i.get('id')) == str(item_id)), None)
             if ingredient:
                 self._draw_rarity_icon(ingredient, slot.inflate(-6, -6))
+                self._register_item_hover(slot, ingredient)
             self._text(str(requirement)[:7], (slot.left, slot.bottom + 3))
         for item in items:
             item_id = str(item.get('id'))
@@ -2391,6 +2657,8 @@ class Renderer:
                        (rect.left + 10, rect.bottom - 65))
             self._draw_rarity_icon(result, pygame.Rect(
                 rect.right - 60, rect.bottom - 108, 42, 42))
+            self._register_item_hover(
+                pygame.Rect(rect.right - 60, rect.bottom - 108, 42, 42), result)
 
     def _draw_rarity_gamble(self, rect, item, state):
         wallet = state.get("bazaar", {}).get("wallet", {})
@@ -2441,7 +2709,7 @@ class Renderer:
         y += 23
         pool = {name: amount for name,
                 amount in self._rarity_pool.items() if amount}
-        chance = rarity_chance(item, target, pool)
+        chance = rarity_chance(item, target, pool, state.get('luck', 0))
         self._text(f"Pool: {', '.join(f'{v} {k}' for k,
                    v in pool.items()) or 'empty'}"[:55], (x, y))
         y += 22
@@ -2549,7 +2817,7 @@ class Renderer:
         self._text(
             f"Timer {minutes:02d}:{seconds:02d}:{milliseconds:03d}", (left, top+44))
         self._text(
-            f"Enemy scale {state.get('enemy_scale', '1')}×",
+            f"Enemy scale {state.get('enemy_scale', '1')}× | Next kill score {state.get('kill_score_multiplier', '1')}×",
             (left, top + 66),
         )
         active = state.get("active_slots", {})

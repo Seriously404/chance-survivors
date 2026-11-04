@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from game.entities.projectile import Projectile
 from game.systems.items import item_stat
@@ -18,6 +18,12 @@ class Summon:
     mobile: bool = False
     attack_timer: float = 0.0
     elemental_core: dict | None = None
+    heal_on_damage: bool = False
+    explosion_radius: float = 0.0
+    homing_strength: float = 0.0
+    piercing: int = 0
+    bounces: int = 0
+    damage_components: list = field(default_factory=list)
 
 
 def teleport(item, player, angle):
@@ -59,6 +65,12 @@ def update_summons(summons, enemies, player, dt, base_speed):
             projectile = Projectile.create_from_player(ally.x, ally.y, angle, 2.5, base_speed,
                                                        damage=ally.damage, bullet_type="ability:summon", element=ally.element)
             projectile.elemental_core = ally.elemental_core
+            projectile.heal_on_damage = ally.heal_on_damage
+            projectile.explosion_radius = ally.explosion_radius
+            projectile.homing_strength = ally.homing_strength
+            projectile.piercing = ally.piercing
+            projectile.bounces_remaining = ally.bounces
+            projectile.damage_components = list(ally.damage_components)
             shots.append(projectile)
             ally.attack_timer = 1.0
     summons[:] = [ally for ally in summons if ally.remaining > 0]

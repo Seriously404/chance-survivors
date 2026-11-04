@@ -10,6 +10,23 @@ from game.config.settings import PIXELS_PER_UNIT, SCREEN_WIDTH, SCREEN_HEIGHT
 from game.systems.enemy_scaling import EnemyScaling
 
 
+class EncounterDirector:
+    """Ease incoming pressure when the battlefield is crowded or health is low."""
+
+    MAX_ENEMIES = 60
+
+    def delay_ms(self, base_delay_ms: int, enemy_count: int, health_fraction: float) -> int:
+        if base_delay_ms <= 0 or enemy_count < 0 or not math.isfinite(health_fraction):
+            raise ValueError("Invalid encounter pressure")
+        health_fraction = max(0.0, min(1.0, health_fraction))
+        crowd = max(0.0, min(1.0, (enemy_count - 15) / 45))
+        danger = max(0.0, (0.4 - health_fraction) / 0.4)
+        return max(1, round(base_delay_ms * (1 + crowd + danger)))
+
+    def can_spawn(self, enemy_count: int) -> bool:
+        return enemy_count < self.MAX_ENEMIES
+
+
 class SpawnerSystem:
     """Handles enemy spawning logic."""
 
@@ -52,6 +69,7 @@ class SpawnerSystem:
         *,
         elapsed_seconds: float = 0.0,
         scaling: EnemyScaling | None = None,
+        max_enemies: int | None = None,
     ) -> None:
         """Spawn a new enemy at a random position.
 
@@ -70,6 +88,8 @@ class SpawnerSystem:
         ]
         if not spawn_candidates:
             raise ValueError("Enemy roster has no spawnable enemy types")
+        if max_enemies is not None and len(enemies) >= max_enemies:
+            return
         total_weight = sum(weight for _, _, weight in spawn_candidates)
         choice = random.random() * total_weight
         running = 0.0
@@ -87,6 +107,8 @@ class SpawnerSystem:
         if type(group_count) is not int or not 1 <= group_count <= 8:
             raise ValueError(
                 f"Invalid spawn_group_count for enemy {enemy_name!r}")
+        if max_enemies is not None:
+            group_count = min(group_count, max_enemies - len(enemies))
         group_radius = stats.get("spawn_group_radius", 0.0)
         if (
             isinstance(group_radius, bool)

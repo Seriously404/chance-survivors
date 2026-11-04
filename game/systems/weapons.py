@@ -59,6 +59,14 @@ def projectile_for_weapon(player, angle, weapon, slot_index, bullet_types,
     projectile = Projectile.create_from_player(
         player.x, player.y, angle, speed, base_speed, damage, piercing,
         bullet_name, str(metadata.get("element", "physical")).lower())
+    projectile.damage_components = [
+        {"element": part["element"], "damage": part["damage"] * (1 + damage_bonus_pct / 100)}
+        for part in metadata.get("hybrid_damage_components", [])
+    ]
+    projectile.heal_on_damage = any(
+        part.get("script", part.get("cast_type")) in {"heal", "mend_ward"}
+        for part in metadata.get("supplements", {}).values()
+    )
     tags = weapon.tags if combined else weapon.get('tags', [])
     projectile.trail_element = next(
         (tag.split(':', 1)[1] for tag in tags if tag.startswith('trail:')), None)

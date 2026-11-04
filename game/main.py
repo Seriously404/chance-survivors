@@ -18,10 +18,11 @@ from game.config.settings import (
     basic_bullet_speed_modifier,
 )
 from game.entities.player import Player
+from game.core.tutorial import RunTutorial
 from game.entities.projectile import Projectile
 from game.entities.enemy_projectile import EnemyProjectile
 from game.systems.collision import CollisionSystem
-from game.systems.spawner import SpawnerSystem
+from game.systems.spawner import EncounterDirector, SpawnerSystem
 from game.systems.game_state import GameStateManager, GameState
 from game.utils.helpers import get_player_rotation
 from game.systems.bullets import load_bullet_types
@@ -32,6 +33,7 @@ from game.systems.progression import PlayerProgress, award_enemy_kill
 from game.systems.items import (
     armor_set_status,
     create_initial_inventory,
+    item_stat,
     player_bonuses,
     spawnable_items,
 )
@@ -55,7 +57,9 @@ from game.systems.items import effective_ability
 from game.ability_scripts.effects import update_summons
 from game.systems.leaderboard_client import build_run_submission, submit_run
 from game.systems.run_save import RunSave, configured_save_path
-from game.systems.score_milestone import has_reached_infinity_milestone
+from game.systems.score_milestone import (
+    has_reached_infinity_milestone, kill_score_multiplier, score_for_kill,
+)
 from copy import deepcopy
 
 
@@ -84,14 +88,6 @@ def _bazaar_view_state(
         manager.ROTATION_SECONDS
         - int(elapsed_seconds % manager.ROTATION_SECONDS)
     )
-    next_unlocks = [
-        crate.unlock_seconds
-        for crate in manager.crate_catalog
-        if crate.unlock_seconds > elapsed_seconds
-    ]
-    next_unlock_seconds = (
-        min(next_unlocks) - elapsed_seconds if next_unlocks else None
-    )
 
     def crate_view(crate):
         items, weights = manager.crate_odds(crate, luck)
@@ -102,7 +98,7 @@ def _bazaar_view_state(
             "bias": crate.bias, "description": crate.description,
             "element": crate.element,
             "rewards": [{**item, "chance": weight / total if total else 0.0,
-                         "time_locked": manager.rarity_rank(item.get("rarity", "common")) >= manager.rarity_rank("epic") and elapsed_seconds < 900,
+                         "time_locked": False,
                          "luck_required": CRATE_LUCK_REQUIREMENTS[manager.rarity_rank(item.get("rarity", "common"))]}
                         for item, weight in zip(items, weights)],
         }
@@ -117,7 +113,7 @@ def _bazaar_view_state(
         "daily_refresh_seconds": 60 - int(elapsed_seconds % 60),
         "crate_count": len(manager.available_crates(elapsed_seconds)),
         "crate_catalog_size": len(manager.crate_catalog),
-        "next_crate_unlock_seconds": next_unlock_seconds,
+        "next_crate_unlock_seconds": None,
         "catalog": [
             {**item, "market_price": manager.catalog_price(item)}
             for item in manager.catalog
@@ -206,8 +202,10 @@ def main() -> None:
     quest_manager = QuestManager()
     settings.mission_score_bonus_pct = quest_manager.total_bonus_pct()
     game_state = GameStateManager()
+    tutorial = RunTutorial()
     collision_system = CollisionSystem(PIXELS_PER_UNIT)
     spawner = SpawnerSystem(enemy_types, enemy_spawn_delay)
+    encounter_director = EncounterDirector()
     enemy_scaling = EnemyScaling()
 
     # Initialize game entities
@@ -271,7 +269,7 @@ def main() -> None:
         nonlocal bazaar_manager, bazaar_service, spawn_catalog, bazaar_seed
         nonlocal bazaar_refresh_count, bazaar_last_manual_refresh_cycle
         nonlocal ability_cooldowns, ability_vfx, save_available, last_save_seconds
-        nonlocal applied_health_bonus, upload_status, upload_complete, menu_error, paused
+        nonlocal applied_health_bonus, upload_status, upload_complete, menu_error, paused, tutorial
         run_save = RunSave.read(save_path)
         saved = run_save.state
         player, bullets, spawner = reset_game(player, bullets, spawner)
@@ -319,6 +317,7 @@ def main() -> None:
         upload_status = "Upload is optional; your score is not sent unless you choose Upload."
         upload_complete = False
         game_state.start_game(saved["player_name"])
+        tutorial = RunTutorial()
 
     try:
         while running:
@@ -346,6 +345,7 @@ def main() -> None:
                         renderer.input_handler.name_error = menu_error
                         continue
                     menu_error = ""
+                    renderer.intro_page = 0
                     game_state.change_state(GameState.INTRODUCTION)
                 elif "settings" in actions or "open_settings" in actions:
                     game_state.change_state(GameState.SETTINGS)
@@ -370,6 +370,10 @@ def main() -> None:
                         renderer.codex_selected = int(action.split(':', 1)[1])
 
             elif game_state.is_introduction():
+                if "intro_next" in actions:
+                    renderer.intro_page += 1
+                elif "intro_prev" in actions:
+                    renderer.intro_page = max(0, renderer.intro_page - 1)
                 if "back" in actions:
                     menu_error = ""
                     game_state.change_state(GameState.MENU)
@@ -421,6 +425,7 @@ def main() -> None:
                     upload_status = "Upload is optional; your score is not sent unless you choose Upload."
                     upload_complete = False
                     game_state.start_game(renderer.get_player_name())
+                    tutorial = RunTutorial(active=True)
                     last_save_seconds = -autosave_interval_seconds
 
             elif game_state.is_settings():
@@ -486,6 +491,7 @@ def main() -> None:
                                 {"text": str(exc), "remaining": 3.0})
                         else:
                             spawn_counter = next_counter
+                            quest_manager.register_event("bazaar_purchases")
                             crate = next(
                                 entry for entry in bazaar_manager.crates if entry.id == crate_id)
                             renderer.start_crate_roll(
@@ -505,6 +511,7 @@ def main() -> None:
                                 {"text": str(exc), "remaining": 3.0})
                         else:
                             spawn_counter = next_counter
+                            quest_manager.register_event("bazaar_purchases")
                             notifications.items.append({
                                 "text": f"Bought {item.get('name', 'market item')}",
                                 "remaining": 3.0,
@@ -537,12 +544,9 @@ def main() -> None:
                     elif action.startswith("bazaar_upgrade:"):
                         item_id = action.split(":", 1)[1]
                         try:
-                            if bazaar_manager.rarity_rank(inventory.get(item_id).get('rarity', 'common')) >= 2 and run_elapsed_seconds < 900:
+                            if inventory.get(item_id).get('rarity') == 'mythical' and bonuses['luck'] < 20:
                                 raise ValueError(
-                                    'Epic and higher upgrades unlock after 15 minutes.')
-                            if inventory.get(item_id).get('rarity') == 'mythical' and (run_elapsed_seconds < 1800 or bonuses['luck'] < 20):
-                                raise ValueError(
-                                    'Ultimate upgrades require 30 minutes and 20 luck.')
+                                    'Ultimate upgrades require 20 luck.')
                             upgraded = bazaar_service.upgrade_rarity(
                                 item_id,
                                 wallet=wallet,
@@ -594,12 +598,6 @@ def main() -> None:
                             if progress.level < recipe.unlock_level:
                                 raise ValueError(
                                     f"{recipe.name} unlocks at player level {recipe.unlock_level}.")
-                            if bazaar_manager.rarity_rank(recipe.output_rarity) >= 3 and run_elapsed_seconds < 900:
-                                raise ValueError(
-                                    'Epic and higher fusions unlock after 15 minutes.')
-                            if recipe.output_rarity == 'ultimate' and run_elapsed_seconds < 1800:
-                                raise ValueError(
-                                    'Ultimate fusions unlock after 30 minutes.')
                             ids = source_ids.split(",") if source_ids else []
                             sources = [next((item for item in inventory.items if str(
                                 item.get("id")) == item_id), None) for item_id in ids]
@@ -618,6 +616,7 @@ def main() -> None:
                                 "remaining": 3.0,
                             })
                         else:
+                            quest_manager.register_event("fusions_made")
                             renderer.selected_item_id = result["id"]
                             renderer.fusion_last_result = result
                             renderer.fusion_sources = []
@@ -680,6 +679,7 @@ def main() -> None:
                     elif action.startswith("combine:"):
                         _, base_id, combo_index, item_id = action.split(":", 3)
                         try:
+                            before = list(inventory.get(base_id)["combinations"])
                             if not quest_manager.can_equip(inventory.get(item_id)):
                                 raise ValueError(
                                     "Main quest restrictions prevent using this item.")
@@ -688,6 +688,9 @@ def main() -> None:
                         except (KeyError, IndexError, ValueError) as exc:
                             notifications.items.append(
                                 {"text": str(exc), "remaining": 3.0})
+                        else:
+                            if item_id not in before:
+                                quest_manager.register_event("combinations_made")
                     elif action.startswith("equip:"):
                         _, slot_kind, slot_index, item_id = action.split(
                             ":", 3)
@@ -768,6 +771,13 @@ def main() -> None:
             # -------------------------
             # Time
             # -------------------------
+            if game_state.is_playing():
+                tutorial.observe(
+                    actions=actions, panel=game_state.active_panel,
+                    tab=renderer.menu_tab, bazaar_tab=renderer._bazaar_tab,
+                    movement=renderer.get_movement(), paused=paused,
+                    base_id=renderer.selected_base_id,
+                )
             dt = renderer.tick(FRAMERATE)
             notifications.update(dt)
 
@@ -802,6 +812,7 @@ def main() -> None:
                         clicks[1] = position
                 by_id = {str(item["id"]): item for item in inventory.items}
                 ability_kills = []
+                quest_damage_enemies = list(enemies)
                 player_dx, player_dy = renderer.get_movement()
                 dash_slot = next((i for i, item_id in enumerate(inventory.active_slots["abilities"])
                                   if item_id and by_id.get(str(item_id), {}).get("stats", {}).get("script") in {"dash", "sandevistan"}), None)
@@ -831,7 +842,6 @@ def main() -> None:
                     cooldown = ability_cooldown(effective_cast)
                     script = ability.get("stats", {}).get("script")
                     if script in {"dash", "sandevistan"}:
-                        from game.systems.items import item_stat
                         distance = min(6.0, max(0.1, item_stat(
                             effective_cast, "dash_distance", 2.0)))
                         duration = float(ability.get(
@@ -859,15 +869,18 @@ def main() -> None:
                         bullets.append(outcome.projectile)
                     if outcome.summon is not None:
                         summons.append(outcome.summon)
+                    if outcome.trail_segment is not None:
+                        trails.emit_segment(*outcome.trail_segment)
                     ability_kills.extend(outcome.killed_enemies)
                     if outcome.healed:
                         notifications.items.append({
                             "text": f"Healed {outcome.healed} HP",
                             "remaining": 3.0,
                         })
-                    if ability.get("stats", {}).get("script", ability.get("stats", {}).get("cast_type")) in {"nova", "void"}:
+                    if ability.get("stats", {}).get("script", ability.get("stats", {}).get("cast_type")) in {"nova", "void", "siphon"}:
                         ability_vfx.append({
-                            "radius": float(ability.get("stats", {}).get("cast_radius", 0.5)),
+                            "radius": max(item_stat(effective_cast, "cast_radius", 0.5),
+                                          item_stat(effective_cast, "area_radius", 0)),
                             "remaining": 0.2,
                             "element": ability.get("stats", {}).get("element", "arcane"),
                         })
@@ -905,21 +918,26 @@ def main() -> None:
                 # Update quests, spawner, and progression
                 quest_manager.register_time(run_elapsed_seconds)
                 quest_manager.register_level(progress.level)
-                spawner.spawn_delay_ms = enemy_scaling.spawn_delay_ms(
+                base_spawn_delay = enemy_scaling.spawn_delay_ms(
                     enemy_spawn_delay,
                     run_elapsed_seconds,
                 )
+                health_fraction = (CombatNumber(player.health) / CombatNumber(player.max_health)).to_float()
+                spawner.spawn_delay_ms = encounter_director.delay_ms(base_spawn_delay, len(enemies), health_fraction)
                 world_dt = dt * \
                     (0.2 if player.time_shift_remaining > 0 else 1.0)
                 spawner.update(world_dt)
-                if spawner.should_spawn():
+                if spawner.should_spawn() and encounter_director.can_spawn(len(enemies)):
                     spawner.spawn(
                         player.x,
                         player.y,
                         enemies,
                         elapsed_seconds=run_elapsed_seconds,
                         scaling=enemy_scaling,
+                        max_enemies=encounter_director.MAX_ENEMIES,
                     )
+                    spawner.reset()
+                elif not encounter_director.can_spawn(len(enemies)):
                     spawner.reset()
                 update_enemy_abilities(
                     enemies,
@@ -928,6 +946,7 @@ def main() -> None:
                     player.x,
                     player.y,
                     pixels_per_unit=PIXELS_PER_UNIT,
+                    max_enemies=encounter_director.MAX_ENEMIES,
                 )
 
                 # Get player movement
@@ -1005,11 +1024,21 @@ def main() -> None:
                     enemy_types,
                     player,
                 )
+                damage_sources = [*quest_damage_enemies, *enemies, *ability_kills,
+                                  *collision_system.killed_enemies]
+                seen_damage_sources = set()
+                for damaged in damage_sources:
+                    if id(damaged) in seen_damage_sources:
+                        continue
+                    seen_damage_sources.add(id(damaged))
+                    for element, amount in damaged.damage_events.items():
+                        quest_manager.register_elemental_damage(element, amount)
+                    damaged.damage_events.clear()
                 for _enemy in [*ability_kills, *collision_system.killed_enemies]:
                     if not _enemy.reward_eligible:
                         continue
-                    absolute_score += LargeNumber(10) * \
-                        LargeNumber(_enemy.score_multiplier)
+                    absolute_score += score_for_kill(
+                        quest_manager.kills_total, _enemy.score_multiplier)
                     if _enemy.currency_drop and _enemy.currency_amount > 0:
                         currency, amount = wallet.reward_for_enemy(
                             _enemy.currency_drop,
@@ -1025,7 +1054,8 @@ def main() -> None:
                         gold = wallet.gold_bonus_for_kill(luck=bonuses["luck"])
                         if gold > 0:
                             notifications.add("Gold", gold)
-                    quest_manager.register_kill(getattr(_enemy, "type", None))
+                    quest_manager.register_kill(getattr(_enemy, "type", None),
+                                                has_summoned=_enemy.has_summoned)
                     award_enemy_kill(
                         progress,
                         _enemy.xp_reward,
@@ -1074,6 +1104,7 @@ def main() -> None:
                     "notifications": notifications.items,
                     "paused": paused,
                     "actions": actions,
+                    "tutorial": tutorial.view(),
                     "items": inventory.items,
                     "active_slots": inventory.active_slots,
                     "level": progress.level,
@@ -1085,6 +1116,7 @@ def main() -> None:
                     "run_elapsed_ms": int(run_elapsed_seconds * 1000),
                     "threat_level": enemy_scaling.threat_level,
                     "enemy_scale": enemy_scaling.multiplier(run_elapsed_seconds).to_eng_string(),
+                    "kill_score_multiplier": kill_score_multiplier(quest_manager.kills_total).format(),
                     "weapon_cooldowns": weapon_cooldowns,
                     "ability_cooldowns": ability_cooldowns,
                     "ability_vfx": ability_vfx,
@@ -1158,6 +1190,7 @@ def main() -> None:
                                "infinity_milestone_reached": has_reached_infinity_milestone(total_score),
                                "currency": wallet.amounts,
                                "notifications": notifications.items, "paused": paused, "actions": actions,
+                               "tutorial": tutorial.view(),
                                "items": inventory.items, "active_slots": inventory.active_slots, "level": progress.level,
                                "experience": progress.current_exp, "next_level_exp": progress.exp_to_next_level,
                                "total_experience": progress.total_exp, "luck": bonuses["luck"], "speed": 1 + bonuses["speed_pct"] / 100,

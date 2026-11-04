@@ -8,9 +8,13 @@ notation for display.
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 import math
 from typing import SupportsFloat
+
+
+# Keep individual currency spends visible through the practical 1e308 goal.
+_ARITHMETIC_PRECISION = 512
 
 
 class LargeNumber:
@@ -50,28 +54,40 @@ class LargeNumber:
         return cls(value)
 
     def __add__(self, other: object) -> "LargeNumber":
-        return LargeNumber(self.value + self._coerce(other))
+        with localcontext() as context:
+            context.prec = _ARITHMETIC_PRECISION
+            return LargeNumber(self.value + self._coerce(other))
 
     def __radd__(self, other: object) -> "LargeNumber":
-        return LargeNumber(self._coerce(other) + self.value)
+        return self + other
 
     def __sub__(self, other: object) -> "LargeNumber":
-        return LargeNumber(self.value - self._coerce(other))
+        with localcontext() as context:
+            context.prec = _ARITHMETIC_PRECISION
+            return LargeNumber(self.value - self._coerce(other))
 
     def __rsub__(self, other: object) -> "LargeNumber":
-        return LargeNumber(self._coerce(other) - self.value)
+        with localcontext() as context:
+            context.prec = _ARITHMETIC_PRECISION
+            return LargeNumber(self._coerce(other) - self.value)
 
     def __mul__(self, other: object) -> "LargeNumber":
-        return LargeNumber(self.value * self._coerce(other))
+        with localcontext() as context:
+            context.prec = _ARITHMETIC_PRECISION
+            return LargeNumber(self.value * self._coerce(other))
 
     def __rmul__(self, other: object) -> "LargeNumber":
-        return LargeNumber(self._coerce(other) * self.value)
+        return self * other
 
     def __truediv__(self, other: object) -> "LargeNumber":
-        return LargeNumber(self.value / self._coerce(other))
+        with localcontext() as context:
+            context.prec = _ARITHMETIC_PRECISION
+            return LargeNumber(self.value / self._coerce(other))
 
     def __rtruediv__(self, other: object) -> "LargeNumber":
-        return LargeNumber(self._coerce(other) / self.value)
+        with localcontext() as context:
+            context.prec = _ARITHMETIC_PRECISION
+            return LargeNumber(self._coerce(other) / self.value)
 
     def __pow__(self, exponent: int) -> "LargeNumber":
         return LargeNumber(self.value ** exponent)

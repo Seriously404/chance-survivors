@@ -27,6 +27,7 @@ class Projectile:
     exploded: bool = False
     elemental_core: dict | None = None
     heal_on_damage: bool = False
+    damage_components: List[Any] = field(default_factory=list)
     previous_x: float | None = None
     previous_y: float | None = None
 

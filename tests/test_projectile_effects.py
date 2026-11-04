@@ -2,6 +2,7 @@
 
 import math
 import unittest
+from unittest.mock import patch
 
 from game.entities.enemy import Enemy
 from game.entities.projectile import Projectile
@@ -9,6 +10,42 @@ from game.utils.large_number import LargeNumber
 
 
 class ProjectileEffectTests(unittest.TestCase):
+    def test_ricochet_redirects_at_impact_and_hits_a_second_target(self):
+        from game.systems.collision import CollisionSystem
+
+        collision = CollisionSystem(200)
+        bullet = Projectile(x=0, y=0, speed=10, damage=5,
+                            bounces_remaining=1)
+        first = Enemy('basic', x=1, y=0, health=20, max_health=20)
+        second = Enemy('basic', x=1, y=1, health=20, max_health=20)
+        definitions = {'basic': {'size': 30, 'resistances': {}}}
+        bullet.move(.2)
+        shots, enemies = collision.check_bullet_enemy_collisions(
+            [bullet], [first, second], definitions)
+        self.assertEqual(shots, [bullet])
+        self.assertEqual(first.health, 15)
+        self.assertAlmostEqual(bullet.x, 1)
+        self.assertAlmostEqual(bullet.dy, 1)
+        bullet.move(.1)
+        shots, enemies = collision.check_bullet_enemy_collisions(
+            shots, enemies, definitions)
+        self.assertEqual(second.health, 15)
+        self.assertEqual(shots, [])
+
+    def test_explosion_applies_core_to_secondary_targets(self):
+        from game.systems.collision import CollisionSystem
+
+        first = Enemy('basic', x=0, y=0, health=100, max_health=100)
+        second = Enemy('basic', x=.2, y=0, health=100, max_health=100)
+        bullet = Projectile(x=0, y=0, damage=20, element='fire',
+                            explosion_radius=.5, elemental_core={'level': 1})
+        definitions = {'basic': {'size': 30, 'resistances': {'fire': .5}}}
+        with patch('game.systems.collision.apply_lingering') as lingering:
+            CollisionSystem(200).check_bullet_enemy_collisions(
+                [bullet], [first, second], definitions)
+        self.assertEqual(first.health, second.health)
+        self.assertEqual(lingering.call_count, 2)
+
     def test_fast_projectile_hits_first_enemy_along_its_path(self):
         from game.entities.enemy import Enemy
         from game.systems.collision import CollisionSystem

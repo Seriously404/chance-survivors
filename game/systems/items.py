@@ -151,20 +151,22 @@ def effective_ability(inventory: Inventory, item: dict[str, Any]) -> dict[str, A
 
 
 def player_bonuses(inventory: Inventory) -> dict[str, float]:
-    """Aggregate equipped armor plus passive owned relic/misc bonuses."""
+    """Aggregate equipped armor and abilities plus owned relic bonuses."""
     by_id = {str(item["id"]): item for item in inventory.items}
     equipped_armor = [
         by_id[str(item_id)] for item_id in inventory.active_slots["armor"]
         if item_id is not None
     ]
     contributors = list(equipped_armor)
+    contributors.extend(by_id[str(item_id)] for item_id in inventory.active_slots["abilities"]
+                        if item_id is not None and str(item_id) in by_id)
     contributors.extend(item for item in inventory.items if item.get(
         "type") in {"misc", "relic"})
     result = {"defense": 0.0, "health": 0.0, "speed_pct": 0.0,
               "luck": 1.0, "damage_pct": 0.0, "crit_chance": 0.0,
               "score_bonus_pct": 0.0, "elemental_dmg": 0.0}
     for item in contributors:
-        if item.get("type") == "armor" and any(item.get("combinations", [])):
+        if item.get("type") in {"armor", "ability"} and any(item.get("combinations", [])):
             from game.systems.combinations import CombinationEngine
             combined = CombinationEngine().evaluate_inventory(
                 inventory, item["id"])
