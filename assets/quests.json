@@ -1,0 +1,249 @@
+{
+  "quests": [
+    {
+      "id": "side-kill-warmup",
+      "name": "Warmup Sweep",
+      "description": "Defeat 10 enemies in total.",
+      "quest_type": "side",
+      "unlock_level": 1,
+      "reward_pct": 5.0,
+      "condition": "kills_total",
+      "target": 10
+    },
+    {
+      "id": "side-kill-basic",
+      "name": "Basic Cleanup",
+      "description": "Defeat 25 basic enemies.",
+      "quest_type": "side",
+      "unlock_level": 2,
+      "reward_pct": 8.0,
+      "condition": "kills_enemy",
+      "enemy_type": "basic",
+      "target": 25
+    },
+    {
+      "id": "side-kill-fast",
+      "name": "Swift Justice",
+      "description": "Defeat 15 fast enemies.",
+      "quest_type": "side",
+      "unlock_level": 3,
+      "reward_pct": 10.0,
+      "condition": "kills_enemy",
+      "enemy_type": "fast",
+      "target": 15
+    },
+    {
+      "id": "side-kill-tank",
+      "name": "Tank Buster",
+      "description": "Defeat 8 tank enemies.",
+      "quest_type": "side",
+      "unlock_level": 4,
+      "reward_pct": 12.0,
+      "condition": "kills_enemy",
+      "enemy_type": "tank",
+      "target": 8
+    },
+    {
+      "id": "side-level-run",
+      "name": "Rising Star",
+      "description": "Reach level 5.",
+      "quest_type": "side",
+      "unlock_level": 3,
+      "reward_pct": 10.0,
+      "condition": "level_reached",
+      "target": 5
+    },
+    {
+      "id": "side-level-10",
+      "name": "Veteran Status",
+      "description": "Reach level 10.",
+      "quest_type": "side",
+      "unlock_level": 6,
+      "reward_pct": 15.0,
+      "condition": "level_reached",
+      "target": 10
+    },
+    {
+      "id": "side-level-25",
+      "name": "Elite Survivor",
+      "description": "Reach level 25.",
+      "quest_type": "side",
+      "unlock_level": 12,
+      "reward_pct": 20.0,
+      "condition": "level_reached",
+      "target": 25
+    },
+    {
+      "id": "side-survive-60",
+      "name": "Endurance Test",
+      "description": "Survive for 60 seconds.",
+      "quest_type": "side",
+      "unlock_level": 4,
+      "reward_pct": 12.0,
+      "condition": "time_survived",
+      "target": 60
+    },
+    {
+      "id": "side-survive-120",
+      "name": "Marathon Runner",
+      "description": "Survive for 120 seconds.",
+      "quest_type": "side",
+      "unlock_level": 8,
+      "reward_pct": 18.0,
+      "condition": "time_survived",
+      "target": 120
+    },
+    {
+      "id": "main-bastion",
+      "name": "The Bastion Run",
+      "description": "Reach level 10 while keeping a disciplined build path.",
+      "quest_type": "main",
+      "unlock_level": 5,
+      "reward_pct": 25.0,
+      "condition": "level_reached",
+      "target": 10,
+      "restrictions": ["No sniper-only playstyle"],
+      "forbidden_item_tags": ["sniper"]
+    },
+    {
+      "id": "main-aggressor",
+      "name": "The Aggressor",
+      "description": "Deal 5000 damage without taking any damage.",
+      "quest_type": "main",
+      "unlock_level": 7,
+      "reward_pct": 30.0,
+      "condition": "damage_dealt",
+      "target": 5000,
+      "restrictions": ["No damage taken"],
+      "forbidden_item_tags": ["defense"]
+    },
+    {
+      "id": "main-luckmaster",
+      "name": "Luck Master",
+      "description": "Accumulate 50 luck points.",
+      "quest_type": "main",
+      "unlock_level": 10,
+      "reward_pct": 35.0,
+      "condition": "luck_accumulated",
+      "target": 50
+    },
+    {
+      "id": "side-kill-shooter",
+      "name": "Sniper Duel",
+      "description": "Defeat 12 shooter enemies.",
+      "quest_type": "side",
+      "unlock_level": 5,
+      "reward_pct": 14.0,
+      "condition": "kills_enemy",
+      "enemy_type": "shooter",
+      "target": 12
+    },
+    {
+      "id": "side-kill-swarm",
+      "name": "Swarm Control",
+      "description": "Defeat 30 swarm enemies.",
+      "quest_type": "side",
+      "unlock_level": 6,
+      "reward_pct": 11.0,
+      "condition": "kills_enemy",
+      "enemy_type": "swarm",
+      "target": 30
+    },
+    {
+      "id": "side-kill-boss",
+      "name": "Boss Hunter",
+      "description": "Defeat 3 boss enemies.",
+      "quest_type": "side",
+      "unlock_level": 15,
+      "reward_pct": 25.0,
+      "condition": "kills_enemy",
+      "enemy_type": "boss",
+      "target": 3
+    },
+    {
+      "id": "side-kill-necro",
+      "name": "Necromancer Slayer",
+      "description": "Defeat 5 necromancer enemies before they summon minions.",
+      "quest_type": "side",
+      "unlock_level": 9,
+      "reward_pct": 16.0,
+      "condition": "kills_enemy",
+      "enemy_type": "necromancer",
+      "target": 5
+    },
+    {
+      "id": "side-kill-stealth",
+      "name": "Shadow Stalker",
+      "description": "Defeat 20 stealth enemies.",
+      "quest_type": "side",
+      "unlock_level": 7,
+      "reward_pct": 13.0,
+      "condition": "kills_enemy",
+      "enemy_type": "stealth",
+      "target": 20
+    },
+    {
+      "id": "side-elemental-fire",
+      "name": "Fire Walker",
+      "description": "Deal 1000 fire damage.",
+      "quest_type": "side",
+      "unlock_level": 5,
+      "reward_pct": 15.0,
+      "condition": "elemental_damage",
+      "element": "fire",
+      "target": 1000
+    },
+    {
+      "id": "side-elemental-frost",
+      "name": "Frost Bite",
+      "description": "Deal 1000 frost damage.",
+      "quest_type": "side",
+      "unlock_level": 6,
+      "reward_pct": 15.0,
+      "condition": "elemental_damage",
+      "element": "frost",
+      "target": 1000
+    },
+    {
+      "id": "side-elemental-shadow",
+      "name": "Shadow Hunter",
+      "description": "Deal 1000 shadow damage.",
+      "quest_type": "side",
+      "unlock_level": 8,
+      "reward_pct": 17.0,
+      "condition": "elemental_damage",
+      "element": "shadow",
+      "target": 1000
+    },
+    {
+      "id": "side-combo-10",
+      "name": "Combo Master",
+      "description": "Create 10 item combinations.",
+      "quest_type": "side",
+      "unlock_level": 8,
+      "reward_pct": 20.0,
+      "condition": "combinations_made",
+      "target": 10
+    },
+    {
+      "id": "side-fusion-5",
+      "name": "Fusion Pioneer",
+      "description": "Perform 5 item fusions.",
+      "quest_type": "side",
+      "unlock_level": 12,
+      "reward_pct": 22.0,
+      "condition": "fusions_made",
+      "target": 5
+    },
+    {
+      "id": "side-bazaar-10",
+      "name": "Bazaar Regular",
+      "description": "Make 10 bazaar purchases.",
+      "quest_type": "side",
+      "unlock_level": 10,
+      "reward_pct": 18.0,
+      "condition": "bazaar_purchases",
+      "target": 10
+    }
+  ]
+}

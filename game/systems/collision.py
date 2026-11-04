@@ -4,8 +4,10 @@ import math
 from typing import List, Tuple, Any
 
 from game.entities.projectile import Projectile
+from game.entities.enemy_projectile import EnemyProjectile
 from game.entities.enemy import Enemy
 from game.entities.player import Player
+from game.systems.elements import apply_elemental_damage
 
 
 class CollisionSystem:
@@ -113,8 +115,13 @@ class CollisionSystem:
 
                 bullet.hit_enemies.append(enemy)
 
-                # Apply damage
-                enemy.take_damage(bullet.damage)
+                # Apply damage with elemental resistances.
+                effective_damage = apply_elemental_damage(
+                    bullet.damage,
+                    bullet.element,
+                    enemy_types[enemy.type].get("resistances", {}),
+                )
+                enemy.take_damage(effective_damage)
 
                 # Check if enemy dies
                 if enemy.is_dead():
@@ -126,6 +133,66 @@ class CollisionSystem:
                     bullets_to_remove.add(i)
                     break
                 bullet.piercing -= 1
+
+                # Handle explosive effect
+                if bullet.explosion_radius > 0 and not bullet.exploded:
+                    bullet.exploded = True
+                    # Damage all enemies within explosion radius
+                    for k, other_enemy in enumerate(enemies):
+                        if k in enemies_to_remove:
+                            continue
+                        if other_enemy in bullet.hit_enemies:
+                            continue
+                        distance = self._get_distance(bullet.x, bullet.y, other_enemy.x, other_enemy.y)
+                        if distance <= bullet.explosion_radius / self.pixels_per_unit:
+                            other_hit_distance = (
+                                enemy_types[other_enemy.type]["size"] / 2 + self.BULLET_RADIUS
+                            ) / self.pixels_per_unit
+                            if distance <= other_hit_distance:
+                                bullet.hit_enemies.append(other_enemy)
+                                effective_damage = apply_elemental_damage(
+                                    bullet.damage,
+                                    bullet.element,
+                                    enemy_types[other_enemy.type].get("resistances", {}),
+                                )
+                                other_enemy.take_damage(effective_damage)
+                                if other_enemy.is_dead():
+                                    enemies_to_remove.add(k)
+                                    self.killed_enemies.append(other_enemy)
+
+                # Handle ricochet effect
+                if bullet.bounces_remaining > 0:
+                    bullet.bounces_remaining -= 1
+
+                # Handle homing effect
+                if bullet.homing_strength > 0:
+                    # Find nearest unhit alive enemy
+                    nearest_enemy = None
+                    nearest_distance = float("inf")
+                    for k, other_enemy in enumerate(enemies):
+                        if k in enemies_to_remove:
+                            continue
+                        if other_enemy in bullet.hit_enemies:
+                            continue
+                        distance = self._get_distance(bullet.x, bullet.y, other_enemy.x, other_enemy.y)
+                        if distance < nearest_distance:
+                            nearest_distance = distance
+                            nearest_enemy = (k, other_enemy)
+                    if nearest_enemy is not None:
+                        k, target = nearest_enemy
+                        # Steer towards target
+                        target_x = target.x
+                        target_y = target.y
+                        angle_to_target = math.atan2(target_y - bullet.y, target_x - bullet.x)
+                        # Blend current direction with target direction
+                        blend = min(1.0, bullet.homing_strength)
+                        bullet.dx = bullet.dx * (1 - blend) + math.cos(angle_to_target) * blend
+                        bullet.dy = bullet.dy * (1 - blend) + math.sin(angle_to_target) * blend
+                        # Normalize
+                        mag = math.sqrt(bullet.dx * bullet.dx + bullet.dy * bullet.dy)
+                        if mag > 0:
+                            bullet.dx /= mag
+                            bullet.dy /= mag
 
         # Remove dead enemies and spent bullets
         remaining_enemies = [
@@ -159,11 +226,61 @@ class CollisionSystem:
                 continue
 
             # Apply damage and remove enemy
-            damage=enemy_types[enemy.type]["damage"]
+            damage=getattr(enemy, "damage", enemy_types[enemy.type]["damage"])
             player.take_damage(max(1,int(damage-max(0,defense))))
             enemies.remove(enemy)
 
         return player
+
+    def check_enemy_projectile_player_collisions(
+        self,
+        projectiles: List[EnemyProjectile],
+        player: Player,
+        defense: float = 0.0,
+    ) -> Tuple[List[EnemyProjectile], list[int]]:
+        """Apply and remove enemy shots that hit the player."""
+        remaining: list[EnemyProjectile] = []
+        damage_taken: list[int] = []
+        for projectile in projectiles:
+            hit_distance = (projectile.radius + self.PLAYER_SIZE / 2) / self.pixels_per_unit
+            start_x = projectile.previous_x if projectile.previous_x is not None else projectile.x
+            start_y = projectile.previous_y if projectile.previous_y is not None else projectile.y
+            if self._distance_to_segment(
+                player.x,
+                player.y,
+                start_x,
+                start_y,
+                projectile.x,
+                projectile.y,
+            ) > hit_distance:
+                remaining.append(projectile)
+                continue
+            damage = max(1, int(projectile.damage - max(0.0, defense)))
+            player.take_damage(damage)
+            damage_taken.append(damage)
+        return remaining, damage_taken
+
+    @staticmethod
+    def _distance_to_segment(
+        point_x: float,
+        point_y: float,
+        start_x: float,
+        start_y: float,
+        end_x: float,
+        end_y: float,
+    ) -> float:
+        segment_x = end_x - start_x
+        segment_y = end_y - start_y
+        segment_length_squared = segment_x * segment_x + segment_y * segment_y
+        if segment_length_squared == 0:
+            return math.hypot(point_x - start_x, point_y - start_y)
+        projection = (
+            (point_x - start_x) * segment_x + (point_y - start_y) * segment_y
+        ) / segment_length_squared
+        projection = max(0.0, min(1.0, projection))
+        closest_x = start_x + projection * segment_x
+        closest_y = start_y + projection * segment_y
+        return math.hypot(point_x - closest_x, point_y - closest_y)
 
     def _get_distance(self, x1: float, y1: float, x2: float, y2: float) -> float:
         """Calculate the Euclidean distance between two points."""

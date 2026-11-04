@@ -138,3 +138,6 @@ When adding new features:
 ## Launch command
 Python -m game.main
 This command launches the entire project. if possible, run it once after implementing fixes, then analyze any problems that occur.
+
+## NOTE
+Python -m game.main is not a done deal test that your feature is implemented correctly, you NEED to correctly test your new features, by writing either helper scripts to call them manually, or by using a controllable headless mode, that allows you to analyze what it does.

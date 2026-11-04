@@ -19,6 +19,12 @@ class Projectile:
     piercing: int = 0
     hit_enemies: List[Any] = field(default_factory=list)
     bullet_type: str = "rapid_fire"
+    element: str = "physical"
+    # Projectile effect fields
+    explosion_radius: float = 0.0
+    bounces_remaining: int = 0
+    homing_strength: float = 0.0
+    exploded: bool = False
 
     @classmethod
     def create_from_player(
@@ -31,6 +37,7 @@ class Projectile:
         damage: int = 2,
         piercing: int = 0,
         bullet_type: str = "rapid_fire",
+        element: str = "physical",
     ) -> "Projectile":
         """Create a projectile from player position and angle."""
         direction_x = math.cos(angle)
@@ -46,6 +53,7 @@ class Projectile:
             damage=damage,
             piercing=piercing,
             bullet_type=bullet_type,
+            element=element,
         )
 
     def move(self, dt: float) -> None:

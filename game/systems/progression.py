@@ -88,14 +88,20 @@ class PlayerProgress:
         self.total_exp = LargeNumber(0)
 
 
-def award_enemy_kill(progress: PlayerProgress) -> int:
-    """Award the current placeholder kill reward (one XP) exactly per call.
+def award_enemy_kill(
+    progress: PlayerProgress,
+    amount: int | float | LargeNumber = 1,
+    multiplier: int | float | LargeNumber = 1,
+) -> int:
+    """Award an enemy's configured XP exactly once per kill.
 
     The caller should invoke this once for each enemy returned in the
     collision system's ``killed_enemies`` list, which contains each kill once.
 
     Returns:
-        Number of levels gained (typically 0 for single kill).
+        Number of levels gained.
     """
-    return progress.add_exp(1)
-
+    scaled_amount = LargeNumber(amount) * LargeNumber(multiplier)
+    if scaled_amount <= 0:
+        raise ValueError("Enemy XP reward and multiplier must be positive")
+    return progress.add_exp(scaled_amount)

@@ -11,16 +11,27 @@ import json
 import sys
 from typing import Any
 
-from game.config.settings import bullet_base_speed, enemy_types, player_max_health
+from game.config.settings import (
+    bullet_base_speed,
+    enemy_types as base_enemy_types,
+    player_max_health,
+)
 from game.entities.enemy import Enemy
+from game.entities.enemy_projectile import EnemyProjectile
 from game.entities.player import Player
 from game.systems.bullets import load_bullet_types
 from game.systems.collision import CollisionSystem
 from game.systems.currency import CurrencyWallet
+from game.systems.enemy_catalog import build_enemy_roster
+from game.systems.enemy_abilities import update_enemy_abilities
+from game.systems.enemy_ranged import update_ranged_attacks
 from game.systems.items import create_initial_inventory, player_bonuses, spawnable_items
 from game.systems.numbers import LargeNumber
 from game.systems.progression import PlayerProgress, award_enemy_kill
 from game.systems.weapons import projectile_for_weapon
+
+
+enemy_types = build_enemy_roster(base_enemy_types)
 
 
 class RuntimeProbe:
@@ -36,6 +47,7 @@ class RuntimeProbe:
         self.wallet = CurrencyWallet()
         self.progress = PlayerProgress()
         self.bullets = []
+        self.enemy_projectiles: list[EnemyProjectile] = []
         self.enemies = []
         self.weapon_cooldowns = [0.0, 0.0]
         self.score = LargeNumber(0)
@@ -50,6 +62,10 @@ class RuntimeProbe:
             "inventory":{"count":len(self.inventory.items),"active_slots":self.inventory.active_slots,
                           "bonuses":player_bonuses(self.inventory)},
             "bullets":[{"type":b.bullet_type,"damage":b.damage,"piercing":b.piercing} for b in self.bullets],
+            "enemy_projectiles":[
+                {"x": projectile.x, "y": projectile.y, "damage": projectile.damage}
+                for projectile in self.enemy_projectiles
+            ],
             "enemies":[{"type":e.type,"x":e.x,"y":e.y,"health":e.health} for e in self.enemies],
             "currency":{k: v.format() for k, v in self.wallet.amounts.items()},
             "score": self.score.format(),
@@ -87,15 +103,72 @@ class RuntimeProbe:
             if not 0 < dt <= 10: raise ValueError("dt must be greater than 0 and at most 10 seconds")
             self.elapsed+=dt
             self.weapon_cooldowns=[max(0,v-dt) for v in self.weapon_cooldowns]
+            update_enemy_abilities(
+                self.enemies,
+                enemy_types,
+                dt,
+                self.player.x,
+                self.player.y,
+            )
+            self.enemy_projectiles.extend(
+                update_ranged_attacks(
+                    self.enemies,
+                    enemy_types,
+                    dt,
+                    self.player.x,
+                    self.player.y,
+                )
+            )
+            self.enemy_projectiles = [
+                projectile
+                for projectile in self.enemy_projectiles
+                if not projectile.should_despawn(
+                    self.player.x,
+                    self.player.y,
+                    6.0,
+                )
+            ]
+            for projectile in self.enemy_projectiles:
+                projectile.move(dt)
+            self.enemy_projectiles, projectile_damage = (
+                self.collision.check_enemy_projectile_player_collisions(
+                    self.enemy_projectiles,
+                    self.player,
+                    player_bonuses(self.inventory)["defense"],
+                )
+            )
             for bullet in self.bullets: bullet.move(dt)
             self.bullets,self.enemies=self.collision.check_bullet_enemy_collisions(
                 self.bullets,self.enemies,enemy_types)
-            killed = len(self.collision.killed_enemies)
-            for _ in range(killed):
-                self.score = self.score + LargeNumber(10)
-                self.wallet.reward_for_kill(luck=player_bonuses(self.inventory)["luck"])
-                award_enemy_kill(self.progress)
-            return {"killed": killed, "state": self.status()}
+            killed_enemies = self.collision.killed_enemies
+            for enemy in killed_enemies:
+                if not enemy.reward_eligible:
+                    continue
+                self.score = self.score + LargeNumber(10) * LargeNumber(
+                    enemy.score_multiplier
+                )
+                if enemy.currency_drop and enemy.currency_amount > 0:
+                    self.wallet.reward_for_enemy(
+                        enemy.currency_drop,
+                        enemy.currency_amount,
+                        luck=player_bonuses(self.inventory)["luck"],
+                        multiplier=enemy.score_multiplier,
+                    )
+                else:
+                    self.wallet.reward_for_kill(
+                        luck=player_bonuses(self.inventory)["luck"]
+                    )
+                award_enemy_kill(
+                    self.progress,
+                    enemy.xp_reward,
+                    multiplier=enemy.score_multiplier,
+                )
+            killed = len(killed_enemies)
+            return {
+                "killed": killed,
+                "projectile_damage": projectile_damage,
+                "state": self.status(),
+            }
         if action=="move_player":
             dt=float(command.get("dt",1/60))
             bonuses=player_bonuses(self.inventory)
@@ -151,7 +224,7 @@ class RuntimeProbe:
         self.execute({"action":"step","dt":0.02})
         assert rapid["type"]=="rapid_fire" and rapid["automatic"] and rapid["piercing"]==0
         assert heavy["type"]=="heavy_shot" and not heavy["automatic"] and heavy["piercing"]>0
-        assert self.score==10 and self.progress.current_exp==1 and not self.enemies
+        assert self.score==10 and self.progress.current_exp==10 and not self.enemies
         self._assert_invariants()
         return {"rapid_fire":rapid,"heavy_shot":heavy,"state":self.status(),"invariants":"passed"}
 

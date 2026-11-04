@@ -8,6 +8,7 @@ RARITY_COMBINATION_SLOTS = {
     "common": 1, "uncommon": 2, "rare": 3, "epic": 3,
     "legendary": 4, "mythical": 4, "ultimate": 5,
 }
+ARMOR_EQUIPMENT_SLOTS = ("boots", "pants", "chestplate", "headpiece", "accessory")
 
 
 def _item(item_id: str, name: str, kind: str, rarity: str, level: int,
@@ -100,11 +101,22 @@ class Inventory:
         expected_type = {"armor": "armor", "weapons": "weapon", "abilities": "ability"}[slot_kind]
         if item["type"] != expected_type:
             raise ValueError(f"{item['type']} item cannot be placed in {slot_kind} slot")
-        if self.is_combination_supplement(item_id):
-            raise ValueError("Combination supplements cannot be actively equipped")
         slots = self.active_slots[slot_kind]
         if not 0 <= slot_index < len(slots):
             raise IndexError("Equipment slot out of range")
+        if slot_kind == "armor":
+            if item.get("armor_set") is not None and "armor_slot" not in item:
+                raise ValueError("Armor set pieces must define an equipment slot")
+            if "armor_slot" in item:
+                armor_slot = item["armor_slot"]
+                if not isinstance(armor_slot, str) or armor_slot not in ARMOR_EQUIPMENT_SLOTS:
+                    raise ValueError(f"Unsupported armor slot: {armor_slot}")
+                if armor_slot != ARMOR_EQUIPMENT_SLOTS[slot_index]:
+                    raise ValueError(
+                        f"{item.get('name', 'Armor')} belongs in the {armor_slot} slot"
+                    )
+        if self.is_combination_supplement(item_id):
+            raise ValueError("Combination supplements cannot be actively equipped")
         # Moving an item between slots of the same category clears its old slot.
         for index, existing_id in enumerate(slots):
             if existing_id == item_id:
@@ -134,3 +146,43 @@ class Inventory:
                               "supplement" if item["id"] in supplement_ids else
                               "combination_base" if item["id"] in base_ids else "normal")
 
+    def fuse_items(self, source_item_ids: list[str], *, recipe_id: str | None = None,
+                   fusion_manager: Any | None = None) -> dict[str, Any]:
+        """Create a permanent fused item from two compatible sources."""
+        if len(source_item_ids) < 2:
+            raise ValueError("Fusion requires at least two items")
+        normalized = [str(item_id) for item_id in source_item_ids]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("Duplicate item IDs are not valid for a fusion")
+        source_items = [self.get(item_id) for item_id in normalized]
+        active_ids = {
+            active_id
+            for slot_ids in self.active_slots.values()
+            for active_id in slot_ids
+            if active_id is not None
+        }
+        if any(item.get("id") in active_ids for item in source_items):
+            raise ValueError("Equipped items cannot be fused")
+        if any(
+            self.is_combination_supplement(str(item.get("id")))
+            or any(value is not None for value in item.get("combinations", []))
+            for item in source_items
+        ):
+            raise ValueError("Remove fusion sources from combinations before fusing them")
+        if fusion_manager is None:
+            from game.systems.fusion import FusionManager
+            fusion_manager = FusionManager()
+        if recipe_id is not None:
+            result = fusion_manager.build_fusion(source_items, recipe_id=recipe_id)
+        else:
+            result = fusion_manager.build_fusion(source_items)
+        source_id_set = set(normalized)
+        remaining_items = [
+            item for item in self.items
+            if str(item.get("id")) not in source_id_set
+        ]
+        if any(str(item.get("id")) == str(result.get("id")) for item in remaining_items):
+            raise ValueError("Fusion result ID already exists in this inventory")
+        self.items = [*remaining_items, result]
+        self._refresh_statuses()
+        return result

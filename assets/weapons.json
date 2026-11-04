@@ -1,0 +1,199 @@
+{
+  "weapons": [
+    {
+      "id": "starter-rapid",
+      "name": "Rapid Carbine",
+      "type": "weapon",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "bullet_type": "rapid_fire",
+        "damage": 7,
+        "cooldown": 0.25,
+        "speed_modifier": 3.0,
+        "piercing": 0,
+        "element": "arcane"
+      },
+      "description": "A reliable starter weapon with balanced stats."
+    },
+    {
+      "id": "starter-heavy",
+      "name": "Heavy Pistol",
+      "type": "weapon",
+      "rarity": "rare",
+      "level": 1,
+      "stats": {
+        "bullet_type": "heavy_shot",
+        "damage": 18,
+        "cooldown": 0.68,
+        "speed_modifier": 2.2,
+        "piercing": 2,
+        "element": "fire"
+      },
+      "description": "A powerful pistol with high damage output."
+    },
+    {
+      "id": "ember-lance",
+      "name": "Ember Lance",
+      "type": "weapon",
+      "rarity": "uncommon",
+      "level": 1,
+      "stats": {
+        "bullet_type": "rapid_fire",
+        "damage": 12,
+        "cooldown": 0.18,
+        "speed_modifier": 3.4,
+        "piercing": 1,
+        "element": "fire"
+      },
+      "description": "A fire-infused rifle with rapid fire capability."
+    },
+    {
+      "id": "azar-saber",
+      "name": "Azar Saber",
+      "type": "weapon",
+      "rarity": "rare",
+      "level": 1,
+      "stats": {
+        "bullet_type": "heavy_shot",
+        "damage": 22,
+        "cooldown": 0.9,
+        "speed_modifier": 2.4,
+        "piercing": 3,
+        "element": "shadow"
+      },
+      "description": "A shadow-infused heavy weapon with high piercing."
+    },
+    {
+      "id": "storm-spool",
+      "name": "Storm Spool",
+      "type": "weapon",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "bullet_type": "rapid_fire",
+        "damage": 26,
+        "cooldown": 0.11,
+        "speed_modifier": 4.2,
+        "piercing": 2,
+        "element": "frost"
+      },
+      "description": "A frost-infused rapid-fire weapon with exceptional speed."
+    },
+    {
+      "id": "arc-rifle",
+      "name": "Arc Rifle",
+      "type": "weapon",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "bullet_type": "rapid_fire",
+        "damage": 7,
+        "cooldown": 0.15,
+        "speed_modifier": 3.2,
+        "piercing": 0,
+        "element": "arcane"
+      },
+      "description": "A basic arcane rifle for beginners."
+    },
+    {
+      "id": "lantern-sniper",
+      "name": "Lantern Sniper",
+      "type": "weapon",
+      "rarity": "rare",
+      "level": 1,
+      "tags": ["sniper"],
+      "stats": {
+        "bullet_type": "heavy_shot",
+        "damage": 22,
+        "cooldown": 0.72,
+        "speed_modifier": 2.6,
+        "piercing": 4,
+        "element": "light"
+      },
+      "description": "A precision sniper rifle with high piercing."
+    },
+    {
+      "id": "plasma-cannon",
+      "name": "Plasma Cannon",
+      "type": "weapon",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "bullet_type": "rapid_fire",
+        "damage": 30,
+        "cooldown": 0.18,
+        "speed_modifier": 3.5,
+        "piercing": 1,
+        "element": "fire"
+      },
+      "description": "A high-damage plasma weapon."
+    },
+    {
+      "id": "storm-splitter",
+      "name": "Storm Splitter",
+      "type": "weapon",
+      "rarity": "rare",
+      "level": 1,
+      "stats": {
+        "bullet_type": "rapid_fire",
+        "damage": 14,
+        "cooldown": 0.12,
+        "speed_modifier": 4.0,
+        "piercing": 1,
+        "element": "frost"
+      },
+      "description": "A fast-firing frost weapon."
+    },
+    {
+      "id": "void-piercer",
+      "name": "Void Piercer",
+      "type": "weapon",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "bullet_type": "heavy_shot",
+        "damage": 35,
+        "cooldown": 0.8,
+        "speed_modifier": 2.0,
+        "piercing": 8,
+        "element": "shadow"
+      },
+      "description": "A shadow-infused sniper that penetrates multiple enemies."
+    },
+    {
+      "id": "flame-blaster",
+      "name": "Flame Blaster",
+      "type": "weapon",
+      "rarity": "uncommon",
+      "level": 1,
+      "stats": {
+        "bullet_type": "shotgun",
+        "damage": 12,
+        "cooldown": 0.9,
+        "speed_modifier": 2.0,
+        "pellets": 6,
+        "pellet_range": 8,
+        "element": "fire"
+      },
+      "description": "A fire shotgun that fires 6 pellets with burn effects."
+    },
+    {
+      "id": "homing-devastator",
+      "name": "Homing Devastator",
+      "type": "weapon",
+      "rarity": "legendary",
+      "level": 1,
+      "stats": {
+        "bullet_type": "homing",
+        "damage": 28,
+        "cooldown": 0.25,
+        "speed_modifier": 3.8,
+        "piercing": 1,
+        "homing_speed": 5.0,
+        "element": "arcane"
+      },
+      "description": "An alien weapon with homing bullets that track enemies."
+    }
+  ]
+}

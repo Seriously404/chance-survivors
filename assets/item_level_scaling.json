@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "default_addition_rate": 0.1,
+  "stat_addition_rates": {
+    "cooldown": -0.02
+  },
+  "minimum_values": {
+    "cooldown": 0.05
+  }
+}

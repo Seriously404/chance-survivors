@@ -4,6 +4,28 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
+def _load_enemy_definitions() -> Dict[str, Dict[str, Any]]:
+    """Lazy load enemy definitions to avoid circular imports."""
+    from ..systems.game_definitions import load_enemies
+    return {enemy["id"]: enemy for enemy in load_enemies()}
+
+
+def get_enemy_definitions() -> Dict[str, Dict[str, Any]]:
+    """Get all enemy definitions."""
+    return _load_enemy_definitions()
+
+
+REWARD_DEFINITION_ALIASES = {
+    "swift": "fast",
+    "brute": "tank",
+    "ranged": "shooter",
+    "shadow": "elemental-shadow",
+}
+
 
 @dataclass
 class Enemy:
@@ -17,6 +39,17 @@ class Enemy:
     angle: float = 0.0
     health: int = 10
     max_health: int = 10
+    damage: int = 10
+    speed: float = 1.0
+    turning_speed: float = 1.0
+    score_multiplier: int = 1
+    currency_drop: str | None = None
+    currency_amount: int = 0
+    xp_reward: int = 1
+    reward_eligible: bool = True
+    summon_timer_seconds: float = 0.0
+    ranged_attack_timer_seconds: float = 0.0
+    summoner_id: int | None = None
 
     def __post_init__(self) -> None:
         """Normalize direction vector after initialization."""
@@ -84,6 +117,9 @@ class Enemy:
         y: float,
     ) -> "Enemy":
         """Create an enemy from a type configuration."""
+        reward_definition = get_enemy_definitions().get(
+            REWARD_DEFINITION_ALIASES.get(enemy_type, enemy_type)
+        )
         return cls(
             type=enemy_type,
             x=x,
@@ -93,4 +129,33 @@ class Enemy:
             angle=0.0,
             health=stats["max_health"],
             max_health=stats["max_health"],
+            damage=int(stats.get("damage", 10)),
+            speed=float(stats.get("speed", 1.0)),
+            turning_speed=float(stats.get("turning_speed", 1.0)),
+            score_multiplier=max(1, int(stats.get("score_multiplier", 1))),
+            currency_drop=(
+                reward_definition.get("currency_drop")
+                if reward_definition is not None
+                else None
+            ),
+            currency_amount=(
+                int(reward_definition.get("currency_amount", 0))
+                if reward_definition is not None
+                else 0
+            ),
+            xp_reward=(
+                int(reward_definition.get("xp_reward", 1))
+                if reward_definition is not None
+                else 1
+            ),
         )
+
+    @classmethod
+    def get_definition(cls, enemy_type: str) -> Dict[str, Any] | None:
+        """Get the definition for an enemy type."""
+        return get_enemy_definitions().get(enemy_type)
+
+    @classmethod
+    def get_all_definitions(cls) -> Dict[str, Dict[str, Any]]:
+        """Get all enemy definitions."""
+        return get_enemy_definitions().copy()

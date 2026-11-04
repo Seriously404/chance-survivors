@@ -92,12 +92,18 @@ class InputHandler:
             self.player_dx -= 1
         elif key == pygame.K_d:
             self.player_dx += 1
+        elif pygame.K_1 <= key <= pygame.K_9:
+            actions.append(f"ability_cast:{key - pygame.K_1}")
+        elif key == pygame.K_0:
+            actions.append("ability_cast:9")
         elif key == pygame.K_RETURN:
             actions.append("confirm")
         elif key == pygame.K_ESCAPE:
             actions.append("back")
         elif key == pygame.K_q:
             actions.append("open_settings")
+        elif key == pygame.K_u:
+            actions.append("upload_run")
         elif key == pygame.K_BACKSPACE:
             self.player_name = self.player_name[:-1]
 
