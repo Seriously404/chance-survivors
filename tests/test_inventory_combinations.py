@@ -53,7 +53,8 @@ class InventoryCombinationTests(unittest.TestCase):
         self.assertEqual(inventory.active_slots["weapons"][0], "weapon")
 
     def test_supplement_cannot_be_reused_across_bases(self) -> None:
-        inventory = Inventory([item("base-a"), item("base-b"), item("supplement")])
+        inventory = Inventory(
+            [item("base-a"), item("base-b"), item("supplement")])
         inventory.assign_combination("base-a", 0, "supplement")
         before = combo_state(inventory)
         with self.assertRaises(ValueError):
@@ -93,11 +94,13 @@ class InventoryCombinationTests(unittest.TestCase):
 
         # Moving one over two swaps the same-base items instead of detaching either.
         inventory.assign_combination("base", 1, "one")
-        self.assertEqual(inventory.get("base")["combinations"], ["two", "one", None])
+        self.assertEqual(inventory.get("base")[
+                         "combinations"], ["two", "one", None])
 
         # Moving a supplement to an empty slot clears its old slot.
         inventory.assign_combination("base", 2, "one")
-        self.assertEqual(inventory.get("base")["combinations"], ["two", None, "one"])
+        self.assertEqual(inventory.get("base")[
+                         "combinations"], ["two", None, "one"])
 
     def test_invalid_slot_and_corrupt_initial_graphs_are_rejected(self) -> None:
         inventory = Inventory([item("base"), item("supplement")])

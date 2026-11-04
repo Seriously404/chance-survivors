@@ -7,19 +7,48 @@ from game.systems.inventory import Inventory
 
 
 class FusionSystemTests(unittest.TestCase):
-    def test_fusion_unlocks_at_endgame_level_50_only(self) -> None:
+    def test_fusion_is_available_from_level_one(self) -> None:
         manager = FusionManager()
 
-        self.assertFalse(manager.is_unlocked(49))
+        self.assertTrue(manager.is_unlocked(1))
         self.assertTrue(manager.is_unlocked(50))
         self.assertTrue(manager.is_unlocked(51))
         self.assertFalse(manager.is_unlocked(True))
 
+    def test_elemental_core_requires_each_element_and_level(self) -> None:
+        manager = FusionManager()
+        elements = ("fire", "frost", "light", "shadow", "arcane", "nature")
+        items = [{"id": e, "type": "ability", "rarity": "common", "level": 1,
+                  "stats": {"element": e}, "status": "normal"} for e in elements]
+        with self.assertRaisesRegex(ValueError, "level 8"):
+            manager.find_sources(items, "elemental-core", 7)
+        sources = manager.find_sources(items, "elemental-core", 8)
+        core = manager.build_fusion(sources, "elemental-core")
+        self.assertEqual(core["fusion_recipe"], "elemental-core")
+        self.assertIn("elemental-core", core["tags"])
+        with self.assertRaisesRegex(ValueError, "Missing compatible"):
+            manager.find_sources(items[:-1], "elemental-core", 8)
+
+    def test_elemental_core_can_supplement_armor(self) -> None:
+        from game.systems.combinations import CombinationEngine
+        armor = {"id": "armor", "name": "Armor", "type": "armor", "rarity": "common",
+                 "level": 1, "stats": {"defense": 1}, "combinations": [None]}
+        core = {"id": "core", "name": "Core", "type": "relic", "rarity": "legendary",
+                "level": 1, "stats": {}, "combinations": [None] * 4,
+                "fusion_recipe": "elemental-core", "tags": ["elemental-core"]}
+        inventory = Inventory([armor, core])
+        inventory.assign_combination("armor", 0, "core")
+        combined = CombinationEngine().evaluate_inventory(inventory, "armor")
+        self.assertIn("core", combined.component_ids)
+
     def test_fusion_manager_creates_valid_fused_item(self) -> None:
         manager = FusionManager()
-        weapon = {"id": "w1", "name": "Alpha Rifle", "type": "weapon", "rarity": "epic", "level": 3, "tags": ["sniper"], "stats": {"damage": 18, "speed_modifier": 2.2, "bullet_type": "rapid_fire", "element": "frost"}}
-        ability = {"id": "a1", "name": "Nova Charm", "type": "ability", "rarity": "epic", "level": 2, "stats": {"cooldown": 8, "damage_pct": 10}}
-        fused = manager.build_fusion([weapon, ability], recipe_id="solar-hammer")
+        weapon = {"id": "w1", "name": "Alpha Rifle", "type": "weapon", "rarity": "epic", "level": 3, "tags": [
+            "sniper"], "stats": {"damage": 18, "speed_modifier": 2.2, "bullet_type": "rapid_fire", "element": "frost"}}
+        ability = {"id": "a1", "name": "Nova Charm", "type": "ability",
+                   "rarity": "epic", "level": 2, "stats": {"cooldown": 8, "damage_pct": 10}}
+        fused = manager.build_fusion(
+            [weapon, ability], recipe_id="solar-hammer")
         self.assertEqual(fused["name"], "Solar Hammer")
         self.assertEqual(fused["type"], "weapon")
         self.assertIn("fusion_recipe", fused)
@@ -31,20 +60,27 @@ class FusionSystemTests(unittest.TestCase):
 
     def test_inventory_fusion_removes_sources_and_keeps_result(self) -> None:
         inventory = Inventory([
-            {"id": "w1", "name": "Alpha Rifle", "type": "weapon", "rarity": "epic", "level": 3, "stats": {"damage": 18, "speed_modifier": 2.2}, "combinations": [None] * 3, "status": "normal"},
-            {"id": "a1", "name": "Nova Charm", "type": "ability", "rarity": "epic", "level": 2, "stats": {"cooldown": 8, "damage_pct": 10}, "combinations": [None] * 3, "status": "normal"},
-            {"id": "c1", "name": "Cinder Plate", "type": "armor", "rarity": "rare", "level": 2, "stats": {"defense": 7}, "combinations": [None] * 3, "status": "normal"},
+            {"id": "w1", "name": "Alpha Rifle", "type": "weapon", "rarity": "epic", "level": 3, "stats": {
+                "damage": 18, "speed_modifier": 2.2}, "combinations": [None] * 3, "status": "normal"},
+            {"id": "a1", "name": "Nova Charm", "type": "ability", "rarity": "epic", "level": 2, "stats": {
+                "cooldown": 8, "damage_pct": 10}, "combinations": [None] * 3, "status": "normal"},
+            {"id": "c1", "name": "Cinder Plate", "type": "armor", "rarity": "rare", "level": 2,
+                "stats": {"defense": 7}, "combinations": [None] * 3, "status": "normal"},
         ])
-        fused = inventory.fuse_items(["w1", "a1"], fusion_manager=FusionManager(), recipe_id="solar-hammer")
+        fused = inventory.fuse_items(
+            ["w1", "a1"], fusion_manager=FusionManager(), recipe_id="solar-hammer")
         self.assertEqual(len(inventory.items), 2)
-        self.assertTrue(any(item["id"] == fused["id"] for item in inventory.items))
+        self.assertTrue(any(item["id"] == fused["id"]
+                        for item in inventory.items))
         self.assertNotIn("w1", {item["id"] for item in inventory.items})
         self.assertNotIn("a1", {item["id"] for item in inventory.items})
 
     def test_recipe_rejects_wrong_types_and_below_threshold_sources(self) -> None:
         manager = FusionManager()
-        weapon = {"id": "w1", "type": "weapon", "rarity": "rare", "level": 3, "stats": {}}
-        ability = {"id": "a1", "type": "ability", "rarity": "epic", "level": 2, "stats": {}}
+        weapon = {"id": "w1", "type": "weapon",
+                  "rarity": "rare", "level": 3, "stats": {}}
+        ability = {"id": "a1", "type": "ability",
+                   "rarity": "epic", "level": 2, "stats": {}}
 
         with self.assertRaisesRegex(ValueError, "Solar Hammer requires weapon \\+ ability"):
             manager.build_fusion([weapon, {"id": "armor", "type": "armor", "rarity": "epic", "level": 2, "stats": {}}],
@@ -75,16 +111,22 @@ class FusionSystemTests(unittest.TestCase):
         ])
         inventory.get("w1")["combinations"][0] = "a1"
         with self.assertRaisesRegex(ValueError, "Remove fusion sources from combinations"):
-            inventory.fuse_items(["w1", "a1"], recipe_id="solar-hammer", fusion_manager=manager)
-        self.assertEqual({item["id"] for item in inventory.items}, {"w1", "a1"})
+            inventory.fuse_items(
+                ["w1", "a1"], recipe_id="solar-hammer", fusion_manager=manager)
+        self.assertEqual({item["id"]
+                         for item in inventory.items}, {"w1", "a1"})
 
     def test_find_companion_returns_only_a_complete_recipe_pair(self) -> None:
         manager = FusionManager()
-        source = {"id": "w1", "type": "weapon", "rarity": "epic", "level": 2, "stats": {}}
+        source = {"id": "w1", "type": "weapon",
+                  "rarity": "epic", "level": 2, "stats": {}}
         candidates = [
-            {"id": "bad-rarity", "type": "ability", "rarity": "rare", "level": 2, "stats": {}},
-            {"id": "wrong-type", "type": "armor", "rarity": "ultimate", "level": 5, "stats": {}},
-            {"id": "valid", "type": "ability", "rarity": "epic", "level": 2, "stats": {}},
+            {"id": "bad-rarity", "type": "ability",
+                "rarity": "rare", "level": 2, "stats": {}},
+            {"id": "wrong-type", "type": "armor",
+                "rarity": "ultimate", "level": 5, "stats": {}},
+            {"id": "valid", "type": "ability",
+                "rarity": "epic", "level": 2, "stats": {}},
         ]
 
         self.assertEqual(

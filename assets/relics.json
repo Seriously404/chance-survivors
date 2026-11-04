@@ -83,7 +83,7 @@
     {
       "id": "lucky-box-legendary",
       "name": "Lucky Box",
-      "type": "misc",
+      "type": "relic",
       "rarity": "legendary",
       "level": 1,
       "stats": {
@@ -95,8 +95,8 @@
     {
       "id": "chaos-core",
       "name": "Chaos Core",
-      "type": "misc",
-      "rarity": "mythical",
+      "type": "relic",
+      "rarity": "legendary",
       "level": 1,
       "stats": {
         "luck": 12,
@@ -108,8 +108,8 @@
     {
       "id": "moon-sigil",
       "name": "Moon Sigil",
-      "type": "misc",
-      "rarity": "mythical",
+      "type": "relic",
+      "rarity": "legendary",
       "level": 1,
       "stats": {
         "luck": 10,
@@ -121,7 +121,7 @@
     {
       "id": "inferno-core",
       "name": "Inferno Core",
-      "type": "misc",
+      "type": "relic",
       "rarity": "legendary",
       "level": 1,
       "stats": {
@@ -133,7 +133,7 @@
     {
       "id": "shimmer-petal",
       "name": "Shimmer Petal",
-      "type": "misc",
+      "type": "relic",
       "rarity": "rare",
       "level": 1,
       "stats": {
@@ -145,7 +145,7 @@
     {
       "id": "ricochet-amulet",
       "name": "Ricochet Amulet",
-      "type": "misc",
+      "type": "relic",
       "rarity": "rare",
       "level": 1,
       "stats": {
@@ -182,7 +182,7 @@
     {
       "id": "sentry-lattice",
       "name": "Sentry Lattice",
-      "type": "misc",
+      "type": "relic",
       "rarity": "epic",
       "level": 1,
       "stats": {

@@ -10,10 +10,12 @@ from collections.abc import Mapping
 from typing import Any
 
 
-ITEM_DEFINITIONS_PATH = Path(__file__).resolve().parents[2] / "assets" / "items.json"
+ITEM_DEFINITIONS_PATH = Path(__file__).resolve(
+).parents[2] / "assets" / "items.json"
 ITEM_DEFINITIONS_VERSION = 1
-SUPPORTED_ITEM_TYPES = frozenset({"weapon", "ability", "armor", "relic", "element", "misc"})
-SUPPORTED_RARITIES = frozenset({"common", "uncommon", "rare", "epic", "legendary", "mythical", "ultimate"})
+SUPPORTED_ITEM_TYPES = frozenset({"weapon", "ability", "armor", "relic"})
+SUPPORTED_RARITIES = frozenset(
+    {"common", "uncommon", "rare", "epic", "legendary", "mythical", "ultimate"})
 RARITY_COMBINATION_SLOTS = {
     "common": 1,
     "uncommon": 2,
@@ -43,7 +45,8 @@ _KNOWN_FIELDS = frozenset({
 
 def _stable_id(value: Any, label: str) -> str:
     if not isinstance(value, str) or not _STABLE_ID.fullmatch(value):
-        raise ValueError(f"{label} must be a non-empty stable identifier without whitespace")
+        raise ValueError(
+            f"{label} must be a non-empty stable identifier without whitespace")
     return value
 
 
@@ -70,7 +73,8 @@ def _json_value(value: Any, label: str) -> Any:
         if any(not isinstance(key, str) or not key for key in value):
             raise ValueError(f"{label} object keys must be non-empty strings")
         return {key: _json_value(value[key], f"{label}.{key}") for key in sorted(value)}
-    raise ValueError(f"{label} contains unsupported value type {type(value).__name__}")
+    raise ValueError(
+        f"{label} contains unsupported value type {type(value).__name__}")
 
 
 def _normalize_stats(value: Any, item_id: str) -> dict[str, Any]:
@@ -79,36 +83,44 @@ def _normalize_stats(value: Any, item_id: str) -> dict[str, Any]:
     stats: dict[str, Any] = {}
     for name in sorted(value):
         if not isinstance(name, str) or not name.strip():
-            raise ValueError(f"Item {item_id!r} stat names must be non-empty strings")
+            raise ValueError(
+                f"Item {item_id!r} stat names must be non-empty strings")
         stat_value = value[name]
         if isinstance(stat_value, (dict, list)) or stat_value is None:
-            raise ValueError(f"Item {item_id!r} stat {name!r} must be a scalar value")
+            raise ValueError(
+                f"Item {item_id!r} stat {name!r} must be a scalar value")
         stats[name.strip()] = _json_value(stat_value, f"Item {item_id}.{name}")
     if len(stats) != len(value):
-        raise ValueError(f"Item {item_id!r} stat names must be unique after trimming")
+        raise ValueError(
+            f"Item {item_id!r} stat names must be unique after trimming")
     return stats
 
 
 def _normalize_currency_preferences(value: Any, item_id: str) -> dict[str, str | int | float]:
     if not isinstance(value, Mapping):
-        raise ValueError(f"Item {item_id!r} currency_preferences must be an object")
+        raise ValueError(
+            f"Item {item_id!r} currency_preferences must be an object")
     result: dict[str, str | int | float] = {}
     for currency_id in sorted(value):
         _stable_id(currency_id, f"Item {item_id!r} currency id")
         preference = value[currency_id]
         if isinstance(preference, bool):
-            raise ValueError(f"Item {item_id!r} currency preference must be a label or positive number")
+            raise ValueError(
+                f"Item {item_id!r} currency preference must be a label or positive number")
         if isinstance(preference, str):
             normalized = _PREFERENCE_LABELS.get(preference.strip().lower())
             if normalized is None:
-                raise ValueError(f"Item {item_id!r} has unsupported preference for {currency_id!r}")
+                raise ValueError(
+                    f"Item {item_id!r} has unsupported preference for {currency_id!r}")
             result[currency_id] = normalized
         elif isinstance(preference, (int, float)):
             if not math.isfinite(preference) or preference <= 0:
-                raise ValueError(f"Item {item_id!r} currency preference multipliers must be positive and finite")
+                raise ValueError(
+                    f"Item {item_id!r} currency preference multipliers must be positive and finite")
             result[currency_id] = preference
         else:
-            raise ValueError(f"Item {item_id!r} currency preference must be a label or positive number")
+            raise ValueError(
+                f"Item {item_id!r} currency preference must be a label or positive number")
     return result
 
 
@@ -126,7 +138,8 @@ def _normalize_definition(raw: Any, index: int) -> dict[str, Any]:
         raise ValueError(f"Item {item_id!r} has an unsupported item type")
     item_type = item_type.strip().lower()
     if item_type not in SUPPORTED_ITEM_TYPES:
-        raise ValueError(f"Item {item_id!r} has unsupported type {item_type!r}")
+        raise ValueError(
+            f"Item {item_id!r} has unsupported type {item_type!r}")
 
     rarity = raw.get("rarity")
     if not isinstance(rarity, str):
@@ -148,13 +161,16 @@ def _normalize_definition(raw: Any, index: int) -> dict[str, Any]:
 
     base = raw.get("base", raw.get("is_base", False))
     if "base" in raw and "is_base" in raw and raw["base"] is not raw["is_base"]:
-        raise ValueError(f"Item {item_id!r} has conflicting base and is_base flags")
+        raise ValueError(
+            f"Item {item_id!r} has conflicting base and is_base flags")
     fusion_only = raw.get("fusion_only", False)
     if type(base) is not bool or type(fusion_only) is not bool:
-        raise ValueError(f"Item {item_id!r} base and fusion_only flags must be booleans")
+        raise ValueError(
+            f"Item {item_id!r} base and fusion_only flags must be booleans")
 
     tags = _unique_string_list(raw.get("tags", []), f"Item {item_id!r} tags")
-    behaviors = _unique_string_list(raw.get("behaviors", []), f"Item {item_id!r} behaviors")
+    behaviors = _unique_string_list(
+        raw.get("behaviors", []), f"Item {item_id!r} behaviors")
     stats = _normalize_stats(raw.get("stats"), item_id)
 
     currency_preferences = _normalize_currency_preferences(
@@ -162,8 +178,10 @@ def _normalize_definition(raw: Any, index: int) -> dict[str, Any]:
     )
     acquisition = raw.get("acquisition", {})
     if not isinstance(acquisition, Mapping):
-        raise ValueError(f"Item {item_id!r} acquisition metadata must be an object")
-    normalized_acquisition = _json_value(acquisition, f"Item {item_id}.acquisition")
+        raise ValueError(
+            f"Item {item_id!r} acquisition metadata must be an object")
+    normalized_acquisition = _json_value(
+        acquisition, f"Item {item_id}.acquisition")
 
     definition: dict[str, Any] = {
         "id": item_id,
@@ -199,7 +217,8 @@ def load_item_definitions(path: str | Path | None = None) -> list[dict[str, Any]
     try:
         raw = json.loads(catalog_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise ValueError(f"Could not load item definitions from {catalog_path}: {exc}") from exc
+        raise ValueError(
+            f"Could not load item definitions from {catalog_path}: {exc}") from exc
     if (
         not isinstance(raw, Mapping)
         or type(raw.get("version")) is not int
@@ -210,7 +229,8 @@ def load_item_definitions(path: str | Path | None = None) -> list[dict[str, Any]
     if not isinstance(definitions, list):
         raise ValueError("Item definition catalog must contain an items list")
 
-    normalized = [_normalize_definition(item, index) for index, item in enumerate(definitions)]
+    normalized = [_normalize_definition(item, index)
+                  for index, item in enumerate(definitions)]
     ids = [item["id"] for item in normalized]
     if len(ids) != len(set(ids)):
         raise ValueError("Item definition ids must be unique")

@@ -61,7 +61,11 @@ def load_all_items() -> list[dict[str, Any]]:
 
 def create_item_catalog_from_json() -> list[dict[str, Any]]:
     """Create a complete item catalog from JSON definitions."""
-    return load_all_items()
+    items = load_all_items()
+    existing = {item.get("id") for item in items}
+    items.extend(item for item in load_json_asset("items.json").get("items", [])
+                 if item.get("id") not in existing)
+    return items
 
 
 def load_rarity_scaling() -> dict[str, Any]:
@@ -74,7 +78,8 @@ def load_rarity_scaling() -> dict[str, Any]:
         "common", "uncommon", "rare", "epic", "legendary", "mythical", "ultimate"
     }
     if not isinstance(multipliers, dict) or set(multipliers) != expected_rarities:
-        raise ValueError("Rarity scaling must define exactly the supported rarities")
+        raise ValueError(
+            "Rarity scaling must define exactly the supported rarities")
     normalized: dict[str, float] = {}
     for rarity, multiplier in multipliers.items():
         numeric_multiplier = _finite_number(multiplier)
@@ -90,7 +95,8 @@ def load_rarity_scaling() -> dict[str, Any]:
         normalized[current] > normalized[next_rarity]
         for current, next_rarity in zip(rarity_order, rarity_order[1:])
     ):
-        raise ValueError("Rarity multipliers must not decrease at higher rarities")
+        raise ValueError(
+            "Rarity multipliers must not decrease at higher rarities")
     tier_growth = data.get("ultimate_tier_growth")
     numeric_tier_growth = _finite_number(tier_growth)
     if numeric_tier_growth is None or numeric_tier_growth < 1:
@@ -130,14 +136,16 @@ def load_item_level_scaling() -> dict[str, Any]:
                 or numeric_value is None
                 or (nonnegative and numeric_value < 0)
             ):
-                raise ValueError(f"Invalid item level scaling value for {stat!r}")
+                raise ValueError(
+                    f"Invalid item level scaling value for {stat!r}")
             normalized[stat] = numeric_value
         return normalized
 
     default_rate = data.get("default_addition_rate")
     numeric_default_rate = _finite_number(default_rate)
     if numeric_default_rate is None or numeric_default_rate < 0:
-        raise ValueError("Default item level addition rate must be finite and non-negative")
+        raise ValueError(
+            "Default item level addition rate must be finite and non-negative")
     return {
         "default_addition_rate": numeric_default_rate,
         "stat_addition_rates": numeric_mapping("stat_addition_rates", nonnegative=False),

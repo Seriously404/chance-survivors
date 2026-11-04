@@ -1,50 +1,35 @@
 """Headless integration tests for spawner scaling and scaled rewards."""
 
-import random
 import unittest
+from unittest.mock import patch
 
 from game.config.settings import enemy_types
 from game.systems.currency import CurrencyWallet
-from game.systems.scaling import ScalingConfig, ScalingSystem
+from game.systems.enemy_scaling import EnemyScaling
 from game.systems.spawner import SpawnerSystem
-from game.utils.large_number import LargeNumber
+from game.systems.numbers import LargeNumber
 
 
 class SpawnerScalingTests(unittest.TestCase):
-    def test_spawner_applies_active_time_and_difficulty_separately(self) -> None:
-        scaling = ScalingSystem(ScalingConfig(
-            time_step_seconds=10,
-            time_health_multiplier=2,
-            time_damage_multiplier=2,
-            time_spawn_rate_multiplier=2,
-            time_reward_multiplier=2,
-            difficulty_health_multiplier=3,
-            difficulty_damage_multiplier=3,
-            difficulty_spawn_rate_multiplier=3,
-            difficulty_reward_multiplier=3,
-        ))
-        spawner = SpawnerSystem(enemy_types, 2000, scaling=scaling, rng=random.Random(9))
-        spawner.update(10)
-        self.assertEqual(scaling.active_time_seconds, 10)
-        spawner.increase_difficulty()
-        self.assertEqual(scaling.active_time_seconds, 10)
-        self.assertEqual(spawner.difficulty_level, 1)
-        self.assertAlmostEqual(spawner.current_spawn_delay_ms, 2000 / 6)
-
+    def test_spawner_applies_active_time_scaling_without_changing_roster(self) -> None:
+        scaling = EnemyScaling()
+        stats = {"max_health": 100, "damage": 100,
+                 "speed": 1, "score_multiplier": 1}
+        spawner = SpawnerSystem({"basic": stats}, 2000)
+        spawner.spawn_delay_ms = scaling.spawn_delay_ms(2000, 600)
+        self.assertLess(spawner.spawn_delay_ms, 2000)
+        spawner.update(spawner.spawn_delay_ms / 1000)
+        self.assertTrue(spawner.should_spawn())
         enemies = []
-        spawner.spawn(0, 0, enemies)
+        with patch("game.systems.spawner.random.random", return_value=0), patch("game.systems.spawner.random.uniform", return_value=1):
+            spawner.spawn(0, 0, enemies, elapsed_seconds=600, scaling=scaling)
         enemy = enemies[0]
-        self.assertEqual(enemy.max_health, LargeNumber(60))
-        self.assertEqual(enemy.damage, LargeNumber(60))
-        self.assertEqual(enemy.reward_multiplier, LargeNumber(6))
-        self.assertAlmostEqual((enemy.x**2 + enemy.y**2) ** 0.5, 3.0)
-
+        self.assertEqual(enemy.max_health, 162)
+        self.assertGreater(enemy.damage, stats["damage"])
+        self.assertEqual(enemy.score_multiplier, 2)
+        self.assertEqual(stats["max_health"], 100)
         spawner.reset()
-        self.assertEqual(spawner.difficulty_level, 0)
-        self.assertEqual(spawner.scaling.active_time_seconds, 0)
-        enemies = []
-        spawner.spawn(0, 0, enemies)
-        self.assertEqual((enemies[0].x, enemies[0].y), (enemy.x, enemy.y))
+        self.assertFalse(spawner.should_spawn())
 
     def test_kill_reward_uses_large_scaled_currency(self) -> None:
         class FixedRandom:
@@ -60,12 +45,16 @@ class SpawnerScalingTests(unittest.TestCase):
 
         wallet = CurrencyWallet()
         currency, amount = wallet.reward_for_kill(
-            rng=FixedRandom(), reward_multiplier=LargeNumber("1e1000")
+            rng=FixedRandom(), multiplier=LargeNumber("1e1000")
         )
 
         self.assertEqual(currency, "Copper")
         self.assertEqual(amount, LargeNumber("3e1000"))
         self.assertEqual(wallet.amounts["Copper"], LargeNumber("3e1000"))
+
+        currency, amount = wallet.reward_for_enemy(
+            "Copper", 3, rng=FixedRandom(), multiplier=2)
+        self.assertEqual((currency, amount), ("Copper", LargeNumber(6)))
 
     def test_extreme_luck_saturates_at_a_valid_probability(self) -> None:
         wallet = CurrencyWallet()

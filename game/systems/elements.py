@@ -32,7 +32,9 @@ def apply_elemental_damage(
     bonus_pct: float = 0.0,
 ) -> int:
     """Apply element bonuses and target resistances to a source attack."""
-    damage = float(base_damage)
+    from game.utils.large_number import LargeNumber
+    ordinary_damage = isinstance(base_damage, (int, float))
+    damage = LargeNumber(base_damage)
     if bonus_pct:
         damage *= 1.0 + (float(bonus_pct) / 100.0)
     norm = normalize_element(element)
@@ -42,4 +44,6 @@ def apply_elemental_damage(
     if norm == "physical":
         resistance = 0.0
     effective = damage * max(0.0, 1.0 - resistance)
-    return max(1, int(effective))
+    if ordinary_damage:
+        return max(1, int(effective.to_float()))
+    return max(LargeNumber(1), effective)

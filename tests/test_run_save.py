@@ -8,17 +8,33 @@ from game.systems.items import create_initial_inventory
 from game.systems.numbers import LargeNumber
 from game.systems.quests import QuestManager
 from game.systems.run_save import RunSave
+from game.utils.large_number import LargeNumber as CombatNumber
 
 
 class RunSaveTests(unittest.TestCase):
+    def test_damaged_large_health_round_trips_exactly(self) -> None:
+        original = self.create_save()
+        original.state["player"] = {
+            "health": CombatNumber("7.1234567890123456789e400"),
+            "max_health": CombatNumber("1e401"),
+        }
+        original = RunSave(original.state)
+        restored = RunSave.from_json(original.to_json())
+        self.assertEqual(
+            restored.state["player"]["health"], original.state["player"]["health"])
+        self.assertEqual(
+            restored.state["player"]["max_health"], original.state["player"]["max_health"])
+
     def create_save(self) -> RunSave:
         inventory = create_initial_inventory()
         inventory.items[0]["stats"]["extreme_test"] = LargeNumber("1e400")
-        weapon = next(item for item in inventory.items if item["type"] == "weapon")
+        weapon = next(
+            item for item in inventory.items if item["type"] == "weapon")
         inventory.equip(weapon["id"], "weapons", 0)
         quests = QuestManager()
-        quests.register_level(5)
+        quests.register_level(8)
         quests.register_kill("basic")
+        quests.accept("main-bastion")
         quests.lock_main_quest(quests.main_quest.id)
         return RunSave.capture(
             player_name="Saved Player",
@@ -30,7 +46,8 @@ class RunSaveTests(unittest.TestCase):
             current_exp=LargeNumber("2e80"),
             total_exp=LargeNumber("3e90"),
             inventory=inventory,
-            currencies={"Copper": LargeNumber("1e100"), "Gold": LargeNumber(9)},
+            currencies={"Copper": LargeNumber(
+                "1e100"), "Gold": LargeNumber(9)},
             quest_state=quests.to_save_state(),
             threat_level=7,
             spawn_counter=11,
@@ -45,7 +62,8 @@ class RunSaveTests(unittest.TestCase):
         state = loaded.state
         self.assertEqual(state["score"], "1E+400")
         self.assertEqual(state["currencies"]["Copper"], "1E+100")
-        self.assertIsInstance(state["inventory"]["active_slots"]["weapons"][0], str)
+        self.assertIsInstance(
+            state["inventory"]["active_slots"]["weapons"][0], str)
         self.assertEqual(state["quests"]["kills_total"], 1)
         self.assertEqual(state["spawn_counter"], 11)
         self.assertEqual(state["bazaar_seed"], 23)
@@ -85,7 +103,8 @@ class RunSaveTests(unittest.TestCase):
 
         self.assertEqual(restored.state["bazaar_seed"], 0)
         self.assertEqual(restored.state["bazaar_refresh_count"], 0)
-        self.assertEqual(restored.state["bazaar_last_manual_refresh_cycle"], -1)
+        self.assertEqual(
+            restored.state["bazaar_last_manual_refresh_cycle"], -1)
 
     def test_round_trip_preserves_ultimate_rarity_subtier(self) -> None:
         payload = self.create_save().to_dict()

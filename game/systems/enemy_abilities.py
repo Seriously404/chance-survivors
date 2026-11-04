@@ -42,7 +42,8 @@ def update_enemy_abilities(
             or type(maximum) is not int
             or maximum <= 0
         ):
-            raise ValueError(f"Invalid summon configuration for {summoner.type!r}")
+            raise ValueError(
+                f"Invalid summon configuration for {summoner.type!r}")
 
         summoner.summon_timer_seconds += dt
         minions = [
@@ -58,7 +59,8 @@ def update_enemy_abilities(
 
         minion_definition = enemy_types.get("necromancer_minion")
         if minion_definition is None:
-            raise ValueError("Enemy roster is missing the necromancer minion definition")
+            raise ValueError(
+                "Enemy roster is missing the necromancer minion definition")
 
         spawned_this_cycle = 0
         while (

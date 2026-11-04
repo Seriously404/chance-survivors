@@ -21,7 +21,8 @@ class EnemyScaling:
             raise TypeError("threat_level must be an integer")
         if not isinstance(self.max_threat_level, int) or self.max_threat_level < 0:
             raise ValueError("max_threat_level must be a non-negative integer")
-        self.threat_level = min(self.max_threat_level, max(0, self.threat_level))
+        self.threat_level = min(self.max_threat_level,
+                                max(0, self.threat_level))
 
     def adjust_threat(self, amount: int) -> int:
         """Adjust threat by whole tiers, clamping it to the supported range."""
@@ -40,16 +41,20 @@ class EnemyScaling:
         if elapsed_seconds < 0:
             raise ValueError("elapsed_seconds cannot be negative")
         elapsed_minutes = int(elapsed_seconds // 60)
-        return Decimal("1.05") ** elapsed_minutes * Decimal("1.25") ** self.threat_level
+        late_decades = max(0, elapsed_minutes - 15) // 5
+        return Decimal("1.05") ** elapsed_minutes * (Decimal(10) ** late_decades) * Decimal("1.25") ** self.threat_level
 
     def scale_stats(self, stats: dict[str, Any], elapsed_seconds: float) -> dict[str, Any]:
         """Return a scaled copy; never mutate the shared enemy configuration."""
         result = deepcopy(stats)
         multiplier = self.multiplier(elapsed_seconds)
-        result["max_health"] = max(1, int(Decimal(str(stats["max_health"])) * multiplier))
+        result["max_health"] = max(
+            1, int(Decimal(str(stats["max_health"])) * multiplier))
         damage_growth = Decimal(1) + multiplier.log10() * Decimal("0.12")
-        result["damage"] = max(1, int(Decimal(str(stats["damage"])) * damage_growth))
-        speed_growth = min(Decimal("1.5"), Decimal(1) + multiplier.log10() * Decimal("0.02"))
+        result["damage"] = max(
+            1, int(Decimal(str(stats["damage"])) * damage_growth))
+        speed_growth = min(Decimal("1.5"), Decimal(
+            1) + multiplier.log10() * Decimal("0.02"))
         result["speed"] = float(Decimal(str(stats["speed"])) * speed_growth)
         base_score_multiplier = Decimal(str(stats.get("score_multiplier", 1)))
         result["score_multiplier"] = max(
@@ -70,5 +75,7 @@ class EnemyScaling:
             raise ValueError("elapsed_seconds must be finite")
         if elapsed_seconds < 0:
             raise ValueError("elapsed_seconds cannot be negative")
-        multiplier = 1.0 + self.threat_level * 0.08 + (elapsed_seconds / 60.0) * 0.005
-        return max(250, int(base_delay_ms / multiplier))
+        minutes = elapsed_seconds / 60.0
+        multiplier = 1.0 + self.threat_level * \
+            0.08 + max(0.0, minutes - 3.0) * 0.12
+        return max(100, int(base_delay_ms / multiplier))

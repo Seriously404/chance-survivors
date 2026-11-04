@@ -38,9 +38,11 @@ class RuntimeProbe:
     """Inspectable and controllable instance built from the game's systems."""
 
     def __init__(self) -> None:
-        self.player = Player(health=player_max_health, max_health=player_max_health)
+        self.player = Player(health=player_max_health,
+                             max_health=player_max_health)
         self.inventory = create_initial_inventory()
-        self.player.max_health = player_max_health + int(player_bonuses(self.inventory)["health"])
+        self.player.max_health = player_max_health + \
+            int(player_bonuses(self.inventory)["health"])
         self.player.health = self.player.max_health
         self.bullet_types = load_bullet_types()
         self.collision = CollisionSystem(200)
@@ -57,17 +59,17 @@ class RuntimeProbe:
 
     def status(self) -> dict[str, Any]:
         return {
-            "player":{"x":self.player.x,"y":self.player.y,"health":self.player.health,
-                      "max_health":self.player.max_health,"angle":self.player.angle},
-            "inventory":{"count":len(self.inventory.items),"active_slots":self.inventory.active_slots,
-                          "bonuses":player_bonuses(self.inventory)},
-            "bullets":[{"type":b.bullet_type,"damage":b.damage,"piercing":b.piercing} for b in self.bullets],
-            "enemy_projectiles":[
+            "player": {"x": self.player.x, "y": self.player.y, "health": self.player.health,
+                       "max_health": self.player.max_health, "angle": self.player.angle},
+            "inventory": {"count": len(self.inventory.items), "active_slots": self.inventory.active_slots,
+                          "bonuses": player_bonuses(self.inventory)},
+            "bullets": [{"type": b.bullet_type, "damage": b.damage, "piercing": b.piercing} for b in self.bullets],
+            "enemy_projectiles": [
                 {"x": projectile.x, "y": projectile.y, "damage": projectile.damage}
                 for projectile in self.enemy_projectiles
             ],
-            "enemies":[{"type":e.type,"x":e.x,"y":e.y,"health":e.health} for e in self.enemies],
-            "currency":{k: v.format() for k, v in self.wallet.amounts.items()},
+            "enemies": [{"type": e.type, "x": e.x, "y": e.y, "health": e.health} for e in self.enemies],
+            "currency": {k: v.format() for k, v in self.wallet.amounts.items()},
             "score": self.score.format(),
             "level": self.progress.level,
             "experience": self.progress.current_exp.format(),
@@ -75,34 +77,48 @@ class RuntimeProbe:
         }
 
     def execute(self, command: dict[str, Any]) -> dict[str, Any]:
-        action=command.get("action")
-        if action=="status": return self.status()
-        if action=="spawn_enemy":
-            kind=str(command.get("type","basic"))
-            if kind not in enemy_types: raise ValueError(f"Unknown enemy type: {kind}")
-            stats=enemy_types[kind]
-            enemy=Enemy.create_from_type(kind,stats,float(command.get("x",0.08)),float(command.get("y",0)))
+        action = command.get("action")
+        if action == "status":
+            return self.status()
+        if action == "spawn_enemy":
+            kind = str(command.get("type", "basic"))
+            if kind not in enemy_types:
+                raise ValueError(f"Unknown enemy type: {kind}")
+            stats = enemy_types[kind]
+            enemy = Enemy.create_from_type(kind, stats, float(
+                command.get("x", 0.08)), float(command.get("y", 0)))
             if "health" in command:
-                enemy.health=max(1,int(command["health"])); enemy.max_health=enemy.health
+                enemy.health = max(1, int(command["health"]))
+                enemy.max_health = enemy.health
             self.enemies.append(enemy)
-            return {"enemy_index":len(self.enemies)-1,"health":enemy.health}
-        if action=="fire":
-            slot=int(command.get("slot",0))
-            if slot not in (0,1): raise ValueError("weapon slot must be 0 or 1")
-            if self.weapon_cooldowns[slot]>0: return {"fired":False,"cooldown":self.weapon_cooldowns[slot]}
-            item_id=self.inventory.active_slots["weapons"][slot]
-            item=next((i for i in self.inventory.items if i["id"]==item_id),None)
-            projectile,cooldown,automatic=projectile_for_weapon(
-                self.player,float(command.get("angle",0)),item,slot,self.bullet_types,bullet_base_speed,
+            return {"enemy_index": len(self.enemies)-1, "health": enemy.health}
+        if action == "fire":
+            slot = int(command.get("slot", 0))
+            if slot not in (0, 1):
+                raise ValueError("weapon slot must be 0 or 1")
+            if self.weapon_cooldowns[slot] > 0:
+                return {"fired": False, "cooldown": self.weapon_cooldowns[slot]}
+            item_id = self.inventory.active_slots["weapons"][slot]
+            item = next(
+                (i for i in self.inventory.items if i["id"] == item_id), None)
+            if item is None:
+                return {"fired": False, "reason": "empty weapon slot"}
+            projectile, cooldown, automatic = projectile_for_weapon(
+                self.player, float(command.get(
+                    "angle", 0)), item, slot, self.bullet_types, bullet_base_speed,
                 player_bonuses(self.inventory)["damage_pct"])
-            self.bullets.append(projectile); self.weapon_cooldowns[slot]=cooldown
-            return {"fired":True,"type":projectile.bullet_type,"damage":projectile.damage,
-                    "piercing":projectile.piercing,"cooldown":cooldown,"automatic":automatic}
-        if action=="step":
-            dt=float(command.get("dt",1/60))
-            if not 0 < dt <= 10: raise ValueError("dt must be greater than 0 and at most 10 seconds")
-            self.elapsed+=dt
-            self.weapon_cooldowns=[max(0,v-dt) for v in self.weapon_cooldowns]
+            self.bullets.append(projectile)
+            self.weapon_cooldowns[slot] = cooldown
+            return {"fired": True, "type": projectile.bullet_type, "damage": projectile.damage,
+                    "piercing": projectile.piercing, "cooldown": cooldown, "automatic": automatic}
+        if action == "step":
+            dt = float(command.get("dt", 1/60))
+            if not 0 < dt <= 10:
+                raise ValueError(
+                    "dt must be greater than 0 and at most 10 seconds")
+            self.elapsed += dt
+            self.weapon_cooldowns = [max(0, v-dt)
+                                     for v in self.weapon_cooldowns]
             update_enemy_abilities(
                 self.enemies,
                 enemy_types,
@@ -137,9 +153,10 @@ class RuntimeProbe:
                     player_bonuses(self.inventory)["defense"],
                 )
             )
-            for bullet in self.bullets: bullet.move(dt)
-            self.bullets,self.enemies=self.collision.check_bullet_enemy_collisions(
-                self.bullets,self.enemies,enemy_types)
+            for bullet in self.bullets:
+                bullet.move(dt)
+            self.bullets, self.enemies = self.collision.check_bullet_enemy_collisions(
+                self.bullets, self.enemies, enemy_types)
             killed_enemies = self.collision.killed_enemies
             for enemy in killed_enemies:
                 if not enemy.reward_eligible:
@@ -169,78 +186,98 @@ class RuntimeProbe:
                 "projectile_damage": projectile_damage,
                 "state": self.status(),
             }
-        if action=="move_player":
-            dt=float(command.get("dt",1/60))
-            bonuses=player_bonuses(self.inventory)
-            self.player.move(float(command.get("dx",0)),float(command.get("dy",0)),dt,
+        if action == "move_player":
+            dt = float(command.get("dt", 1/60))
+            bonuses = player_bonuses(self.inventory)
+            self.player.move(float(command.get("dx", 0)), float(command.get("dy", 0)), dt,
                              1+bonuses["speed_pct"]/100)
-            return {"x":self.player.x,"y":self.player.y,"speed_multiplier":1+bonuses["speed_pct"]/100}
-        if action=="enemy_attack":
-            index=int(command.get("index",0))
-            if not 0<=index<len(self.enemies): raise IndexError("enemy index out of range")
-            self.enemies[index].x=self.player.x; self.enemies[index].y=self.player.y
-            health_before=self.player.health
-            self.player=self.collision.check_enemy_player_collisions(
-                self.enemies,self.player,enemy_types,player_bonuses(self.inventory)["defense"])
-            return {"damage_taken":health_before-self.player.health,"health":self.player.health}
-        if action=="spawn_item":
-            template=next((i for i in self._catalog if i["id"]==command.get("item_id")),None)
-            if template is None: raise ValueError("Unknown catalog item_id")
-            item=deepcopy(template); self._spawned+=1; item["id"]=f"probe-{self._spawned}"
+            return {"x": self.player.x, "y": self.player.y, "speed_multiplier": 1+bonuses["speed_pct"]/100}
+        if action == "enemy_attack":
+            index = int(command.get("index", 0))
+            if not 0 <= index < len(self.enemies):
+                raise IndexError("enemy index out of range")
+            self.enemies[index].x = self.player.x
+            self.enemies[index].y = self.player.y
+            health_before = self.player.health
+            self.player = self.collision.check_enemy_player_collisions(
+                self.enemies, self.player, enemy_types, player_bonuses(self.inventory)["defense"])
+            return {"damage_taken": health_before-self.player.health, "health": self.player.health}
+        if action == "spawn_item":
+            template = next(
+                (i for i in self._catalog if i["id"] == command.get("item_id")), None)
+            if template is None:
+                raise ValueError("Unknown catalog item_id")
+            item = deepcopy(template)
+            self._spawned += 1
+            item["id"] = f"probe-{self._spawned}"
             self.inventory.add(item)
-            return {"item_id":item["id"],"inventory_count":len(self.inventory.items)}
-        if action=="equip":
-            self.inventory.equip(str(command["item_id"]),str(command["slot"]),int(command["index"]))
+            return {"item_id": item["id"], "inventory_count": len(self.inventory.items)}
+        if action == "equip":
+            self.inventory.equip(str(command["item_id"]), str(
+                command["slot"]), int(command["index"]))
             return self.status()["inventory"]
-        if action=="combine":
-            self.inventory.assign_combination(str(command["base_id"]),int(command["index"]),command.get("item_id"))
+        if action == "combine":
+            self.inventory.assign_combination(str(command["base_id"]), int(
+                command["index"]), command.get("item_id"))
             return self.status()["inventory"]
-        if action=="assert_invariants":
+        if action == "assert_invariants":
             self._assert_invariants()
-            return {"ok":True,"items":len(self.inventory.items),"bullets":len(self.bullets),"enemies":len(self.enemies)}
-        if action=="scenario": return self.run_scenario()
-        raise ValueError("unknown runtime action; supported: status, spawn_enemy, fire, step, move_player, enemy_attack, spawn_item, equip, combine, assert_invariants, scenario")
+            return {"ok": True, "items": len(self.inventory.items), "bullets": len(self.bullets), "enemies": len(self.enemies)}
+        if action == "scenario":
+            return self.run_scenario()
+        raise ValueError(
+            "unknown runtime action; supported: status, spawn_enemy, fire, step, move_player, enemy_attack, spawn_item, equip, combine, assert_invariants, scenario")
 
     def _assert_invariants(self) -> None:
-        ids=[item["id"] for item in self.inventory.items]
-        assert len(ids)==len(set(ids)), "duplicate inventory ids"
-        assert len(ids)<=self.inventory.CAPACITY, "inventory overflow"
-        assert self.player.health<=self.player.max_health, "health exceeds max health"
-        assert all(value>=0 for value in self.wallet.amounts.values()), "negative currency"
-        assert all(bullet.damage>0 for bullet in self.bullets), "invalid projectile damage"
+        ids = [item["id"] for item in self.inventory.items]
+        assert len(ids) == len(set(ids)), "duplicate inventory ids"
+        assert len(ids) <= self.inventory.CAPACITY, "inventory overflow"
+        assert self.player.health <= self.player.max_health, "health exceeds max health"
+        assert all(value >= 0 for value in self.wallet.amounts.values()
+                   ), "negative currency"
+        assert all(bullet.damage >
+                   0 for bullet in self.bullets), "invalid projectile damage"
 
     def run_scenario(self) -> dict[str, Any]:
         """Exercise both equipped weapons, collision rewards, and item assignment."""
-        target=Enemy.create_from_type("basic",enemy_types["basic"],0.07,0)
+        target = Enemy.create_from_type("basic", enemy_types["basic"], 0.07, 0)
         self.enemies.append(target)
-        rapid=self.execute({"action":"fire","slot":0})
-        self.execute({"action":"step","dt":0.02})
+        rapid = self.execute({"action": "fire", "slot": 0})
+        self.execute({"action": "step", "dt": 0.02})
         if self.enemies:
-            self.execute({"action":"step","dt":0.2})
-            self.execute({"action":"fire","slot":0})
-            self.execute({"action":"step","dt":0.02})
-        heavy=self.execute({"action":"fire","slot":1})
-        self.execute({"action":"step","dt":0.8})
-        self.execute({"action":"step","dt":0.02})
-        assert rapid["type"]=="rapid_fire" and rapid["automatic"] and rapid["piercing"]==0
-        assert heavy["type"]=="heavy_shot" and not heavy["automatic"] and heavy["piercing"]>0
-        assert self.score==10 and self.progress.current_exp==10 and not self.enemies
+            self.execute({"action": "step", "dt": 0.3})
+            self.execute({"action": "fire", "slot": 0})
+            self.execute({"action": "step", "dt": 0.02})
+        assert not self.execute({"action": "fire", "slot": 1})["fired"]
+        heavy_id = self.execute(
+            {"action": "spawn_item", "item_id": "starter-heavy"})["item_id"]
+        self.execute({"action": "equip", "item_id": heavy_id,
+                     "slot": "weapons", "index": 1})
+        heavy = self.execute({"action": "fire", "slot": 1})
+        self.execute({"action": "step", "dt": 0.8})
+        self.execute({"action": "step", "dt": 0.02})
+        assert rapid["type"] == "rapid_fire" and rapid["automatic"] and rapid["piercing"] == 0
+        assert heavy["type"] == "heavy_shot" and not heavy["automatic"] and heavy["piercing"] > 0
+        assert self.score == 10 and self.progress.current_exp == 10 and not self.enemies
         self._assert_invariants()
-        return {"rapid_fire":rapid,"heavy_shot":heavy,"state":self.status(),"invariants":"passed"}
+        return {"rapid_fire": rapid, "heavy_shot": heavy, "state": self.status(), "invariants": "passed"}
 
 
 def main() -> None:
-    probe=RuntimeProbe()
+    probe = RuntimeProbe()
     if "--interactive" not in sys.argv:
-        print(json.dumps(probe.execute({"action":"scenario"}),indent=2))
+        print(json.dumps(probe.execute(
+            {"action": "scenario"}), indent=2, default=str))
         return
     for line in sys.stdin:
         try:
-            response=probe.execute(json.loads(line))
-            print(json.dumps({"ok":True,"result":response}),flush=True)
+            response = probe.execute(json.loads(line))
+            print(json.dumps({"ok": True, "result": response},
+                  default=str), flush=True)
         except Exception as exc:  # developer console should surface live failures
-            print(json.dumps({"ok":False,"error":f"{type(exc).__name__}: {exc}"}),flush=True)
+            print(json.dumps(
+                {"ok": False, "error": f"{type(exc).__name__}: {exc}"}), flush=True)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()

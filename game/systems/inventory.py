@@ -8,7 +8,8 @@ RARITY_COMBINATION_SLOTS = {
     "common": 1, "uncommon": 2, "rare": 3, "epic": 3,
     "legendary": 4, "mythical": 4, "ultimate": 5,
 }
-ARMOR_EQUIPMENT_SLOTS = ("boots", "pants", "chestplate", "headpiece", "accessory")
+ARMOR_EQUIPMENT_SLOTS = ("boots", "pants", "chestplate",
+                         "headpiece", "accessory")
 
 
 def _item(item_id: str, name: str, kind: str, rarity: str, level: int,
@@ -16,7 +17,7 @@ def _item(item_id: str, name: str, kind: str, rarity: str, level: int,
     rarity = rarity.lower()
     if rarity not in RARITY_COMBINATION_SLOTS:
         raise ValueError(f"Unsupported rarity: {rarity}")
-    return {"id": item_id, "name": name, "type": kind, "rarity": rarity,
+    return {"id": item_id, "name": name, "type": kind, "rarity": rarity, "base_rarity": rarity,
             "level": level, "stats": stats,
             "combinations": [None] * RARITY_COMBINATION_SLOTS[rarity],
             "status": "normal"}
@@ -70,9 +71,11 @@ class Inventory:
             raise ValueError(f"Duplicate inventory item ID: {item['id']}")
         proposed_items = self.items + [item]
         supplement_ids = self._validate_combination_records(proposed_items)
-        active_ids = {item_id for slots in self.active_slots.values() for item_id in slots if item_id is not None}
+        active_ids = {item_id for slots in self.active_slots.values()
+                      for item_id in slots if item_id is not None}
         if active_ids.intersection(supplement_ids):
-            raise ValueError("An actively equipped item cannot be a combination supplement")
+            raise ValueError(
+                "An actively equipped item cannot be a combination supplement")
         self.items.append(item)
         self._refresh_statuses()
         return len(self.items) - 1
@@ -95,28 +98,36 @@ class Inventory:
             base_type = base.get("type")
             slots = base.get("combinations")
             if not isinstance(base_type, str) or not base_type:
-                raise ValueError(f"Item {base_id!r} needs a non-empty type for combinations")
+                raise ValueError(
+                    f"Item {base_id!r} needs a non-empty type for combinations")
             if not isinstance(slots, list):
-                raise ValueError(f"Item {base_id!r} combination slots must be a list")
+                raise ValueError(
+                    f"Item {base_id!r} combination slots must be a list")
             for supplement_id in slots:
                 if supplement_id is None:
                     continue
                 if not isinstance(supplement_id, str) or supplement_id not in by_id:
-                    raise ValueError(f"Item {base_id!r} references an unknown combination supplement")
+                    raise ValueError(
+                        f"Item {base_id!r} references an unknown combination supplement")
                 if supplement_id == base_id:
                     raise ValueError("An item cannot be combined with itself")
                 if supplement_id in owners:
-                    raise ValueError("A combination supplement can belong to only one base item")
+                    raise ValueError(
+                        "A combination supplement can belong to only one base item")
                 supplement_type = by_id[supplement_id].get("type")
                 if not isinstance(supplement_type, str):
-                    raise ValueError(f"Item {supplement_id!r} has no valid type")
-                if (base_type == "armor") != (supplement_type == "armor"):
-                    raise ValueError("Armor can only be combined with armor; non-armor with non-armor")
+                    raise ValueError(
+                        f"Item {supplement_id!r} has no valid type")
+                if ((base_type == "armor") != (supplement_type == "armor")
+                        and not (base_type == "armor" and by_id[supplement_id].get("fusion_recipe") == "elemental-core")):
+                    raise ValueError(
+                        "Armor can only be combined with armor; non-armor with non-armor")
                 owners[supplement_id] = base_id
                 base_ids.add(base_id)
 
         if base_ids.intersection(owners):
-            raise ValueError("An item cannot be both a combination base and a supplement")
+            raise ValueError(
+                "An item cannot be both a combination base and a supplement")
         return set(owners)
 
     def assign_combination(self, base_id: str, combo_index: int,
@@ -126,32 +137,41 @@ class Inventory:
         if type(combo_index) is not int:
             raise IndexError("Combination slot index must be an integer")
         if not 0 <= combo_index < len(combos):
-            raise IndexError("Combination slot is outside this item's rarity capacity")
+            raise IndexError(
+                "Combination slot is outside this item's rarity capacity")
 
         # Reject pre-existing corrupt graphs and compute a candidate ownership
         # graph before changing any item slots.
         self._validate_combination_records(self.items)
-        proposed_slots = {item["id"]: list(item["combinations"]) for item in self.items}
+        proposed_slots = {item["id"]: list(
+            item["combinations"]) for item in self.items}
         if supplement_id is not None:
             if not isinstance(supplement_id, str):
-                raise ValueError("Combination supplement id must be a string or None")
+                raise ValueError(
+                    "Combination supplement id must be a string or None")
             supplement = self.get(supplement_id)
             if supplement_id == base_id:
                 raise ValueError("An item cannot be combined with itself")
             if any(supplement_id in slots for slots in self.active_slots.values()):
-                raise ValueError("An actively equipped item cannot become a combination supplement")
+                raise ValueError(
+                    "An actively equipped item cannot become a combination supplement")
             if any(value is not None for value in supplement["combinations"]):
-                raise ValueError("A combination base cannot also be used as a supplement")
-            if (base["type"] == "armor") != (supplement["type"] == "armor"):
-                raise ValueError("Armor can only be combined with armor; non-armor with non-armor")
+                raise ValueError(
+                    "A combination base cannot also be used as a supplement")
+            if ((base["type"] == "armor") != (supplement["type"] == "armor")
+                    and not (base["type"] == "armor" and supplement.get("fusion_recipe") == "elemental-core")):
+                raise ValueError(
+                    "Armor can only be combined with armor; non-armor with non-armor")
 
             old_base_id = next(
-                (owner_id for owner_id, slots in proposed_slots.items() if supplement_id in slots),
+                (owner_id for owner_id, slots in proposed_slots.items()
+                 if supplement_id in slots),
                 None,
             )
             if old_base_id is not None:
                 if old_base_id != base_id:
-                    raise ValueError("An item already used in another combination cannot be moved")
+                    raise ValueError(
+                        "An item already used in another combination cannot be moved")
                 old_index = proposed_slots[base_id].index(supplement_id)
                 if old_index != combo_index:
                     displaced = proposed_slots[base_id][combo_index]
@@ -167,9 +187,11 @@ class Inventory:
             for item in self.items
         ]
         supplement_ids = self._validate_combination_records(proposed_items)
-        active_ids = {item_id for slots in self.active_slots.values() for item_id in slots if item_id is not None}
+        active_ids = {item_id for slots in self.active_slots.values()
+                      for item_id in slots if item_id is not None}
         if active_ids.intersection(supplement_ids):
-            raise ValueError("An actively equipped item cannot be a combination supplement")
+            raise ValueError(
+                "An actively equipped item cannot be a combination supplement")
 
         for item in self.items:
             item["combinations"] = proposed_slots[item["id"]]
@@ -179,15 +201,18 @@ class Inventory:
         item = self.get(item_id)
         if slot_kind not in self.active_slots:
             raise ValueError(f"Unknown equipment category: {slot_kind}")
-        expected_type = {"armor": "armor", "weapons": "weapon", "abilities": "ability"}[slot_kind]
+        expected_type = {"armor": "armor", "weapons": "weapon",
+                         "abilities": "ability"}[slot_kind]
         if item["type"] != expected_type:
-            raise ValueError(f"{item['type']} item cannot be placed in {slot_kind} slot")
+            raise ValueError(
+                f"{item['type']} item cannot be placed in {slot_kind} slot")
         slots = self.active_slots[slot_kind]
         if not 0 <= slot_index < len(slots):
             raise IndexError("Equipment slot out of range")
         if slot_kind == "armor":
             if item.get("armor_set") is not None and "armor_slot" not in item:
-                raise ValueError("Armor set pieces must define an equipment slot")
+                raise ValueError(
+                    "Armor set pieces must define an equipment slot")
             if "armor_slot" in item:
                 armor_slot = item["armor_slot"]
                 if not isinstance(armor_slot, str) or armor_slot not in ARMOR_EQUIPMENT_SLOTS:
@@ -197,7 +222,15 @@ class Inventory:
                         f"{item.get('name', 'Armor')} belongs in the {armor_slot} slot"
                     )
         if self.is_combination_supplement(item_id):
-            raise ValueError("Combination supplements cannot be actively equipped")
+            raise ValueError(
+                "Combination supplements cannot be actively equipped")
+        if slot_kind == "abilities" and item.get("stats", {}).get("script") in {"dash", "sandevistan"}:
+            for index, existing_id in enumerate(slots):
+                if index != slot_index and existing_id and existing_id != item_id:
+                    existing = self.get(existing_id)
+                    if existing.get("stats", {}).get("script") in {"dash", "sandevistan"}:
+                        raise ValueError(
+                            "Only one dash ability can be equipped at a time")
         # Moving an item between slots of the same category clears its old slot.
         for index, existing_id in enumerate(slots):
             if existing_id == item_id:
@@ -249,12 +282,14 @@ class Inventory:
             or any(value is not None for value in item.get("combinations", []))
             for item in source_items
         ):
-            raise ValueError("Remove fusion sources from combinations before fusing them")
+            raise ValueError(
+                "Remove fusion sources from combinations before fusing them")
         if fusion_manager is None:
             from game.systems.fusion import FusionManager
             fusion_manager = FusionManager()
         if recipe_id is not None:
-            result = fusion_manager.build_fusion(source_items, recipe_id=recipe_id)
+            result = fusion_manager.build_fusion(
+                source_items, recipe_id=recipe_id)
         else:
             result = fusion_manager.build_fusion(source_items)
         source_id_set = set(normalized)
@@ -263,7 +298,8 @@ class Inventory:
             if str(item.get("id")) not in source_id_set
         ]
         if any(str(item.get("id")) == str(result.get("id")) for item in remaining_items):
-            raise ValueError("Fusion result ID already exists in this inventory")
+            raise ValueError(
+                "Fusion result ID already exists in this inventory")
         self.items = [*remaining_items, result]
         self._refresh_statuses()
         return result

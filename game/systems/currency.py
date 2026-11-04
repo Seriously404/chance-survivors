@@ -34,7 +34,8 @@ class CurrencyWallet:
     def _currency_name(currency: str) -> str | None:
         return CURRENCY_NAMES.get(currency.casefold())
 
-    def reward_for_kill(self, rng: random.Random | None = None, luck: float = 0.0) -> tuple[str, LargeNumber]:
+    def reward_for_kill(self, rng: random.Random | None = None, luck: float = 0.0,
+                        multiplier: int | LargeNumber = 1) -> tuple[str, LargeNumber]:
         """Award currency for killing an enemy.
 
         Args:
@@ -51,7 +52,12 @@ class CurrencyWallet:
         else:
             amount = LargeNumber(rng.randint(3, 7))
             currency = "Copper"
-        self.amounts[currency] = self.amounts.get(currency, LargeNumber(0)) + amount
+        multiplier = LargeNumber(multiplier)
+        if multiplier <= 0:
+            raise ValueError("Enemy reward multiplier must be positive")
+        amount *= multiplier
+        self.amounts[currency] = self.amounts.get(
+            currency, LargeNumber(0)) + amount
         return currency, amount
 
     def reward_for_enemy(
@@ -69,7 +75,8 @@ class CurrencyWallet:
 
         amount = LargeNumber(base_amount) * LargeNumber(multiplier)
         if amount <= 0:
-            raise ValueError("Enemy currency reward and multiplier must be positive")
+            raise ValueError(
+                "Enemy currency reward and multiplier must be positive")
 
         luck = float(luck)
         if not math.isfinite(luck):
@@ -81,15 +88,28 @@ class CurrencyWallet:
             for currency_id, definition in CURRENCY_DEFINITIONS.items()
             if definition["name"] == currency_name
         )
-        drop_modifier = float(CURRENCY_DEFINITIONS[currency_id].get("drop_rate_modifier", 1.0))
+        drop_modifier = float(
+            CURRENCY_DEFINITIONS[currency_id].get("drop_rate_modifier", 1.0))
         luck_factor = luck / (10.0 + luck) if luck < 10.0 else 1.0
-        bonus_chance = min(0.75, max(0.0, drop_modifier) * (0.05 + 0.85 * luck_factor))
+        bonus_chance = min(0.75, max(0.0, drop_modifier)
+                           * (0.05 + 0.85 * luck_factor))
         rng = rng or random
         if rng.random() < bonus_chance:
             amount = amount + amount
 
-        self.amounts[currency_name] = self.amounts.get(currency_name, LargeNumber(0)) + amount
+        self.amounts[currency_name] = self.amounts.get(
+            currency_name, LargeNumber(0)) + amount
         return currency_name, amount
+
+    def gold_bonus_for_kill(self, rng: random.Random | None = None, luck: float = 0.0) -> LargeNumber:
+        """Occasionally award gold alongside an enemy's ordinary currency."""
+        rng = rng or random
+        chance = min(0.35, 0.15 + max(0.0, float(luck)) * 0.005)
+        if rng.random() >= chance:
+            return LargeNumber(0)
+        amount = LargeNumber(rng.randint(2, 4))
+        self.add("Gold", amount)
+        return amount
 
     def spend(self, currency: str, amount: LargeNumber) -> bool:
         """Spend currency if sufficient balance exists.
@@ -125,7 +145,8 @@ class CurrencyWallet:
         currency_name = self._currency_name(currency)
         if currency_name is None:
             raise ValueError(f"Unknown currency: {currency}")
-        self.amounts[currency_name] = self.amounts.get(currency_name, LargeNumber(0)) + amount
+        self.amounts[currency_name] = self.amounts.get(
+            currency_name, LargeNumber(0)) + amount
 
 
 class CurrencyNotifications:

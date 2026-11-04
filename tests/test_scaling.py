@@ -73,9 +73,11 @@ class ScalingSystemTests(unittest.TestCase):
         stats = scaling.scaled_enemy_stats(7, 11)
         self.assertEqual(stats["health"], LargeNumber("7e20000"))
         self.assertEqual(stats["damage"], LargeNumber("1.1e20001"))
-        self.assertEqual(stats["spawn_rate_multiplier"], LargeNumber("1e20000"))
+        self.assertEqual(stats["spawn_rate_multiplier"],
+                         LargeNumber("1e20000"))
         self.assertEqual(stats["reward"], LargeNumber("1.1025"))
-        self.assertEqual(scaling.spawn_delay_seconds(1), scaling.config.minimum_spawn_delay_seconds)
+        self.assertEqual(scaling.spawn_delay_seconds(
+            1), scaling.config.minimum_spawn_delay_seconds)
 
     def test_versioned_serialization_round_trip_preserves_config_and_state(self) -> None:
         scaling = ScalingSystem(self.config)
@@ -84,7 +86,8 @@ class ScalingSystemTests(unittest.TestCase):
         restored = ScalingSystem.from_dict(scaling.to_dict())
         self.assertEqual(restored.to_dict(), scaling.to_dict())
         self.assertEqual(restored.active_time_steps, 2)
-        self.assertEqual(restored.scaled_enemy_stats(100, 10), scaling.scaled_enemy_stats(100, 10))
+        self.assertEqual(restored.scaled_enemy_stats(100, 10),
+                         scaling.scaled_enemy_stats(100, 10))
 
     def test_invalid_inputs_and_corrupt_saves_are_rejected(self) -> None:
         for value in (0, -1, math.inf, math.nan, True):

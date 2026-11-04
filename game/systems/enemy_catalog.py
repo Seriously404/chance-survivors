@@ -79,7 +79,8 @@ def build_enemy_roster(
                 "color": _ADDITIONAL_COLORS.get(enemy_id, (220, 60, 60)),
             }
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError(f"Invalid enemy definition for {enemy_id!r}") from exc
+            raise ValueError(
+                f"Invalid enemy definition for {enemy_id!r}") from exc
 
         numeric_values = (
             stats["speed"],
@@ -93,7 +94,8 @@ def build_enemy_roster(
             or stats["size"] <= 0
             or any(not math.isfinite(value) or value <= 0 for value in numeric_values)
         ):
-            raise ValueError(f"Enemy definition {enemy_id!r} has invalid runtime stats")
+            raise ValueError(
+                f"Enemy definition {enemy_id!r} has invalid runtime stats")
         roster[enemy_id] = stats
     if "swarm" in roster:
         minion_stats = deepcopy(roster["swarm"])

@@ -23,7 +23,8 @@ _PASSIVE_BONUS_STATS = (
 )
 _SUPPORTED_STATS = frozenset(_PASSIVE_BONUS_STATS)
 _SUPPORTED_THRESHOLDS = frozenset(range(2, 6))
-_DEFAULT_ASSET_PATH = Path(__file__).resolve().parents[2] / "assets" / "armor_sets.json"
+_DEFAULT_ASSET_PATH = Path(__file__).resolve(
+).parents[2] / "assets" / "armor_sets.json"
 
 
 def _validate_armor_sets(data: Any) -> dict[str, dict[str, Any]]:
@@ -42,11 +43,13 @@ def _validate_armor_sets(data: Any) -> dict[str, dict[str, Any]]:
         if not isinstance(set_id, str) or not set_id.strip():
             raise ValueError("Armor set IDs must be non-empty strings")
         if set_id != set_id.strip():
-            raise ValueError("Armor set IDs cannot contain surrounding whitespace")
+            raise ValueError(
+                "Armor set IDs cannot contain surrounding whitespace")
         if set_id in definitions:
             raise ValueError(f"Duplicate armor set ID: {set_id}")
         if not isinstance(name, str) or not name.strip():
-            raise ValueError(f"Armor set {set_id!r} must have a non-empty name")
+            raise ValueError(
+                f"Armor set {set_id!r} must have a non-empty name")
 
         raw_bonuses = armor_set.get("bonuses")
         if not isinstance(raw_bonuses, dict):
@@ -61,22 +64,28 @@ def _validate_armor_sets(data: Any) -> dict[str, dict[str, Any]]:
                 raise ValueError(f"Invalid threshold in armor set {set_id!r}")
             threshold = int(raw_threshold)
             if threshold not in _SUPPORTED_THRESHOLDS:
-                raise ValueError(f"Unsupported threshold {raw_threshold!r} in armor set {set_id!r}")
+                raise ValueError(
+                    f"Unsupported threshold {raw_threshold!r} in armor set {set_id!r}")
             if not isinstance(raw_stats, dict):
-                raise ValueError(f"Threshold {threshold} bonuses must be an object")
+                raise ValueError(
+                    f"Threshold {threshold} bonuses must be an object")
 
             stats: dict[str, float] = {}
             for stat, value in raw_stats.items():
                 if stat not in _SUPPORTED_STATS:
-                    raise ValueError(f"Unsupported armor-set bonus stat: {stat!r}")
+                    raise ValueError(
+                        f"Unsupported armor-set bonus stat: {stat!r}")
                 if isinstance(value, bool) or not isinstance(value, (int, float)):
-                    raise ValueError(f"Armor-set bonus {stat!r} must be a finite number")
+                    raise ValueError(
+                        f"Armor-set bonus {stat!r} must be a finite number")
                 try:
                     numeric_value = float(value)
                 except OverflowError as error:
-                    raise ValueError(f"Armor-set bonus {stat!r} must be a finite number") from error
+                    raise ValueError(
+                        f"Armor-set bonus {stat!r} must be a finite number") from error
                 if not math.isfinite(numeric_value):
-                    raise ValueError(f"Armor-set bonus {stat!r} must be a finite number")
+                    raise ValueError(
+                        f"Armor-set bonus {stat!r} must be a finite number")
                 stats[stat] = numeric_value
             bonuses[threshold] = stats
 
@@ -106,7 +115,8 @@ def _count_equipped_sets(
         if set_id is None:
             continue
         if not isinstance(set_id, str) or not set_id.strip():
-            raise ValueError("Equipped armor set IDs must be non-empty strings")
+            raise ValueError(
+                "Equipped armor set IDs must be non-empty strings")
         if set_id not in definitions:
             raise ValueError(f"Unsupported equipped armor set ID: {set_id!r}")
         counts[set_id] = counts.get(set_id, 0) + 1

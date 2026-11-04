@@ -28,12 +28,15 @@ class BazaarService:
         item_id: str,
         luck: float,
     ) -> dict[str, Any]:
-        crate = next((entry for entry in self.manager.crates if entry.id == crate_id), None)
+        crate = next(
+            (entry for entry in self.manager.crates if entry.id == crate_id), None)
         if crate is None:
             raise ValueError("That crate is no longer available.")
-        self._validate_purchase(wallet, inventory, item_id, crate.cost)
+        for currency, cost in crate.costs.items():
+            self._validate_purchase(wallet, inventory, item_id, cost, currency)
         reward = self.manager.roll_crate(crate, luck=luck)
-        return self._add_purchase(reward, wallet, inventory, item_id, crate.cost)
+        return self._add_purchase(reward, wallet, inventory, item_id, crate.cost, crate.currency,
+                                  costs=crate.costs)
 
     def buy_catalog_item(
         self,
@@ -44,11 +47,15 @@ class BazaarService:
         item_id: str,
     ) -> dict[str, Any]:
         definition = next(
-            (item for item in self.manager.catalog if str(item.get("id")) == definition_id),
+            (item for item in self.manager.catalog if str(
+                item.get("id")) == definition_id),
             None,
         )
-        if definition is None:
+        if definition is None or definition.get("type") != "relic" or definition.get("fusion_only"):
             raise ValueError("That market item is no longer available.")
+        if self.manager.rarity_rank(definition.get("rarity", "common")) >= self.manager.rarity_rank("epic") and self.manager.elapsed_seconds < 900:
+            raise ValueError(
+                "Epic and higher market items unlock after 15 minutes.")
         cost = self.manager.catalog_price(definition)
         self._validate_purchase(wallet, inventory, item_id, cost)
         return self._add_purchase(definition, wallet, inventory, item_id, cost)
@@ -65,19 +72,23 @@ class BazaarService:
         if self.manager.rarity_rank(item.get("rarity", "common")) >= len(RARITY_ORDER) - 1:
             tier = item.get("ultimate_tier", 1)
             if type(tier) is not int or not 1 <= tier <= 100:
-                raise ValueError("Ultimate rarity tier must be an integer from 1 to 100")
+                raise ValueError(
+                    "Ultimate rarity tier must be an integer from 1 to 100")
             if tier == 100:
-                raise ValueError("Ultimate 100 items cannot be rarity-upgraded further.")
+                raise ValueError(
+                    "Ultimate 100 items cannot be rarity-upgraded further.")
         cost = self.manager.rarity_upgrade_cost(item)
         self._require_funds(wallet, cost)
         staged = deepcopy(item)
         self.manager.upgrade_rarity(staged, luck=luck, currency_cost=cost)
         self._spend(wallet, cost)
         original_rarity = item.get("rarity")
-        original_tier = item.get("ultimate_tier", 1) if original_rarity == "ultimate" else 0
+        original_tier = item.get(
+            "ultimate_tier", 1) if original_rarity == "ultimate" else 0
         item.clear()
         item.update(staged)
-        current_tier = item.get("ultimate_tier", 1) if item.get("rarity") == "ultimate" else 0
+        current_tier = item.get("ultimate_tier", 1) if item.get(
+            "rarity") == "ultimate" else 0
         return (
             item.get("rarity") != original_rarity
             or current_tier != original_tier
@@ -113,7 +124,8 @@ class BazaarService:
         if inventory.is_combination_supplement(item_id) or any(
             value is not None for value in item.get("combinations", [])
         ):
-            raise ValueError("Remove this item from its combination before selling it.")
+            raise ValueError(
+                "Remove this item from its combination before selling it.")
         value = self.manager.sell_value(item, trader_bonus=trader_bonus)
         inventory.items.remove(item)
         inventory._refresh_statuses()
@@ -126,12 +138,14 @@ class BazaarService:
         inventory: Inventory,
         item_id: str,
         cost: int,
+        currency: str = CURRENCY,
     ) -> None:
         if len(inventory.items) >= inventory.CAPACITY:
             raise ValueError("Inventory is full; sell an item before buying.")
         if not item_id or any(str(item.get("id")) == item_id for item in inventory.items):
-            raise ValueError("Could not create a unique ID for the purchased item.")
-        self._require_funds(wallet, cost)
+            raise ValueError(
+                "Could not create a unique ID for the purchased item.")
+        self._require_funds(wallet, cost, currency)
 
     def _add_purchase(
         self,
@@ -140,23 +154,31 @@ class BazaarService:
         inventory: Inventory,
         item_id: str,
         cost: int,
+        currency: str = CURRENCY,
+        *,
+        costs: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         item = deepcopy(definition)
+        item.setdefault("base_rarity", item.get("rarity", "common"))
         item["id"] = item_id
         rarity = str(item.get("rarity", "common")).lower()
         if rarity not in RARITY_COMBINATION_SLOTS:
             raise ValueError(f"Unsupported purchased item rarity: {rarity}")
-        item.setdefault("combinations", [None] * RARITY_COMBINATION_SLOTS[rarity])
+        item.setdefault("combinations", [None]
+                        * RARITY_COMBINATION_SLOTS[rarity])
         item.setdefault("status", "normal")
-        self._spend(wallet, cost)
+        charges = costs or {currency: cost}
+        original_amounts = deepcopy(wallet.amounts)
         original_items = deepcopy(inventory.items)
         original_slots = deepcopy(inventory.active_slots)
         try:
+            for charge_currency, charge_cost in charges.items():
+                self._spend(wallet, charge_cost, charge_currency)
             inventory.add(item)
         except (OverflowError, TypeError, ValueError):
             inventory.items = original_items
             inventory.active_slots = original_slots
-            wallet.add(self.CURRENCY, LargeNumber(cost))
+            wallet.amounts = original_amounts
             raise
         return item
 
@@ -164,12 +186,15 @@ class BazaarService:
         try:
             return inventory.get(item_id)
         except KeyError as exc:
-            raise ValueError("That item is no longer in your inventory.") from exc
+            raise ValueError(
+                "That item is no longer in your inventory.") from exc
 
-    def _require_funds(self, wallet: CurrencyWallet, cost: int) -> None:
-        if wallet.get(self.CURRENCY) < LargeNumber(cost):
-            raise ValueError(f"Not enough Gold; this action costs {cost}.")
+    def _require_funds(self, wallet: CurrencyWallet, cost: int, currency: str = CURRENCY) -> None:
+        if wallet.get(currency) < LargeNumber(cost):
+            raise ValueError(
+                f"Not enough {currency}; this action costs {cost}.")
 
-    def _spend(self, wallet: CurrencyWallet, cost: int) -> None:
-        if not wallet.spend(self.CURRENCY, LargeNumber(cost)):
-            raise ValueError(f"Not enough Gold; this action costs {cost}.")
+    def _spend(self, wallet: CurrencyWallet, cost: int, currency: str = CURRENCY) -> None:
+        if not wallet.spend(currency, LargeNumber(cost)):
+            raise ValueError(
+                f"Not enough {currency}; this action costs {cost}.")

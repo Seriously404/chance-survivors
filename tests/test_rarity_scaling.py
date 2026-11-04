@@ -21,8 +21,8 @@ class RarityScalingTests(unittest.TestCase):
         scaling = load_rarity_scaling()
 
         self.assertEqual(scaling["multipliers"]["common"], 1.0)
-        self.assertEqual(scaling["multipliers"]["ultimate"], 8.0)
-        self.assertEqual(scaling["ultimate_tier_growth"], 1.02)
+        self.assertEqual(scaling["multipliers"]["ultimate"], 20.0)
+        self.assertEqual(scaling["ultimate_tier_growth"], 1.1)
 
     def test_rarity_scales_weapon_stats_and_reduces_cooldown(self) -> None:
         weapon = {
@@ -42,9 +42,9 @@ class RarityScalingTests(unittest.TestCase):
             1.0,
         )
 
-        self.assertEqual(projectile.damage, 18)
-        self.assertAlmostEqual(cooldown, 1.0)
-        self.assertAlmostEqual(item_stat(weapon, "speed_modifier"), 3.6)
+        self.assertEqual(projectile.damage, 22)
+        self.assertAlmostEqual(cooldown, 0.8)
+        self.assertAlmostEqual(item_stat(weapon, "speed_modifier"), 4.5)
 
     def test_ability_damage_and_cooldown_use_rarity_scaled_stats(self) -> None:
         ability = {
@@ -69,9 +69,9 @@ class RarityScalingTests(unittest.TestCase):
             enemy_types={},
         )
 
-        self.assertEqual(outcome.projectile.damage, 50)
-        self.assertAlmostEqual(outcome.projectile.speed, 5.0)
-        self.assertAlmostEqual(ability_cooldown(ability), 4.0)
+        self.assertEqual(outcome.projectile.damage, 70)
+        self.assertAlmostEqual(outcome.projectile.speed, 7.0)
+        self.assertAlmostEqual(ability_cooldown(ability), 10 / 3.5)
 
     def test_rarity_affects_passive_armor_and_relic_bonuses(self) -> None:
         inventory = Inventory([
@@ -98,8 +98,8 @@ class RarityScalingTests(unittest.TestCase):
 
         bonuses = player_bonuses(inventory)
 
-        self.assertEqual(bonuses["defense"], 9.0)
-        self.assertEqual(bonuses["luck"], 5.0)
+        self.assertEqual(bonuses["defense"], 11.25)
+        self.assertEqual(bonuses["luck"], 8.0)
 
     def test_ultimate_tier_growth_and_level_growth_compose(self) -> None:
         item = {
@@ -111,7 +111,7 @@ class RarityScalingTests(unittest.TestCase):
 
         self.assertAlmostEqual(
             item_stat(item, "damage"),
-            10 * 1.2 * 8.0 * 1.02**99,
+            10 * 1.2 * 20.0 * 1.1**99,
         )
         with self.assertRaisesRegex(ValueError, "Ultimate rarity tier"):
             item_stat({**item, "ultimate_tier": 101}, "damage")
@@ -123,8 +123,8 @@ class RarityScalingTests(unittest.TestCase):
             "stats": {"damage": 10, "cooldown": 10},
         }
 
-        self.assertAlmostEqual(item_stat(item, "damage"), 10 * 1.3 * 1.8)
-        self.assertAlmostEqual(item_stat(item, "cooldown"), 10 * 0.94 / 1.8)
+        self.assertAlmostEqual(item_stat(item, "damage"), 10 * 1.3 * 2.25)
+        self.assertAlmostEqual(item_stat(item, "cooldown"), 10 * 0.94 / 2.25)
         self.assertAlmostEqual(
             item_stat({**item, "level": 1000}, "cooldown"),
             0.05,
@@ -146,8 +146,8 @@ class RarityScalingTests(unittest.TestCase):
             load_bullet_types(),
             1.0,
         )
-        self.assertEqual(projectile.damage, 23)
-        self.assertAlmostEqual(cooldown, 0.94)
+        self.assertEqual(projectile.damage, 29)
+        self.assertAlmostEqual(cooldown, 1.8 * 0.94 / 2.25)
 
         ability = {
             "id": "levelled-bolt",
@@ -177,7 +177,8 @@ class RarityScalingTests(unittest.TestCase):
             "combinations": [None] * 3,
         }])
         inventory.equip("levelled-coat", "armor", 0)
-        self.assertAlmostEqual(player_bonuses(inventory)["defense"], 11.7)
+        self.assertAlmostEqual(player_bonuses(inventory)[
+                               "defense"], 5 * 1.3 * 2.25)
 
     def test_paid_level_upgrade_changes_stats_through_shared_pipeline(self) -> None:
         item = {
@@ -202,8 +203,8 @@ class RarityScalingTests(unittest.TestCase):
 
         self.assertEqual(item["level"], 2)
         self.assertEqual(wallet.get("Gold"), LargeNumber(94))
-        self.assertAlmostEqual(item_stat(item, "damage"), 19.8)
-        self.assertAlmostEqual(item_stat(item, "cooldown"), 0.98)
+        self.assertAlmostEqual(item_stat(item, "damage"), 24.75)
+        self.assertAlmostEqual(item_stat(item, "cooldown"), 1.8 * 0.98 / 2.25)
 
     def test_level_scaling_asset_is_validated(self) -> None:
         self.assertEqual(

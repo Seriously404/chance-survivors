@@ -7,8 +7,10 @@ import math
 from typing import Any
 
 from game.systems.inventory import ARMOR_EQUIPMENT_SLOTS, Inventory, _item
+from game.systems.item_potential import level_potential
 from game.systems.json_loader import create_item_catalog_from_json
 from game.systems.json_loader import load_item_level_scaling, load_rarity_scaling
+from game.utils.large_number import LargeNumber
 from game.systems.armor_sets import (
     armor_set_bonuses as calculate_armor_set_bonuses,
     armor_set_status as calculate_armor_set_status,
@@ -35,7 +37,8 @@ def create_item_catalog() -> list[dict[str, Any]]:
                 not isinstance(armor_slot, str)
                 or armor_slot not in ARMOR_EQUIPMENT_SLOTS
             ):
-                raise ValueError(f"Unsupported armor slot on item {item.get('id')!r}")
+                raise ValueError(
+                    f"Unsupported armor slot on item {item.get('id')!r}")
             armor_set = item.get("armor_set")
             if armor_set is not None:
                 if (
@@ -43,7 +46,8 @@ def create_item_catalog() -> list[dict[str, Any]]:
                     or not armor_set.strip()
                     or armor_set not in _ARMOR_SETS
                 ):
-                    raise ValueError(f"Unsupported armor set on item {item.get('id')!r}")
+                    raise ValueError(
+                        f"Unsupported armor set on item {item.get('id')!r}")
                 if armor_slot is None:
                     raise ValueError(
                         f"Armor set item {item.get('id')!r} must define an armor slot"
@@ -56,8 +60,9 @@ def create_item_catalog() -> list[dict[str, Any]]:
             item.get("level", 1),
             deepcopy(item.get("stats", {}))
         )
-        if "tags" in item:
-            inventory_item["tags"] = deepcopy(item["tags"])
+        for key in ("tags", "behaviors", "description"):
+            if key in item:
+                inventory_item[key] = deepcopy(item[key])
         for metadata_key in ("armor_set", "armor_slot"):
             if metadata_key in item:
                 inventory_item[metadata_key] = item[metadata_key]
@@ -67,10 +72,11 @@ def create_item_catalog() -> list[dict[str, Any]]:
 
 
 def create_initial_inventory() -> Inventory:
-    """Create a minimal starting inventory with only a basic common rifle."""
-    inventory = Inventory(create_item_catalog())
-    # Player starts with only a basic common rifle
+    """Start with a basic rifle and a single-target fireball."""
+    inventory = Inventory([item for item in create_item_catalog(
+    ) if item["id"] in {"starter-rapid", "starter-fire-rune"}])
     inventory.equip("starter-rapid", "weapons", 0)
+    inventory.equip("starter-fire-rune", "abilities", 0)
     return inventory
 
 
@@ -81,7 +87,8 @@ def item_stat(item: dict[str, Any], name: str, default: float = 0.0) -> float:
     try:
         base_value = float(value)
     except OverflowError as exc:
-        raise ValueError(f"Item stat {name!r} exceeds the supported numeric range") from exc
+        raise ValueError(
+            f"Item stat {name!r} exceeds the supported numeric range") from exc
     if not math.isfinite(base_value):
         raise ValueError(f"Item stat {name!r} must be finite")
     level = item.get("level", 1)
@@ -90,12 +97,15 @@ def item_stat(item: dict[str, Any], name: str, default: float = 0.0) -> float:
     addition_rate = _ITEM_LEVEL_SCALING["stat_addition_rates"].get(
         name, _ITEM_LEVEL_SCALING["default_addition_rate"]
     )
+    addition_rate *= level_potential(item)
     try:
         leveled_value = base_value + base_value * addition_rate * (level - 1)
     except OverflowError as exc:
-        raise ValueError("Item level scaling exceeded the supported numeric range") from exc
+        raise ValueError(
+            "Item level scaling exceeded the supported numeric range") from exc
     if not math.isfinite(leveled_value):
-        raise ValueError("Item level scaling exceeded the supported numeric range")
+        raise ValueError(
+            "Item level scaling exceeded the supported numeric range")
     rarity = str(item.get("rarity", "common")).lower()
     multipliers = _RARITY_SCALING["multipliers"]
     if rarity not in multipliers:
@@ -104,8 +114,10 @@ def item_stat(item: dict[str, Any], name: str, default: float = 0.0) -> float:
     if rarity == "ultimate":
         tier = item.get("ultimate_tier", 1)
         if type(tier) is not int or not 1 <= tier <= 100:
-            raise ValueError("Ultimate rarity tier must be an integer from 1 to 100")
-        rarity_multiplier *= _RARITY_SCALING["ultimate_tier_growth"] ** (tier - 1)
+            raise ValueError(
+                "Ultimate rarity tier must be an integer from 1 to 100")
+        rarity_multiplier *= _RARITY_SCALING["ultimate_tier_growth"] ** (
+            tier - 1)
     if name == "cooldown":
         rarity_multiplier = 1 / rarity_multiplier
     result = leveled_value * rarity_multiplier
@@ -113,8 +125,29 @@ def item_stat(item: dict[str, Any], name: str, default: float = 0.0) -> float:
     if minimum_value is not None:
         result = max(minimum_value, result)
     if not math.isfinite(result):
-        raise ValueError(f"Scaled item stat {name!r} exceeds the supported numeric range")
+        raise ValueError(
+            f"Scaled item stat {name!r} exceeds the supported numeric range")
     return result
+
+
+def effective_ability(inventory: Inventory, item: dict[str, Any]) -> dict[str, Any]:
+    """Build a castable snapshot from the currently assigned supplements."""
+    if not any(item.get("combinations", [])):
+        return item
+    from game.systems.combinations import CombinationEngine
+    combined = CombinationEngine().evaluate_inventory(inventory, item["id"])
+    stats = dict(combined.metadata)
+    stats.update({name: value.to_float()
+                 for name, value in combined.stats.items()})
+    # The engine has already applied level and rarity scaling.
+    supplements = [inventory.get(sid)
+                   for sid in item["combinations"] if sid is not None]
+    heals_on_hit = any(s.get("type") == "ability" and
+                       s.get("stats", {}).get("script", s.get("stats", {}).get(
+                           "cast_type")) in {"heal", "mend_ward"}
+                       for s in supplements)
+    return {**item, "stats": stats, "tags": list(combined.tags), "level": 1, "rarity": "common",
+            "heal_on_damage": heals_on_hit}
 
 
 def player_bonuses(inventory: Inventory) -> dict[str, float]:
@@ -125,11 +158,20 @@ def player_bonuses(inventory: Inventory) -> dict[str, float]:
         if item_id is not None
     ]
     contributors = list(equipped_armor)
-    contributors.extend(item for item in inventory.items if item.get("type") in {"misc", "relic"})
+    contributors.extend(item for item in inventory.items if item.get(
+        "type") in {"misc", "relic"})
     result = {"defense": 0.0, "health": 0.0, "speed_pct": 0.0,
-              "luck": 0.0, "damage_pct": 0.0, "crit_chance": 0.0,
+              "luck": 1.0, "damage_pct": 0.0, "crit_chance": 0.0,
               "score_bonus_pct": 0.0, "elemental_dmg": 0.0}
     for item in contributors:
+        if item.get("type") == "armor" and any(item.get("combinations", [])):
+            from game.systems.combinations import CombinationEngine
+            combined = CombinationEngine().evaluate_inventory(
+                inventory, item["id"])
+            for stat_name in result:
+                result[stat_name] += combined.stats.get(
+                    stat_name, LargeNumber(0)).to_float()
+            continue
         for stat_name in result:
             result[stat_name] += item_stat(item, stat_name)
     for stat_name, value in calculate_armor_set_bonuses(
@@ -141,16 +183,18 @@ def player_bonuses(inventory: Inventory) -> dict[str, float]:
 
 def player_speed_multiplier(speed: float | int | LargeNumber) -> float:
     """Calculate player speed multiplier with clamping.
-    
+
     Args:
         speed: Speed value which can be positive, negative, or very large.
-        
+
     Returns:
         Clamped speed multiplier between 0.1 and 100.0.
     """
     if isinstance(speed, LargeNumber):
+        if speed > 9900:
+            return 100.0
         speed = speed.to_float()
-    
+
     # Clamp between 0.1 and 100.0
     multiplier = max(0.1, min(100.0, 1.0 + speed / 100.0))
     return multiplier

@@ -5,7 +5,9 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, field
 import math
+from decimal import Decimal, localcontext
 from typing import Any
+from game.systems.numbers import LargeNumber
 
 from .game_definitions import load_quests
 
@@ -29,6 +31,8 @@ class Quest:
     completed: bool = False
     failed: bool = False
     lock_on_accept: bool = False
+    reward_power: float = 1.0
+    restriction_mode: str = ""
 
     def percent_complete(self) -> float:
         if self.target <= 0:
@@ -43,6 +47,7 @@ class Quest:
             "type": self.quest_type,
             "unlock_level": self.unlock_level,
             "reward_pct": float(self.reward_pct),
+            "reward_power": float(self.reward_power),
             "condition": self.condition,
             "target": float(self.target),
             "enemy_type": self.enemy_type,
@@ -63,7 +68,8 @@ class QuestManager:
     """Track active, failed, and completed quests for a run."""
 
     def __init__(self, blueprints: list[dict[str, Any]] | None = None) -> None:
-        self.blueprints = [deepcopy(item) for item in (blueprints or QUEST_BLUEPRINTS)]
+        self.blueprints = [deepcopy(item)
+                           for item in (blueprints or QUEST_BLUEPRINTS)]
         self.active_quests: list[Quest] = []
         self.completed_quests: list[Quest] = []
         self.failed_quests: list[Quest] = []
@@ -72,28 +78,39 @@ class QuestManager:
         self.kills_by_enemy: dict[str, int] = {}
         self.time_survived = 0.0
         self.main_quest: Quest | None = None
+        self.main_quest_declined = False
         self._sync_unlocked_quests()
 
     def _quest_id_set(self, quests: list[Quest]) -> set[str]:
         return {quest.id for quest in quests}
 
     def _sync_unlocked_quests(self) -> None:
-        existing = self._quest_id_set(self.active_quests + self.completed_quests + self.failed_quests)
-        for blueprint in self.blueprints:
-            quest_id = str(blueprint["id"])
-            if quest_id in existing:
-                continue
-            if int(blueprint["unlock_level"]) > self.level:
-                continue
-            if blueprint["quest_type"] == "main":
-                if self.main_quest is not None:
-                    continue
-                self.main_quest = self._build_quest(blueprint)
-                self.active_quests.append(self.main_quest)
-                continue
-            if len([quest for quest in self.active_quests if quest.quest_type == "side"]) >= 3:
-                continue
-            self.active_quests.append(self._build_quest(blueprint))
+        # Availability is derived from level and completed/active IDs.
+        return
+
+    def available_quests(self) -> list[Quest]:
+        existing = self._quest_id_set(
+            self.active_quests + self.completed_quests + self.failed_quests)
+        return [self._build_quest(bp) for bp in self.blueprints
+                if str(bp["id"]) not in existing and int(bp["unlock_level"]) <= self.level
+                and not (bp["quest_type"] == "main" and (self.main_quest is not None or self.main_quest_declined))]
+
+    def accept(self, quest_id: str, equipped_items: list[dict[str, Any]] | None = None) -> bool:
+        quest = next((q for q in self.available_quests()
+                     if q.id == quest_id), None)
+        if quest is None or (quest.quest_type == "side" and sum(q.quest_type == "side" for q in self.active_quests) >= 3):
+            return False
+        if quest.quest_type == "main":
+            self.main_quest = quest
+            if any(self._violates_main_quest_restrictions(item) for item in (equipped_items or [])):
+                self.main_quest = None
+                return False
+            quest.lock_on_accept = True
+        self.active_quests.append(quest)
+        if quest.condition == "level_reached":
+            quest.progress = float(self.level)
+            self._advance_quest(quest)
+        return True
 
     def _build_quest(self, blueprint: dict[str, Any]) -> Quest:
         return Quest(
@@ -108,6 +125,8 @@ class QuestManager:
             enemy_type=blueprint.get("enemy_type"),
             restrictions=list(blueprint.get("restrictions", [])),
             forbidden_item_tags=list(blueprint.get("forbidden_item_tags", [])),
+            reward_power=float(blueprint.get("reward_power", 1.0)),
+            restriction_mode=str(blueprint.get("restriction_mode", "")),
         )
 
     def register_level(self, level: int) -> None:
@@ -121,32 +140,29 @@ class QuestManager:
     def register_kill(self, enemy_type: str | None = None) -> None:
         self.kills_total += 1
         if enemy_type is not None:
-            self.kills_by_enemy[enemy_type] = self.kills_by_enemy.get(enemy_type, 0) + 1
+            self.kills_by_enemy[enemy_type] = self.kills_by_enemy.get(
+                enemy_type, 0) + 1
         for quest in list(self.active_quests):
             if quest.condition == "kills_total":
-                quest.progress = float(self.kills_total)
-            elif quest.condition == "kills_enemy" and quest.enemy_type:
-                quest.progress = float(self.kills_by_enemy.get(quest.enemy_type, 0))
+                quest.progress += 1
+            elif quest.condition == "kills_enemy" and quest.enemy_type == enemy_type:
+                quest.progress += 1
             self._advance_quest(quest)
 
     def register_time(self, elapsed_seconds: float) -> None:
-        self.time_survived = max(0.0, float(elapsed_seconds))
+        elapsed = max(0.0, float(elapsed_seconds))
+        delta = max(0.0, elapsed - self.time_survived)
+        self.time_survived = elapsed
         for quest in list(self.active_quests):
             if quest.condition == "time_survived":
-                quest.progress = self.time_survived
+                quest.progress += delta
                 self._advance_quest(quest)
 
     def _advance_quest(self, quest: Quest) -> None:
         if quest.completed or quest.failed:
             return
-        if quest.condition == "kills_total":
-            value = float(self.kills_total)
-        elif quest.condition == "kills_enemy":
-            value = float(self.kills_by_enemy.get(quest.enemy_type, 0))
-        elif quest.condition == "level_reached":
+        if quest.condition == "level_reached":
             value = float(self.level)
-        elif quest.condition == "time_survived":
-            value = float(self.time_survived)
         else:
             value = float(quest.progress)
         quest.progress = max(float(quest.progress), value)
@@ -157,13 +173,34 @@ class QuestManager:
             self.completed_quests.append(quest)
 
     def total_bonus_pct(self) -> float:
-        return float(sum(quest.reward_pct for quest in self.completed_quests))
+        return float(sum(quest.reward_pct for quest in self.completed_quests if quest.quest_type == "side"))
+
+    def decline_main_quest(self) -> bool:
+        if self.main_quest is not None or self.main_quest_declined or not any(q.quest_type == "main" for q in self.available_quests()):
+            return False
+        self.main_quest_declined = True
+        return True
+
+    def final_score(self, score: LargeNumber) -> LargeNumber:
+        score = LargeNumber(score).scale_by_percent(self.total_bonus_pct())
+        power = self.main_quest.reward_power if self.main_quest and self.main_quest.completed else 1.0
+        if not score or power == 1.0:
+            return score
+        with localcontext() as context:
+            context.prec = 50
+            result = score.value ** Decimal(str(power))
+        return LargeNumber(result)
 
     def to_state(self) -> list[dict[str, Any]]:
-        quest_states = [quest.to_state() for quest in self.active_quests + self.completed_quests]
-        for quest_state in quest_states:
-            quest_state["status"] = "completed" if quest_state["completed"] else "active"
-        return quest_states
+        states = {q.id: dict(q.to_state(), status="active")
+                  for q in self.active_quests}
+        states.update({q.id: dict(q.to_state(), status="completed")
+                      for q in self.completed_quests})
+        states.update({q.id: dict(q.to_state(), status="failed")
+                      for q in self.failed_quests})
+        states.update({q.id: dict(q.to_state(), status="available")
+                      for q in self.available_quests()})
+        return [states[str(bp["id"])] for bp in self.blueprints if str(bp["id"]) in states]
 
     def to_save_state(self) -> dict[str, Any]:
         """Return the counters and quest outcomes needed to resume a run."""
@@ -187,6 +224,7 @@ class QuestManager:
             "completed": compact(self.completed_quests),
             "failed": compact(self.failed_quests),
             "main_quest_id": self.main_quest.id if self.main_quest else None,
+            "main_quest_declined": self.main_quest_declined,
         }
 
     @classmethod
@@ -223,7 +261,12 @@ class QuestManager:
         manager.kills_total = kills_total
         manager.kills_by_enemy = dict(kills_by_enemy)
         manager.time_survived = float(time_survived)
-        blueprints_by_id = {str(item["id"]): item for item in manager.blueprints}
+        declined = state.get("main_quest_declined", False)
+        if not isinstance(declined, bool):
+            raise ValueError("Quest save has invalid main quest choice")
+        manager.main_quest_declined = declined
+        blueprints_by_id = {
+            str(item["id"]): item for item in manager.blueprints}
         seen_ids: set[str] = set()
 
         for key, target in (
@@ -240,13 +283,15 @@ class QuestManager:
                 quest_id = entry.get("id")
                 progress = entry.get("progress")
                 if quest_id not in blueprints_by_id or quest_id in seen_ids:
-                    raise ValueError("Quest save references an unknown or duplicate quest")
+                    raise ValueError(
+                        "Quest save references an unknown or duplicate quest")
                 if (isinstance(progress, bool) or not isinstance(progress, (int, float))
                         or not math.isfinite(progress) or progress < 0):
                     raise ValueError("Quest save has invalid quest progress")
                 locked = entry.get("lock_on_accept", False)
                 if not isinstance(locked, bool):
-                    raise ValueError("Quest save has invalid restriction state")
+                    raise ValueError(
+                        "Quest save has invalid restriction state")
                 quest = manager._build_quest(blueprints_by_id[quest_id])
                 quest.progress = float(progress)
                 quest.completed = key == "completed"
@@ -274,6 +319,8 @@ class QuestManager:
         locked: bool,
         equipped_items: list[dict[str, Any]] | None = None,
     ) -> bool:
+        if not locked:
+            return False
         if (self.main_quest is None or self.main_quest.id != quest_id
                 or self.main_quest.completed or self.main_quest.failed):
             return False
@@ -288,14 +335,20 @@ class QuestManager:
     def can_equip(self, item: dict[str, Any]) -> bool:
         """Return whether an item respects an active locked main quest."""
         quest = self.main_quest
-        if quest is None or not quest.lock_on_accept or quest.completed or quest.failed:
+        if quest is None or not quest.lock_on_accept or quest.failed:
             return True
         return not self._violates_main_quest_restrictions(item)
 
     def _violates_main_quest_restrictions(self, item: dict[str, Any]) -> bool:
         quest = self.main_quest
-        if quest is None or quest.completed or quest.failed:
+        if quest is None or quest.failed:
             return False
+        kind = item.get("type")
+        if quest.restriction_mode in ("ability_only", "sentry_only") and kind == "weapon":
+            return True
+        if quest.restriction_mode == "sentry_only" and kind == "ability":
+            if item.get("stats", {}).get("script") not in {"sentinel", "turret"}:
+                return True
         tags = item.get("tags", [])
         if not isinstance(tags, list):
             return False

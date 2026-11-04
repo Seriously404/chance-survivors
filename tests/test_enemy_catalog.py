@@ -38,7 +38,8 @@ class EnemyCatalogTests(unittest.TestCase):
         self.assertTrue(expected_additions.issubset(roster))
         self.assertEqual(roster["basic"], legacy_enemy_types["basic"])
         self.assertEqual(legacy_enemy_types["basic"]["max_health"], 10)
-        self.assertLess(roster["boss"]["weight"], roster["elemental-fire"]["weight"])
+        self.assertLess(roster["boss"]["weight"],
+                        roster["elemental-fire"]["weight"])
         self.assertNotEqual(
             roster["elemental-fire"]["color"],
             roster["elemental-frost"]["color"],
@@ -53,7 +54,7 @@ class EnemyCatalogTests(unittest.TestCase):
 
         self.assertEqual(len(enemies), 1)
         self.assertEqual(enemies[0].type, "elemental-fire")
-        self.assertEqual(enemies[0].currency_drop, "silver")
+        self.assertEqual(enemies[0].currency_drop, "ember")
         self.assertEqual(enemies[0].currency_amount, 18)
         self.assertEqual(enemies[0].xp_reward, 22)
 
@@ -99,7 +100,8 @@ class EnemyCatalogTests(unittest.TestCase):
         )
 
     def test_summoned_minions_cannot_be_chosen_by_regular_spawner(self) -> None:
-        minion_stats = build_enemy_roster(legacy_enemy_types)["necromancer_minion"]
+        minion_stats = build_enemy_roster(legacy_enemy_types)[
+            "necromancer_minion"]
 
         with self.assertRaisesRegex(ValueError, "no spawnable enemy types"):
             SpawnerSystem({"necromancer_minion": minion_stats}).spawn(
@@ -130,12 +132,14 @@ class EnemyCatalogTests(unittest.TestCase):
 
         self.assertEqual(result["killed"], 1)
         self.assertEqual(probe.score, 0)
-        self.assertTrue(all(amount == 0 for amount in probe.wallet.amounts.values()))
+        self.assertTrue(
+            all(amount == 0 for amount in probe.wallet.amounts.values()))
         self.assertEqual(probe.progress.total_exp, 0)
 
     def test_shooter_fires_only_after_cooldown_and_inside_range(self) -> None:
         roster = build_enemy_roster(legacy_enemy_types)
-        shooter = Enemy.create_from_type("shooter", roster["shooter"], 2.0, 0.0)
+        shooter = Enemy.create_from_type(
+            "shooter", roster["shooter"], 2.0, 0.0)
         enemies = [shooter]
 
         self.assertEqual(
@@ -148,7 +152,8 @@ class EnemyCatalogTests(unittest.TestCase):
         self.assertAlmostEqual(shots[0].dx, -1.0)
         self.assertEqual(shots[0].damage, shooter.damage)
 
-        far_shooter = Enemy.create_from_type("shooter", roster["shooter"], 5.0, 0.0)
+        far_shooter = Enemy.create_from_type(
+            "shooter", roster["shooter"], 5.0, 0.0)
         self.assertEqual(
             update_ranged_attacks([far_shooter], roster, 10.0, 0.0, 0.0),
             [],
@@ -228,14 +233,17 @@ class EnemyCatalogTests(unittest.TestCase):
 
         self.assertEqual(len(enemies), 3)
         self.assertEqual({enemy.type for enemy in enemies}, {"swarm"})
-        self.assertEqual({enemy.currency_drop for enemy in enemies}, {"copper"})
+        self.assertEqual(
+            {enemy.currency_drop for enemy in enemies}, {"copper"})
         self.assertEqual({enemy.currency_amount for enemy in enemies}, {3})
         self.assertEqual({enemy.xp_reward for enemy in enemies}, {5})
-        self.assertTrue(all(enemy.max_health > roster["swarm"]["max_health"] for enemy in enemies))
+        self.assertTrue(
+            all(enemy.max_health > roster["swarm"]["max_health"] for enemy in enemies))
         self.assertEqual(len({(enemy.x, enemy.y) for enemy in enemies}), 3)
         for enemy in enemies:
             self.assertGreater(enemy.dx * -enemy.x + enemy.dy * -enemy.y, 0)
-            self.assertLessEqual(math.hypot(enemy.x - enemies[0].x, enemy.y - enemies[0].y), 0.2)
+            self.assertLessEqual(math.hypot(
+                enemy.x - enemies[0].x, enemy.y - enemies[0].y), 0.2)
 
     def test_invalid_swarm_configuration_does_not_partially_spawn(self) -> None:
         stats = {

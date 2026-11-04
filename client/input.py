@@ -23,8 +23,11 @@ class InputHandler:
         self.click_release = None
         self.fire_events = []
         self.mouse_buttons_held = set()
+        self.held_abilities = set()
+        self.held_movement = set()
+        self.name_focused = True
 
-    def process_events(self) -> Tuple[bool, List[Tuple[float, float]], List[str]]:
+    def process_events(self, mode: str = "PLAYING", name_entry=None) -> Tuple[bool, List[Tuple[float, float]], List[str]]:
         """Process all pygame events.
 
         Returns:
@@ -42,37 +45,63 @@ class InputHandler:
                 running = False
 
             elif event.type == pygame.KEYDOWN:
-                self._handle_keydown(event.key, actions)
+                if mode == "MENU" and self.name_focused:
+                    if event.key == pygame.K_BACKSPACE:
+                        self.player_name = self.player_name[:-1]
+                    elif event.key == pygame.K_RETURN:
+                        self.name_focused = False
+                        pygame.key.stop_text_input()
+                        actions.append("confirm")
+                    elif event.key == pygame.K_ESCAPE:
+                        actions.append("back")
+                elif event.key != pygame.K_BACKSPACE:
+                    if mode == "PLAYING" or event.key in (pygame.K_RETURN, pygame.K_ESCAPE, pygame.K_q, pygame.K_u):
+                        self._handle_keydown(event.key, actions)
 
             elif event.type == pygame.KEYUP:
-                self._handle_keyup(event.key)
+                if mode == "PLAYING":
+                    self._handle_keyup(event.key)
+                if mode == "PLAYING" and event.key in self.held_abilities:
+                    self.held_abilities.discard(event.key)
+                    actions.append(
+                        f"ability_cast:{(event.key - pygame.K_1) if event.key != pygame.K_0 else 9}")
 
             elif event.type == pygame.TEXTINPUT:
-                self.player_name = (self.player_name + event.text)[:20]
+                if mode == "MENU" and self.name_focused:
+                    self.player_name = (self.player_name + event.text)[:20]
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button in (1, 3):
+                    if mode == "MENU":
+                        self.name_focused = bool(
+                            name_entry and name_entry.collidepoint(event.pos))
+                        if self.name_focused:
+                            pygame.key.start_text_input()
+                        else:
+                            pygame.key.stop_text_input()
                     shots.append(event.pos)
-                    self.fire_events.append((event.button,event.pos))
+                    self.fire_events.append((event.button, event.pos))
                     self.mouse_buttons_held.add(event.button)
                     self.held_fire = True
                     self.drag_start = event.pos
                     self.drag_active = False
             elif event.type == pygame.MOUSEMOTION:
                 if self.drag_start is not None and not self.drag_active:
-                    dx=event.pos[0]-self.drag_start[0]; dy=event.pos[1]-self.drag_start[1]
-                    self.drag_active=dx*dx+dy*dy >= 64
+                    dx = event.pos[0]-self.drag_start[0]
+                    dy = event.pos[1]-self.drag_start[1]
+                    self.drag_active = dx*dx+dy*dy >= 64
             elif event.type == pygame.MOUSEBUTTONUP and event.button in (1, 3):
                 self.mouse_buttons_held.discard(event.button)
                 self.held_fire = bool(self.mouse_buttons_held)
                 if self.drag_start is not None and self.drag_active:
-                    self.drag_release=(self.drag_start,event.pos)
+                    self.drag_release = (self.drag_start, event.pos)
                 elif self.drag_start is not None:
-                    self.click_release=event.pos
-                self.drag_start=None
-                self.drag_active=False
+                    self.click_release = event.pos
+                self.drag_start = None
+                self.drag_active = False
             elif event.type == pygame.MOUSEWHEEL:
-                actions.extend(["inventory_up" if event.y > 0 else "inventory_down"] * abs(event.y))
+                actions.extend(["inventory_up" if event.y >
+                               0 else "inventory_down"] * abs(event.y))
 
         self.mouse_position = pygame.mouse.get_pos()
         return running, shots, actions
@@ -84,6 +113,10 @@ class InputHandler:
             key: The key that was pressed.
             actions: List to append action strings to.
         """
+        if key in (pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d):
+            if key in self.held_movement:
+                return
+            self.held_movement.add(key)
         if key == pygame.K_w:
             self.player_dy += 1
         elif key == pygame.K_s:
@@ -93,9 +126,11 @@ class InputHandler:
         elif key == pygame.K_d:
             self.player_dx += 1
         elif pygame.K_1 <= key <= pygame.K_9:
-            actions.append(f"ability_cast:{key - pygame.K_1}")
+            self.held_abilities.add(key)
         elif key == pygame.K_0:
-            actions.append("ability_cast:9")
+            self.held_abilities.add(key)
+        elif key == pygame.K_SPACE:
+            actions.append("dash")
         elif key == pygame.K_RETURN:
             actions.append("confirm")
         elif key == pygame.K_ESCAPE:
@@ -113,6 +148,10 @@ class InputHandler:
         Args:
             key: The key that was released.
         """
+        if key in (pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d):
+            if key not in self.held_movement:
+                return
+            self.held_movement.remove(key)
         if key == pygame.K_w:
             self.player_dy -= 1
         elif key == pygame.K_s:
@@ -167,3 +206,5 @@ class InputHandler:
         self.fire_events = []
         self.mouse_buttons_held.clear()
         self.held_fire = False
+        self.held_abilities.clear()
+        self.held_movement.clear()

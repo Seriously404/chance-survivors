@@ -3,7 +3,7 @@
 import unittest
 
 from game.systems.elements import apply_elemental_damage, normalize_element
-from game.systems.items import create_initial_inventory
+from game.systems.items import create_item_catalog
 from game.systems.weapons import projectile_for_weapon
 
 
@@ -17,14 +17,15 @@ class ElementSystemTests(unittest.TestCase):
         self.assertEqual(normalize_element("Fire"), "fire")
 
     def test_weapon_projectile_inherits_item_element(self) -> None:
-        inventory = create_initial_inventory()
-        weapon = next(item for item in inventory.items if item["id"] == "starter-heavy")
+        weapon = next(item for item in create_item_catalog()
+                      if item["id"] == "starter-heavy")
         projectile, _, _ = projectile_for_weapon(
             type("Player", (), {"x": 0.0, "y": 0.0})(),
             0.0,
             weapon,
             0,
-            {"heavy_shot": type("Def", (), {"damage": 20, "cooldown": 1.0, "speed_modifier": 1.0, "piercing": 0, "automatic": False})()},
+            {"heavy_shot": type("Def", (), {"damage": 20, "cooldown": 1.0,
+                                "speed_modifier": 1.0, "piercing": 0, "automatic": False})()},
             1.0,
         )
         self.assertEqual(projectile.element, "fire")

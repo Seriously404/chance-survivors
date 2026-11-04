@@ -1,184 +1,289 @@
 {
   "currencies": [
     {
+      "id": "ember",
+      "name": "Ember",
+      "symbol": "Em",
+      "color": [
+        255,
+        100,
+        30
+      ],
+      "description": "A burning remnant dropped by fire elementals.",
+      "rarity": "uncommon",
+      "drop_rate_modifier": 0.5,
+      "value_multiplier": 5,
+      "emoji": "🔥"
+    },
+    {
       "id": "copper",
       "name": "Copper",
       "symbol": "C",
-      "color": [184, 134, 11],
+      "color": [
+        184,
+        134,
+        11
+      ],
       "description": "The basic currency used for common purchases.",
       "rarity": "common",
-      "drop_rate_modifier": 1.0,
-      "value_multiplier": 1.0
+      "drop_rate_modifier": 1,
+      "value_multiplier": 1,
+      "emoji": "🟤"
     },
     {
       "id": "silver",
       "name": "Silver",
       "symbol": "S",
-      "color": [192, 192, 192],
+      "color": [
+        192,
+        192,
+        192
+      ],
       "description": "A rarer currency found from tougher enemies.",
       "rarity": "uncommon",
       "drop_rate_modifier": 0.5,
-      "value_multiplier": 5.0
+      "value_multiplier": 5,
+      "emoji": "⚪"
     },
     {
       "id": "gold",
       "name": "Gold",
       "symbol": "G",
-      "color": [255, 215, 0],
+      "color": [
+        255,
+        215,
+        0
+      ],
       "description": "A precious currency dropped by bosses.",
       "rarity": "rare",
       "drop_rate_modifier": 0.2,
-      "value_multiplier": 25.0
+      "value_multiplier": 25,
+      "emoji": "🟡"
     },
     {
       "id": "dark_matter",
       "name": "Dark Matter",
       "symbol": "DM",
-      "color": [75, 0, 130],
+      "color": [
+        75,
+        0,
+        130
+      ],
       "description": "A mysterious currency from shadow enemies.",
       "rarity": "epic",
       "drop_rate_modifier": 0.1,
-      "value_multiplier": 100.0
+      "value_multiplier": 100,
+      "emoji": "🌑"
     },
     {
       "id": "holy_water",
       "name": "Holy Water",
       "symbol": "HW",
-      "color": [255, 255, 0],
+      "color": [
+        255,
+        255,
+        0
+      ],
       "description": "A blessed currency from light enemies.",
       "rarity": "epic",
       "drop_rate_modifier": 0.1,
-      "value_multiplier": 100.0
+      "value_multiplier": 100,
+      "emoji": "💧"
     },
     {
       "id": "essence",
       "name": "Essence",
       "symbol": "E",
-      "color": [34, 139, 34],
+      "color": [
+        34,
+        139,
+        34
+      ],
       "description": "A natural currency from nature enemies.",
       "rarity": "rare",
       "drop_rate_modifier": 0.15,
-      "value_multiplier": 50.0
+      "value_multiplier": 50,
+      "emoji": "🌿"
     },
     {
       "id": "arcane_dust",
       "name": "Arcane Dust",
       "symbol": "AD",
-      "color": [147, 112, 219],
+      "color": [
+        147,
+        112,
+        219
+      ],
       "description": "A magical currency from arcane enemies.",
       "rarity": "epic",
       "drop_rate_modifier": 0.1,
-      "value_multiplier": 100.0
+      "value_multiplier": 100,
+      "emoji": "✨"
     },
     {
       "id": "chaos_fragment",
       "name": "Chaos Fragment",
       "symbol": "CF",
-      "color": [220, 20, 60],
+      "color": [
+        220,
+        20,
+        60
+      ],
       "description": "A chaotic currency from unpredictable sources.",
       "rarity": "legendary",
       "drop_rate_modifier": 0.05,
-      "value_multiplier": 500.0
+      "value_multiplier": 500,
+      "emoji": "💥"
     },
     {
       "id": "infinity_shard",
       "name": "Infinity Shard",
       "symbol": "IS",
-      "color": [255, 105, 180],
+      "color": [
+        255,
+        105,
+        180
+      ],
       "description": "A shard that approaches infinity in value.",
       "rarity": "mythical",
       "drop_rate_modifier": 0.01,
-      "value_multiplier": 5000.0
+      "value_multiplier": 5000,
+      "emoji": "♾"
     },
     {
       "id": "time_crystal",
       "name": "Time Crystal",
       "symbol": "TC",
-      "color": [0, 191, 255],
+      "color": [
+        0,
+        191,
+        255
+      ],
       "description": "A crystallized fragment of time itself.",
       "rarity": "legendary",
       "drop_rate_modifier": 0.05,
-      "value_multiplier": 750.0
+      "value_multiplier": 750,
+      "emoji": "⌛"
     },
     {
       "id": "soul_gem",
       "name": "Soul Gem",
       "symbol": "SG",
-      "color": [138, 43, 226],
+      "color": [
+        138,
+        43,
+        226
+      ],
       "description": "A gem containing captured souls.",
       "rarity": "mythical",
       "drop_rate_modifier": 0.02,
-      "value_multiplier": 2500.0
+      "value_multiplier": 2500,
+      "emoji": "💎"
     },
     {
       "id": "star_dust",
       "name": "Star Dust",
       "symbol": "SD",
-      "color": [255, 215, 255],
+      "color": [
+        255,
+        215,
+        255
+      ],
       "description": "Dust collected from fallen stars.",
       "rarity": "legendary",
       "drop_rate_modifier": 0.03,
-      "value_multiplier": 1000.0
+      "value_multiplier": 1000,
+      "emoji": "⭐"
     },
     {
       "id": "blood_orb",
       "name": "Blood Orb",
       "symbol": "BO",
-      "color": [139, 0, 0],
+      "color": [
+        139,
+        0,
+        0
+      ],
       "description": "A dark orb filled with blood energy.",
       "rarity": "epic",
       "drop_rate_modifier": 0.08,
-      "value_multiplier": 200.0
+      "value_multiplier": 200,
+      "emoji": "🩸"
     },
     {
       "id": "soul_fragment",
       "name": "Soul Fragment",
       "symbol": "SF",
-      "color": [147, 112, 219],
+      "color": [
+        147,
+        112,
+        219
+      ],
       "description": "A fragment of a shattered soul.",
       "rarity": "rare",
       "drop_rate_modifier": 0.12,
-      "value_multiplier": 75.0
+      "value_multiplier": 75,
+      "emoji": "👻"
     },
     {
       "id": "mana_crystal",
       "name": "Mana Crystal",
       "symbol": "MC",
-      "color": [0, 255, 255],
+      "color": [
+        0,
+        255,
+        255
+      ],
       "description": "A crystal charged with magical energy.",
       "rarity": "epic",
       "drop_rate_modifier": 0.09,
-      "value_multiplier": 150.0
+      "value_multiplier": 150,
+      "emoji": "🔮"
     },
     {
       "id": "iron_coin",
       "name": "Iron Coin",
       "symbol": "IC",
-      "color": [128, 128, 128],
+      "color": [
+        128,
+        128,
+        128
+      ],
       "description": "A sturdy coin made of iron.",
       "rarity": "uncommon",
       "drop_rate_modifier": 0.4,
-      "value_multiplier": 10.0
+      "value_multiplier": 10,
+      "emoji": "⚙"
     },
     {
       "id": "platinum_nugget",
       "name": "Platinum Nugget",
       "symbol": "PN",
-      "color": [229, 228, 226],
+      "color": [
+        229,
+        228,
+        226
+      ],
       "description": "A rare nugget of pure platinum.",
       "rarity": "legendary",
       "drop_rate_modifier": 0.04,
-      "value_multiplier": 800.0
+      "value_multiplier": 800,
+      "emoji": "💠"
     },
     {
       "id": "quantum_bit",
       "name": "Quantum Bit",
       "symbol": "QB",
-      "color": [255, 0, 255],
+      "color": [
+        255,
+        0,
+        255
+      ],
       "description": "A bit of data from the quantum realm.",
       "rarity": "mythical",
       "drop_rate_modifier": 0.01,
-      "value_multiplier": 3000.0
+      "value_multiplier": 3000,
+      "emoji": "⚛"
     }
   ]
 }

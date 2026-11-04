@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any
 
 from functools import lru_cache
+from game.utils.large_number import LargeNumber
 
 
 @lru_cache(maxsize=1)
@@ -87,7 +88,8 @@ class Enemy:
         current_angle = math.atan2(self.dy, self.dx)
 
         # Find the shortest rotation direction
-        angle_difference = (target_angle - current_angle + math.pi) % (2 * math.pi) - math.pi
+        angle_difference = (target_angle - current_angle +
+                            math.pi) % (2 * math.pi) - math.pi
 
         max_rotation = math.radians(90) * turning_speed * dt
         rotation = max(-max_rotation, min(max_rotation, angle_difference))
@@ -129,7 +131,8 @@ class Enemy:
             angle=0.0,
             health=stats["max_health"],
             max_health=stats["max_health"],
-            damage=int(stats.get("damage", 10)),
+            damage=(stats.get("damage", 10) if isinstance(stats.get("damage", 10), int)
+                    else LargeNumber(stats.get("damage", 10))),
             speed=float(stats.get("speed", 1.0)),
             turning_speed=float(stats.get("turning_speed", 1.0)),
             score_multiplier=max(1, int(stats.get("score_multiplier", 1))),

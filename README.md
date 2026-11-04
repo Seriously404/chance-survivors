@@ -18,8 +18,8 @@ the gameplay HUD and results screen explicitly identify the milestone.
 ## Game Loop
 
 1. Defeat enemies to earn points
-2. Collect points from kills and achievements
-3. Gamble points on new weapons, abilities, or upgrades
+2. Collect score, experience, and currencies from kills
+3. Spend currencies on crates and upgrades
 4. Combine items to create powerful combinations
 5. Fuse items to lock their stats and use them in further combinations
 6. Repeat until death or victory
@@ -32,7 +32,7 @@ The player can add any ability or weapon on to any other ability or weapon to ei
 
 ### Fusion
 
-Fusion unlocks at player level 50, marking the beginning of the endgame. Before then, the Fusion panel displays the unlock requirement and fusion actions are rejected by the game loop. Once unlocked, recipes require the listed source types, minimum rarity, and minimum level. Only unequipped items that are not already used in combinations can be consumed; invalid attempts leave the inventory unchanged and report why. Fused results have stable unique IDs, record their source items, preserve output-weapon behavior/tags, and are marked fusion-only so they cannot be mistaken for ordinary drops or shop entries.
+Fusion is available from the start, with stronger recipes unlocking at later levels. The Bazaar lists each recipe and its requirements. Only unequipped items that are not already used in combinations can be consumed; invalid attempts leave the inventory unchanged and report why. Fused results record their source items and are marked fusion-only so they cannot appear as ordinary drops or shop entries.
 
 ### Gambling
 
@@ -46,7 +46,7 @@ The game has a luck stat for the player, and the luckier the player is, the high
 
 Any item has two separate things: a level and a rarity. Levels add the configured per-level stat contribution before rarity is applied; the default contribution is 10% of the base stat per level, configurable through `assets/item_level_scaling.json`. Cooldown levels instead subtract 2% of the base cooldown per level, with a 0.05-second minimum, so leveling does not make abilities or weapons slower. Rarity multiplies the resulting stats.
 
-Mythical items can upgrade into Ultimate 1, then continue through Ultimate 100. Ultimate-tier upgrades cost more at higher tiers, use the rarity upgrader's luck-based success and payment rules, and stop at Ultimate 100. Inventory and run saves preserve the tier; icons progress from deep blue-purple toward white.
+Mythical items can upgrade into Ultimate 1. Inventory and run saves preserve Ultimate subtiers, and icons progress from deep blue-purple toward white.
 
 Combat and passive item stats use the shared calculation pipeline: base stat, additive level contributions, then rarity scaling from `assets/rarity_scaling.json`. Higher rarity increases effects and damage while reducing cooldowns; Ultimate tiers apply an additional configurable multiplier per tier.
 
@@ -68,19 +68,19 @@ Enemy kill payouts are loaded from `assets/enemies.json`: each live enemy type m
 
 ### Bazaar and Content Expansion
 
-The in-run Bazaar lets you buy luck-influenced crates or priced catalog items, upgrade owned-item rarity and levels, and sell un-equipped items. Higher-tier crates unlock as active run time advances; the offers rotate every five active minutes, and once per rotation the player can manually refresh the offers after alternatives have unlocked. The run seed and manual refresh state survive saves/resumes. Costs and sell values are shown in the Bazaar; wheel scrolling exposes the full market and inventory. Transactions validate Gold and inventory capacity before charging, and failed actions display feedback. Seeded runs support reproducible crate and rarity rolls in tests.
+The Bazaar sells themed crates in different currencies and offers relics in the market. Use the fusion table and codex to craft special items, gamble currency pools on rarity, exchange currencies, upgrade item levels, or sell unequipped items. Crates rotate as active run time advances. Wheel scrolling exposes longer lists, and failed transactions display feedback.
 
 ### Missions
 
-Quest progress is shown in the gameplay HUD and the Quests panel, including progress bars and earned score bonuses. Main-quest restrictions can be locked from that panel; for the no-sniper quest, locking prevents equipping or combining sniper-tagged items and cannot be enabled while one is already equipped. The lock state is included in run saves.
+Select quests in the Quests panel. Side quests add percentage bonuses; at level 8, choose one of three restricted main quests or skip the main quest for the run. Completed main quests raise the score to the shown power. The choice and restrictions persist in run saves.
 
 ### Scaling
 
-New enemies scale with active run time and the player's threat tier. Their health and reward multiplier follow a 5%-per-active-minute and 25%-per-threat-tier curve; score, configured currency drops, and XP all use that multiplier. Damage and movement rise more gradually, while spawn intervals shorten with time and threat. The in-game `+` and `-` controls adjust threat from 0 to 20. Time in menus and while paused does not advance this scaling or the run timer.
+New enemies scale with active run time. Their health and rewards rise while spawn intervals shorten; time in menus and while paused does not advance scaling or the run timer.
 
 ### Active Abilities
 
-Equipped abilities can be cast with their matching number key (1–9, then 0 for slot 10). Current effects include aimed elemental projectiles, close-range elemental novas, and healing; cooldowns are shown on the ability bar. Abilities are configured per item through cast type and effect stats.
+Hold an equipped ability's number key (1–9, then 0 for slot 10) to aim, and release it to cast. Cooldowns appear on the ability bar. New runs begin with a basic fireball as well as a rifle.
 
 ### Run Uploads
 
@@ -92,14 +92,19 @@ Active runs are atomically autosaved every 15 seconds and when leaving a run for
 
 ## Installation
 
+Run these commands from the project root with Python 3.12. A virtual environment
+is recommended:
+
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
 ```
 
 ## Running the Game
 
 ```bash
-python game/main.py
+python -m game.main
 ```
 
 ## Leaderboard API
@@ -113,14 +118,26 @@ python -m game.leaderboard_api
 
 Then open `http://localhost:8000/` to view the leaderboard. The page includes a ranked table, a per-entry detail panel, and a button to clear the database after supplying the admin token.
 
+Open `http://127.0.0.1:8000/docs` for interactive API documentation, including run submission and leaderboard endpoints. The older `python -m api.main` server entry point also exposes these routes and its legacy player-stat endpoints.
+
 ## Controls
 
 - **W, A, S, D** — Move the player
-- **Mouse Click** — Shoot
-- **1–9, 0** — Cast ability slots 1–10
+- **Space** — Dash
+- **Mouse** — Aim; left and right click fire equipped weapons
+- **Hold and release 1–9, 0** — Aim and cast ability slots 1–10
 - **Enter** — Confirm
-- **Escape** — Back
-- **Q** — Open settings
+- **Escape** — Back, or save and return to the title during a run
+- Use the on-screen buttons to open menus and pause.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests
+```
+
+For headless environments, set `SDL_VIDEODRIVER=dummy` and
+`SDL_AUDIODRIVER=dummy` before running tests that initialize the renderer.
 
 ## Project Structure
 
@@ -128,18 +145,14 @@ Then open `http://localhost:8000/` to view the leaderboard. The page includes a 
 chance-survivors/
 ├── requirements.txt          # Python dependencies
 ├── AGENTS.md                 # Codebase structure and rules
-├── REFACTOR.md              # Refactoring plan and extras
 ├── README.md                # This file
-├── client/                  # Rendering and input
-│   ├── __init__.py
-│   └── render.py            # All pygame code
-├── game/                    # Core game logic
-│   ├── __init__.py
-│   ├── main.py              # Main game loop
-│   └── core/
-│       ├── game.py          # State management
-│       └── states.py        # Game states
-└── .venv/                   # Virtual environment
+├── api/                     # Legacy API entry point
+├── assets/                  # Item, enemy, and other game data
+├── client/                  # Pygame rendering and input
+├── game/                    # Game logic and leaderboard API
+│   └── main.py              # Main game loop
+├── scripts/                 # Development helpers
+└── tests/                   # Automated tests
 ```
 
 ## Dependencies
@@ -149,6 +162,7 @@ chance-survivors/
 - pylint
 - fastapi
 - uvicorn
+- httpx2
 
 ## License
 

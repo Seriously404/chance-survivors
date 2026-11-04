@@ -53,15 +53,27 @@ class LeaderboardApiTests(unittest.TestCase):
         leaderboard = client.get("/api/leaderboard").json()
         self.assertEqual(len(leaderboard), 1)
         self.assertEqual(leaderboard[0]["name"], "Alice")
-        self.assertEqual(leaderboard[0]["score"], "123456789012345678901234567890123456789")
+        self.assertEqual(leaderboard[0]["score"],
+                         "123456789012345678901234567890123456789")
 
         detail = client.get(f"/api/leaderboard/{entry_id}").json()
         self.assertEqual(detail["level"], 24)
         self.assertEqual(detail["active_items"], ["rifle", "boots"])
         self.assertEqual(detail["inventory"][0]["name"], "Rifle")
 
+    def test_legacy_server_exposes_leaderboard_and_interactive_docs(self) -> None:
+        from api.main import app as legacy_app
+
+        legacy = TestClient(legacy_app)
+        self.assertEqual(legacy.get("/").status_code, 200)
+        self.assertEqual(legacy.get("/docs").status_code, 200)
+        schema = legacy.get("/openapi.json").json()
+        self.assertIn("/api/submit-run", schema["paths"])
+        self.assertIn("/players/{name}/stats", schema["paths"])
+
     def test_admin_clear_requires_valid_token(self) -> None:
-        response = client.post("/admin/clear-leaderboard", headers={"Authorization": "Bearer wrong-token"})
+        response = client.post("/admin/clear-leaderboard",
+                               headers={"Authorization": "Bearer wrong-token"})
         self.assertEqual(response.status_code, 403)
 
         client.post(

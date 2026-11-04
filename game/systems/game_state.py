@@ -7,6 +7,8 @@ class GameState(Enum):
     """Represents all possible game states."""
 
     MENU = auto()
+    INTRODUCTION = auto()
+    CODEX = auto()
     SETTINGS = auto()
     PLAYING = auto()
     GAME_OVER = auto()
@@ -67,6 +69,9 @@ class GameStateManager:
             True if the game state is MENU.
         """
         return self.state == GameState.MENU
+
+    def is_introduction(self) -> bool:
+        return self.state == GameState.INTRODUCTION
 
     def is_settings(self) -> bool:
         """Check if the game is in the settings state.

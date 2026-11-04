@@ -48,7 +48,8 @@ class ScalingConfig:
 
     def __post_init__(self) -> None:
         for name in ("time_step_seconds", "minimum_spawn_delay_seconds"):
-            object.__setattr__(self, name, _finite_float(getattr(self, name), name))
+            object.__setattr__(self, name, _finite_float(
+                getattr(self, name), name))
         for stat in _STATS:
             for kind in ("time", "difficulty"):
                 name = f"{kind}_{stat}_multiplier"
@@ -81,18 +82,22 @@ class ScalingConfig:
         time_multipliers = data.get("time_multipliers")
         difficulty_multipliers = data.get("difficulty_multipliers")
         if not isinstance(time_multipliers, Mapping) or not isinstance(difficulty_multipliers, Mapping):
-            raise ValueError("Scaling configuration is missing multiplier maps")
+            raise ValueError(
+                "Scaling configuration is missing multiplier maps")
         try:
             values: dict[str, Any] = {
                 "time_step_seconds": data["time_step_seconds"],
                 "minimum_spawn_delay_seconds": data["minimum_spawn_delay_seconds"],
             }
             for stat in _STATS:
-                values[f"time_{stat}_multiplier"] = LargeNumber.from_dict(time_multipliers[stat])
-                values[f"difficulty_{stat}_multiplier"] = LargeNumber.from_dict(difficulty_multipliers[stat])
+                values[f"time_{stat}_multiplier"] = LargeNumber.from_dict(
+                    time_multipliers[stat])
+                values[f"difficulty_{stat}_multiplier"] = LargeNumber.from_dict(
+                    difficulty_multipliers[stat])
             return cls(**values)
         except (KeyError, TypeError) as exc:
-            raise ValueError(f"Malformed scaling configuration: {exc}") from exc
+            raise ValueError(
+                f"Malformed scaling configuration: {exc}") from exc
 
 
 class ScalingSystem:
@@ -127,7 +132,8 @@ class ScalingSystem:
         delta = _finite_float(dt, "Active-time delta", allow_zero=True)
         updated = self._active_time_seconds + delta
         if not math.isfinite(updated):
-            raise ValueError("Active gameplay time exceeded the finite timer range")
+            raise ValueError(
+                "Active gameplay time exceeded the finite timer range")
         self._active_time_seconds = updated
 
     def increase_difficulty(self, steps: int = 1) -> None:
@@ -141,7 +147,8 @@ class ScalingSystem:
         result: dict[str, LargeNumber] = {}
         for stat in _STATS:
             time_multiplier = getattr(self.config, f"time_{stat}_multiplier")
-            difficulty_multiplier = getattr(self.config, f"difficulty_{stat}_multiplier")
+            difficulty_multiplier = getattr(
+                self.config, f"difficulty_{stat}_multiplier")
             result[stat] = (
                 time_multiplier ** time_steps
                 * difficulty_multiplier ** self._difficulty_level
@@ -156,12 +163,14 @@ class ScalingSystem:
     ) -> dict[str, LargeNumber]:
         """Scale combat/reward values and include the spawn-rate multiplier."""
         if any(isinstance(value, bool) for value in (base_health, base_damage, base_reward)):
-            raise ValueError("Enemy health, damage, and reward must be numeric values")
+            raise ValueError(
+                "Enemy health, damage, and reward must be numeric values")
         health = LargeNumber(base_health)
         damage = LargeNumber(base_damage)
         reward = LargeNumber(base_reward)
         if health <= 0 or damage < 0 or reward < 0:
-            raise ValueError("Enemy base health must be positive; damage/reward non-negative")
+            raise ValueError(
+                "Enemy base health must be positive; damage/reward non-negative")
         multipliers = self.multipliers()
         return {
             "health": health * multipliers["health"],
@@ -202,9 +211,11 @@ class ScalingSystem:
             difficulty = state["difficulty_level"]
         except (KeyError, TypeError) as exc:
             raise ValueError(f"Malformed scaling save: {exc}") from exc
-        active_time = _finite_float(active_time, "Saved active time", allow_zero=True)
+        active_time = _finite_float(
+            active_time, "Saved active time", allow_zero=True)
         if type(difficulty) is not int or difficulty < 0:
-            raise ValueError("Saved difficulty level must be a non-negative integer")
+            raise ValueError(
+                "Saved difficulty level must be a non-negative integer")
         result = cls(config)
         result._active_time_seconds = active_time
         result._difficulty_level = difficulty

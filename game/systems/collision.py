@@ -8,6 +8,8 @@ from game.entities.enemy_projectile import EnemyProjectile
 from game.entities.enemy import Enemy
 from game.entities.player import Player
 from game.systems.elements import apply_elemental_damage
+from game.systems.elemental_core import weakened_resistances, apply_lingering
+from game.utils.large_number import LargeNumber
 
 
 class CollisionSystem:
@@ -53,7 +55,10 @@ class CollisionSystem:
             enemy_stats["size"] / 2 + self.BULLET_RADIUS
         ) / self.pixels_per_unit
 
-        distance = self._get_distance(bullet.x, bullet.y, enemy.x, enemy.y)
+        start_x = bullet.previous_x if bullet.previous_x is not None else bullet.x
+        start_y = bullet.previous_y if bullet.previous_y is not None else bullet.y
+        distance = self._distance_to_segment(
+            enemy.x, enemy.y, start_x, start_y, bullet.x, bullet.y)
         return distance <= collision_distance
 
     def check_enemy_player_collision(
@@ -85,6 +90,7 @@ class CollisionSystem:
         bullets: List[Projectile],
         enemies: List[Enemy],
         enemy_types: dict,
+        player: Player | None = None,
     ) -> Tuple[List[Projectile], List[Enemy]]:
         """Check all bullet-enemy collisions and update entities.
 
@@ -101,7 +107,17 @@ class CollisionSystem:
         self.killed_enemies = []
 
         for i, bullet in enumerate(bullets):
-            for j, enemy in enumerate(enemies):
+            start_x = bullet.previous_x if bullet.previous_x is not None else bullet.x
+            start_y = bullet.previous_y if bullet.previous_y is not None else bullet.y
+            dx, dy = bullet.x - start_x, bullet.y - start_y
+            length_sq = dx * dx + dy * dy
+
+            def along_path(entry):
+                enemy = entry[1]
+                if not length_sq:
+                    return 0.0
+                return max(0.0, min(1.0, ((enemy.x-start_x)*dx + (enemy.y-start_y)*dy) / length_sq))
+            for j, enemy in sorted(enumerate(enemies), key=along_path):
                 # Later projectiles in this same pass may overlap an enemy
                 # that an earlier projectile already killed. Treat it as
                 # removed immediately so the kill/reward is only reported once.
@@ -119,46 +135,62 @@ class CollisionSystem:
                 effective_damage = apply_elemental_damage(
                     bullet.damage,
                     bullet.element,
-                    enemy_types[enemy.type].get("resistances", {}),
+                    weakened_resistances(enemy_types[enemy.type].get(
+                        "resistances", {}), bullet.elemental_core)
+                    if bullet.elemental_core else enemy_types[enemy.type].get("resistances", {}),
                 )
+                health_before = enemy.health
                 enemy.take_damage(effective_damage)
+                if player is not None and bullet.heal_on_damage:
+                    dealt = min(LargeNumber(health_before),
+                                LargeNumber(effective_damage))
+                    player.health = min(player.max_health,
+                                        player.health + dealt)
+                if bullet.elemental_core:
+                    apply_lingering(enemy, bullet.damage,
+                                    bullet.elemental_core)
 
                 # Check if enemy dies
                 if enemy.is_dead():
                     enemies_to_remove.add(j)
                     self.killed_enemies.append(enemy)
 
-                # Check if bullet should be removed
-                if bullet.piercing <= 0:
-                    bullets_to_remove.add(i)
-                    break
-                bullet.piercing -= 1
-
                 # Handle explosive effect
                 if bullet.explosion_radius > 0 and not bullet.exploded:
                     bullet.exploded = True
+                    progress = along_path((j, enemy))
+                    impact_x, impact_y = start_x + dx * progress, start_y + dy * progress
                     # Damage all enemies within explosion radius
                     for k, other_enemy in enumerate(enemies):
                         if k in enemies_to_remove:
                             continue
                         if other_enemy in bullet.hit_enemies:
                             continue
-                        distance = self._get_distance(bullet.x, bullet.y, other_enemy.x, other_enemy.y)
-                        if distance <= bullet.explosion_radius / self.pixels_per_unit:
-                            other_hit_distance = (
-                                enemy_types[other_enemy.type]["size"] / 2 + self.BULLET_RADIUS
-                            ) / self.pixels_per_unit
-                            if distance <= other_hit_distance:
-                                bullet.hit_enemies.append(other_enemy)
-                                effective_damage = apply_elemental_damage(
-                                    bullet.damage,
-                                    bullet.element,
-                                    enemy_types[other_enemy.type].get("resistances", {}),
-                                )
-                                other_enemy.take_damage(effective_damage)
-                                if other_enemy.is_dead():
-                                    enemies_to_remove.add(k)
-                                    self.killed_enemies.append(other_enemy)
+                        distance = self._get_distance(
+                            impact_x, impact_y, other_enemy.x, other_enemy.y)
+                        if distance <= bullet.explosion_radius:
+                            bullet.hit_enemies.append(other_enemy)
+                            effective_damage = apply_elemental_damage(
+                                bullet.damage,
+                                bullet.element,
+                                enemy_types[other_enemy.type].get(
+                                    "resistances", {}),
+                            )
+                            health_before = other_enemy.health
+                            other_enemy.take_damage(effective_damage)
+                            if player is not None and bullet.heal_on_damage:
+                                dealt = min(LargeNumber(health_before),
+                                            LargeNumber(effective_damage))
+                                player.health = min(
+                                    player.max_health, player.health + dealt)
+                            if other_enemy.is_dead():
+                                enemies_to_remove.add(k)
+                                self.killed_enemies.append(other_enemy)
+
+                if bullet.piercing <= 0:
+                    bullets_to_remove.add(i)
+                    break
+                bullet.piercing -= 1
 
                 # Handle ricochet effect
                 if bullet.bounces_remaining > 0:
@@ -174,7 +206,8 @@ class CollisionSystem:
                             continue
                         if other_enemy in bullet.hit_enemies:
                             continue
-                        distance = self._get_distance(bullet.x, bullet.y, other_enemy.x, other_enemy.y)
+                        distance = self._get_distance(
+                            bullet.x, bullet.y, other_enemy.x, other_enemy.y)
                         if distance < nearest_distance:
                             nearest_distance = distance
                             nearest_enemy = (k, other_enemy)
@@ -183,13 +216,17 @@ class CollisionSystem:
                         # Steer towards target
                         target_x = target.x
                         target_y = target.y
-                        angle_to_target = math.atan2(target_y - bullet.y, target_x - bullet.x)
+                        angle_to_target = math.atan2(
+                            target_y - bullet.y, target_x - bullet.x)
                         # Blend current direction with target direction
                         blend = min(1.0, bullet.homing_strength)
-                        bullet.dx = bullet.dx * (1 - blend) + math.cos(angle_to_target) * blend
-                        bullet.dy = bullet.dy * (1 - blend) + math.sin(angle_to_target) * blend
+                        bullet.dx = bullet.dx * \
+                            (1 - blend) + math.cos(angle_to_target) * blend
+                        bullet.dy = bullet.dy * \
+                            (1 - blend) + math.sin(angle_to_target) * blend
                         # Normalize
-                        mag = math.sqrt(bullet.dx * bullet.dx + bullet.dy * bullet.dy)
+                        mag = math.sqrt(bullet.dx * bullet.dx +
+                                        bullet.dy * bullet.dy)
                         if mag > 0:
                             bullet.dx /= mag
                             bullet.dy /= mag
@@ -210,6 +247,7 @@ class CollisionSystem:
         player: Player,
         enemy_types: dict,
         defense: float = 0.0,
+        elemental_resistance: float = 0.0,
     ) -> Player:
         """Check all enemy-player collisions and update player health.
 
@@ -226,8 +264,13 @@ class CollisionSystem:
                 continue
 
             # Apply damage and remove enemy
-            damage=getattr(enemy, "damage", enemy_types[enemy.type]["damage"])
-            player.take_damage(max(1,int(damage-max(0,defense))))
+            damage = getattr(
+                enemy, "damage", enemy_types[enemy.type]["damage"])
+            if str(enemy.type).startswith("elemental-"):
+                damage = LargeNumber(
+                    damage) * (1.0 - max(0.0, min(.8, elemental_resistance)))
+            player.take_damage(max(LargeNumber(1), LargeNumber(
+                damage)-max(LargeNumber(0), LargeNumber(defense))))
             enemies.remove(enemy)
 
         return player
@@ -242,7 +285,8 @@ class CollisionSystem:
         remaining: list[EnemyProjectile] = []
         damage_taken: list[int] = []
         for projectile in projectiles:
-            hit_distance = (projectile.radius + self.PLAYER_SIZE / 2) / self.pixels_per_unit
+            hit_distance = (projectile.radius +
+                            self.PLAYER_SIZE / 2) / self.pixels_per_unit
             start_x = projectile.previous_x if projectile.previous_x is not None else projectile.x
             start_y = projectile.previous_y if projectile.previous_y is not None else projectile.y
             if self._distance_to_segment(

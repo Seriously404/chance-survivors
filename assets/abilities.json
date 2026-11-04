@@ -1,6 +1,21 @@
 {
   "abilities": [
     {
+      "id": "dash-boots",
+      "name": "Dash",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "cooldown": 5,
+        "cast_type": "dash",
+        "script": "dash",
+        "dash_distance": 2,
+        "dash_duration": 0.18
+      },
+      "description": "Dash a short distance toward your aim."
+    },
+    {
       "id": "starter-charm",
       "name": "Lucky Charm",
       "type": "ability",
@@ -12,7 +27,8 @@
         "cast_type": "nova",
         "cast_damage": 12,
         "cast_radius": 0.35,
-        "element": "arcane"
+        "element": "arcane",
+        "script": "nova"
       },
       "description": "A charm that creates an arcane nova around the caster."
     },
@@ -26,9 +42,10 @@
         "health": 10,
         "cooldown": 12,
         "cast_type": "heal",
-        "heal_amount": 25
+        "heal_amount": 25,
+        "script": "heal"
       },
-      "description": "A core ability that heals allies."
+      "description": "A core ability that restores your health."
     },
     {
       "id": "ember-wand",
@@ -39,10 +56,15 @@
       "stats": {
         "cooldown": 8,
         "damage_pct": 12,
-        "burn": 2,
-        "element": "fire"
+        "element": "fire",
+        "script": "ember",
+        "cast_damage": 16,
+        "cast_speed_modifier": 2.5
       },
-      "description": "A wand that casts fire spells with burn effects."
+      "description": "Fires a homing ember. Combined projectiles or moving summons leave a short burning trail.",
+      "tags": [
+        "trail:fire"
+      ]
     },
     {
       "id": "warding-sigil",
@@ -54,9 +76,10 @@
         "cooldown": 10,
         "shield": 8,
         "luck": 1,
-        "element": "light"
+        "element": "light",
+        "script": "ward"
       },
-      "description": "A sigil that creates a protective ward."
+      "description": "Grants a temporary shield that absorbs incoming damage."
     },
     {
       "id": "void-bloom",
@@ -68,9 +91,12 @@
         "cooldown": 12,
         "damage_pct": 18,
         "crit_chance": 4,
-        "element": "shadow"
+        "element": "shadow",
+        "script": "void",
+        "cast_damage": 24,
+        "cast_radius": 0.55
       },
-      "description": "A void ability that increases critical chance."
+      "description": "Releases a shadow nova around the caster."
     },
     {
       "id": "glass-cascade",
@@ -85,7 +111,8 @@
         "cast_type": "projectile",
         "cast_damage": 20,
         "cast_speed_modifier": 2.5,
-        "element": "light"
+        "element": "light",
+        "script": "projectile"
       },
       "description": "A light projectile ability with luck enhancement."
     },
@@ -102,7 +129,8 @@
         "cast_type": "nova",
         "cast_damage": 30,
         "cast_radius": 0.5,
-        "element": "fire"
+        "element": "fire",
+        "script": "nova"
       },
       "description": "A fire nova that also provides defensive benefits."
     },
@@ -116,9 +144,27 @@
         "cooldown": 9,
         "damage_pct": 14,
         "luck": 3,
-        "element": "frost"
+        "element": "frost",
+        "script": "frost",
+        "cast_damage": 18,
+        "cast_speed_modifier": 2.5
       },
-      "description": "A frost ability with luck bonuses."
+      "description": "Fires a frost projectile that pierces enemies."
+    },
+    {
+      "id": "nature-seed",
+      "name": "Nature Seed",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "cooldown": 6,
+        "script": "projectile",
+        "cast_damage": 9,
+        "cast_speed_modifier": 2.5,
+        "element": "nature"
+      },
+      "description": "Launches a seed charged with nature damage."
     },
     {
       "id": "nova-blast",
@@ -131,7 +177,8 @@
         "cast_type": "nova",
         "cast_damage": 8,
         "cast_radius": 0.25,
-        "element": "physical"
+        "element": "physical",
+        "script": "nova"
       },
       "description": "A basic nova ability for beginners."
     },
@@ -145,7 +192,8 @@
         "cooldown": 10,
         "cast_type": "heal",
         "heal_amount": 15,
-        "element": "light"
+        "element": "light",
+        "script": "heal"
       },
       "description": "A light-based healing ability."
     },
@@ -159,11 +207,11 @@
         "cooldown": 15,
         "cast_type": "summon",
         "summon_duration": 12,
-        "summon_health": 50,
         "summon_damage": 15,
-        "element": "light"
+        "element": "light",
+        "script": "sentinel"
       },
-      "description": "Summons a sentinel ally that fights alongside you."
+      "description": "Summons a sentinel that follows you and fires at nearby enemies."
     },
     {
       "id": "turret-deploy",
@@ -175,25 +223,232 @@
         "cooldown": 18,
         "cast_type": "summon",
         "summon_duration": 10,
-        "summon_health": 30,
         "summon_damage": 20,
-        "element": "arcane"
+        "element": "arcane",
+        "script": "turret"
       },
-      "description": "Deploys an automated turret that attacks enemies."
+      "description": "Deploys a stationary turret that fires at nearby enemies."
     },
     {
       "id": "blink-step",
       "name": "Blink Step",
       "type": "ability",
-      "rarity": "rare",
+      "rarity": "epic",
       "level": 1,
       "stats": {
         "cooldown": 6,
         "cast_type": "teleport",
         "teleport_range": 5,
-        "element": "shadow"
+        "element": "shadow",
+        "script": "teleport"
       },
       "description": "Teleports the caster short distance with shadow magic."
+    },
+    {
+      "id": "starter-fire-rune",
+      "name": "Fireball",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "damage": 3,
+        "cooldown": 5,
+        "script": "projectile",
+        "cast_damage": 3,
+        "element": "fire"
+      },
+      "tags": [
+        "elemental",
+        "fire"
+      ],
+      "behaviors": [
+        "single_target_projectile"
+      ],
+      "combination_slots": 1,
+      "currency_preferences": {
+        "Copper": 1
+      },
+      "acquisition": {
+        "sources": [
+          "bazaar"
+        ],
+        "drop_weight": 12
+      },
+      "base": true,
+      "fusion_only": false,
+      "description": "Fire one bolt that deals fire damage to the first enemy it hits."
+    },
+    {
+      "id": "cinder-burst",
+      "name": "Cinder Burst",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "description": "Launch a fire bolt that explodes on impact, damaging nearby enemies.",
+      "stats": {
+        "script": "projectile",
+        "element": "fire",
+        "cooldown": 5,
+        "cast_damage": 10,
+        "cast_speed_modifier": 2.5,
+        "area_radius": 0.6
+      },
+      "acquisition": {
+        "sources": [
+          "bazaar"
+        ],
+        "drop_weight": 12
+      },
+      "base": true,
+      "fusion_only": false
+    },
+    {
+      "id": "frost-needle",
+      "name": "Frost Needle",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "description": "Fire a frost needle that pierces one additional enemy.",
+      "stats": {
+        "script": "frost",
+        "element": "frost",
+        "cooldown": 4,
+        "cast_damage": 11,
+        "cast_speed_modifier": 3
+      },
+      "acquisition": {
+        "sources": [
+          "bazaar"
+        ],
+        "drop_weight": 12
+      },
+      "base": true,
+      "fusion_only": false
+    },
+    {
+      "id": "arcane-ricochet",
+      "name": "Arcane Ricochet",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "description": "Fire an arcane bolt that can bounce once after a hit.",
+      "stats": {
+        "script": "projectile",
+        "element": "arcane",
+        "cooldown": 4.5,
+        "cast_damage": 10,
+        "cast_speed_modifier": 2.5,
+        "bounce_count": 1
+      },
+      "acquisition": {
+        "sources": [
+          "bazaar"
+        ],
+        "drop_weight": 12
+      },
+      "base": true,
+      "fusion_only": false
+    },
+    {
+      "id": "healing-spark",
+      "name": "Healing Spark",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "description": "Restore health. Does not consume its cooldown at full health.",
+      "stats": {
+        "script": "heal",
+        "element": "light",
+        "cooldown": 7,
+        "heal_amount": 14
+      },
+      "acquisition": {
+        "sources": [
+          "bazaar"
+        ],
+        "drop_weight": 16
+      },
+      "base": true,
+      "fusion_only": false
+    },
+    {
+      "id": "menders-ward",
+      "name": "Mender's Ward",
+      "type": "ability",
+      "rarity": "uncommon",
+      "level": 1,
+      "description": "Restore health and gain a temporary shield.",
+      "stats": {
+        "script": "mend_ward",
+        "element": "nature",
+        "cooldown": 10,
+        "heal_amount": 8,
+        "shield": 6,
+        "shield_duration": 5
+      },
+      "acquisition": {
+        "sources": [
+          "bazaar"
+        ],
+        "drop_weight": 10
+      },
+      "base": true,
+      "fusion_only": false
+    },
+    {
+      "id": "shadow-siphon",
+      "name": "Shadow Siphon",
+      "type": "ability",
+      "rarity": "uncommon",
+      "level": 1,
+      "description": "Damage nearby enemies with shadow and heal for the damage dealt.",
+      "stats": {
+        "script": "siphon",
+        "element": "shadow",
+        "cooldown": 9,
+        "cast_damage": 8,
+        "cast_radius": 0.7
+      },
+      "acquisition": {
+        "sources": [
+          "bazaar"
+        ],
+        "drop_weight": 10
+      },
+      "base": true,
+      "fusion_only": false
+    },
+    {
+      "id": "starter-teleport-sigil",
+      "name": "Blink Sigil",
+      "description": "Teleport toward the cursor, up to three units away.",
+      "type": "ability",
+      "rarity": "epic",
+      "level": 1,
+      "stats": {
+        "range": 3,
+        "cooldown": 6,
+        "script": "teleport",
+        "teleport_range": 3
+      },
+      "tags": [
+        "teleportation"
+      ],
+      "behaviors": [
+        "blink"
+      ],
+      "combination_slots": 2,
+      "currency_preferences": {
+        "Copper": 1
+      },
+      "acquisition": {
+        "sources": [
+          "bazaar"
+        ],
+        "drop_weight": 10
+      },
+      "base": true,
+      "fusion_only": false
     }
   ]
 }

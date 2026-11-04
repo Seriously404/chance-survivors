@@ -7,6 +7,17 @@ from game.systems.quests import QuestManager
 
 
 class QuestManagerTests(unittest.TestCase):
+    def test_quests_progress_only_after_acceptance(self) -> None:
+        manager = QuestManager([{"id": "sweep", "name": "Sweep", "description": "Defeat two", "quest_type": "side",
+                               "unlock_level": 1, "reward_pct": 5, "condition": "kills_total", "target": 2}])
+        manager.register_kill("basic")
+        self.assertEqual(manager.total_bonus_pct(), 0)
+        self.assertTrue(manager.accept("sweep"))
+        manager.register_kill("basic")
+        self.assertEqual(manager.active_quests[0].progress, 1)
+        manager.register_kill("basic")
+        self.assertEqual(manager.total_bonus_pct(), 5)
+
     def test_unlocks_side_and_main_quests_and_rewards(self) -> None:
         manager = QuestManager([
             {
@@ -32,19 +43,23 @@ class QuestManagerTests(unittest.TestCase):
             },
         ])
 
-        self.assertEqual(len(manager.active_quests), 1)
+        self.assertEqual(len(manager.active_quests), 0)
+        self.assertTrue(manager.accept("side-kill-10"))
         self.assertEqual(manager.active_quests[0].id, "side-kill-10")
 
         for _ in range(10):
             manager.register_kill("basic")
 
         self.assertEqual(manager.total_bonus_pct(), 5.0)
-        self.assertTrue(any(quest.id == "side-kill-10" for quest in manager.completed_quests))
+        self.assertTrue(
+            any(quest.id == "side-kill-10" for quest in manager.completed_quests))
 
         manager.register_level(5)
+        self.assertTrue(manager.accept("main-level-5"))
         self.assertIsNotNone(manager.main_quest)
-        self.assertTrue(any(quest.id == "main-level-5" for quest in manager.completed_quests))
-        self.assertEqual(manager.total_bonus_pct(), 30.0)
+        self.assertTrue(
+            any(quest.id == "main-level-5" for quest in manager.completed_quests))
+        self.assertEqual(manager.total_bonus_pct(), 5.0)
 
     def test_locking_main_quest_enables_restriction_tracking(self) -> None:
         manager = QuestManager([
@@ -62,11 +77,12 @@ class QuestManagerTests(unittest.TestCase):
         ])
 
         manager.register_level(5)
+        self.assertTrue(manager.accept("main-no-snipers"))
         self.assertTrue(manager.main_quest is not None)
         self.assertTrue(manager.lock_main_quest("main-no-snipers"))
         self.assertTrue(manager.main_quest.lock_on_accept)
 
-    def test_locked_main_quest_rejects_tagged_equipment_and_can_be_unlocked(self) -> None:
+    def test_locked_main_quest_rejects_tagged_equipment_permanently(self) -> None:
         manager = QuestManager([
             {
                 "id": "main-no-snipers",
@@ -82,6 +98,7 @@ class QuestManagerTests(unittest.TestCase):
             }
         ])
         manager.register_level(5)
+        self.assertTrue(manager.accept("main-no-snipers"))
         sniper = {"id": "sniper-instance", "tags": ["SnIpEr"]}
         rifle = {"id": "rifle-instance", "tags": ["rifle"]}
 
@@ -105,8 +122,8 @@ class QuestManagerTests(unittest.TestCase):
             ],
         )
         self.assertFalse(restored.can_equip(sniper))
-        self.assertTrue(manager.set_main_quest_lock("main-no-snipers", False))
-        self.assertTrue(manager.can_equip(sniper))
+        self.assertFalse(manager.set_main_quest_lock("main-no-snipers", False))
+        self.assertFalse(manager.can_equip(sniper))
 
     def test_main_restriction_lock_refuses_conflicting_equipped_items(self) -> None:
         manager = QuestManager([
@@ -123,11 +140,11 @@ class QuestManagerTests(unittest.TestCase):
             }
         ])
         manager.register_level(5)
-
-        self.assertFalse(manager.set_main_quest_lock(
-            "main-no-snipers", True, [{"id": "sniper", "tags": ["sniper"]}]
-        ))
-        self.assertFalse(manager.main_quest.lock_on_accept)
+        self.assertFalse(manager.accept("main-no-snipers",
+                         [{"id": "sniper", "tags": ["sniper"]}]))
+        self.assertIsNone(manager.main_quest)
+        self.assertTrue(manager.accept("main-no-snipers", []))
+        self.assertTrue(manager.main_quest.lock_on_accept)
 
     def test_sniper_definition_tag_survives_inventory_creation(self) -> None:
         sniper = next(

@@ -35,9 +35,11 @@ class LargeNumber:
             try:
                 decimal_value = Decimal(value)
             except InvalidOperation as exc:
-                raise ValueError(f"Unsupported large-number literal: {value!r}") from exc
+                raise ValueError(
+                    f"Unsupported large-number literal: {value!r}") from exc
         else:
-            raise TypeError(f"Unsupported type for LargeNumber: {type(value).__name__}")
+            raise TypeError(
+                f"Unsupported type for LargeNumber: {type(value).__name__}")
 
         if not decimal_value.is_finite():
             raise ValueError("LargeNumber does not accept NaN or Infinity")
@@ -120,7 +122,8 @@ class LargeNumber:
         exponent = normalized.adjusted()
         if exponent >= 12 or exponent <= -4:
             return format(normalized, "E")
-        quantized = normalized.quantize(Decimal(1).scaleb(-places), rounding="ROUND_HALF_UP")
+        quantized = normalized.quantize(
+            Decimal(1).scaleb(-places), rounding="ROUND_HALF_UP")
         return format(quantized, "f")
 
     def scale_by_percent(self, percentage: SupportsFloat) -> "LargeNumber":

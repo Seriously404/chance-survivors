@@ -36,7 +36,8 @@ def valid_definition(**changes):
 
 
 def write_catalog(path: Path, definitions, *, version: int = ITEM_DEFINITIONS_VERSION):
-    path.write_text(json.dumps({"version": version, "items": definitions}), encoding="utf-8")
+    path.write_text(json.dumps(
+        {"version": version, "items": definitions}), encoding="utf-8")
 
 
 class ItemCatalogTests(unittest.TestCase):
@@ -65,21 +66,24 @@ class ItemCatalogTests(unittest.TestCase):
         self.assertEqual(first[0]["rarity"], "rare")
         self.assertEqual(first[0]["tags"], ["alpha", "zeta"])
         self.assertEqual(first[0]["behaviors"], ["a_behavior", "z_behavior"])
-        self.assertEqual(first[0]["currency_preferences"], {"copper": 1.5, "gold": "favored"})
+        self.assertEqual(first[0]["currency_preferences"], {
+                         "copper": 1.5, "gold": "favored"})
         self.assertTrue(first[0]["base"])
         self.assertFalse(first[0]["fusion_only"])
         self.assertEqual(first[0]["combination_slots"], 3)
 
     def test_slot_count_must_match_each_supported_rarity(self) -> None:
         definitions = [
-            valid_definition(id=f"item_{rarity}", rarity=rarity, combination_slots=slots)
+            valid_definition(id=f"item_{rarity}",
+                             rarity=rarity, combination_slots=slots)
             for rarity, slots in RARITY_COMBINATION_SLOTS.items()
         ]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "items.json"
             write_catalog(path, definitions)
             loaded = load_item_definitions(path)
-        self.assertEqual([item["combination_slots"] for item in loaded], list(RARITY_COMBINATION_SLOTS.values()))
+        self.assertEqual([item["combination_slots"] for item in loaded], list(
+            RARITY_COMBINATION_SLOTS.values()))
 
     def test_catalog_envelope_and_file_errors_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -89,7 +93,8 @@ class ItemCatalogTests(unittest.TestCase):
                     write_catalog(path, [valid_definition()], version=version)
                     with self.assertRaises(ValueError):
                         load_item_definitions(path)
-            path.write_text(json.dumps({"version": 1, "items": {}}), encoding="utf-8")
+            path.write_text(json.dumps(
+                {"version": 1, "items": {}}), encoding="utf-8")
             with self.assertRaises(ValueError):
                 load_item_definitions(path)
             path.write_text("{", encoding="utf-8")
@@ -146,7 +151,8 @@ class ItemCatalogTests(unittest.TestCase):
                         load_item_definitions(path)
 
     def test_acquisition_and_unknown_json_metadata_are_detached(self) -> None:
-        definition = valid_definition(extra_metadata={"drop": {"weight": 3, "enabled": True}})
+        definition = valid_definition(
+            extra_metadata={"drop": {"weight": 3, "enabled": True}})
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "items.json"
             write_catalog(path, [definition])
@@ -154,7 +160,8 @@ class ItemCatalogTests(unittest.TestCase):
 
         definition["acquisition"]["methods"].append("fusion")
         definition["extra_metadata"]["drop"]["weight"] = 99
-        self.assertEqual(loaded["acquisition"]["methods"], ["starter", "crate"])
+        self.assertEqual(loaded["acquisition"]
+                         ["methods"], ["starter", "crate"])
         self.assertEqual(loaded["extra_metadata"]["drop"]["weight"], 3)
         json.dumps(loaded, allow_nan=False)
 

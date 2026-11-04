@@ -9,6 +9,14 @@ from game.systems.numbers import LargeNumber
 class TestCurrencyWallet(unittest.TestCase):
     """Test cases for CurrencyWallet with LargeNumber support."""
 
+    def test_normal_kills_can_also_award_gold(self):
+        class FixedRandom:
+            def random(self): return 0.1
+            def randint(self, low, high): return low
+        wallet = CurrencyWallet()
+        self.assertEqual(wallet.gold_bonus_for_kill(FixedRandom()), 2)
+        self.assertEqual(wallet.get("Gold"), 2)
+
     def test_initial_balance(self):
         """Wallet starts with zero balance for all currencies."""
         wallet = CurrencyWallet()

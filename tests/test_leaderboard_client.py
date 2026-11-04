@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from game.systems.leaderboard_client import build_run_submission, submit_run
 from game.systems.numbers import LargeNumber
+from game.utils.large_number import LargeNumber as CombatNumber
 
 
 class LeaderboardClientTests(unittest.TestCase):
@@ -26,13 +27,15 @@ class LeaderboardClientTests(unittest.TestCase):
             luck=4.5,
             inventory=inventory,
             active_slots={"weapons": ["rare-rifle"], "abilities": [None]},
-            stats={"currency": {"Gold": LargeNumber("1e40")}},
+            stats={"currency": {"Gold": LargeNumber(
+                "1e40")}, "health": CombatNumber("1.123456789e400")},
         )
 
         self.assertEqual(payload["score"], "1.797E+308")
         self.assertEqual(payload["active_items"], ["rare-rifle"])
         self.assertEqual(payload["inventory"][0]["id"], "rare-rifle")
         self.assertEqual(payload["stats"]["currency"]["Gold"], "1E+40")
+        self.assertEqual(payload["stats"]["health"], "1.123456789e400")
         json.dumps(payload, allow_nan=False)
 
     def test_submit_run_posts_to_leaderboard_endpoint(self) -> None:
@@ -52,7 +55,8 @@ class LeaderboardClientTests(unittest.TestCase):
 
         self.assertEqual(result, {"id": 9, "status": "accepted"})
         request = open_url.call_args.args[0]
-        self.assertEqual(request.full_url, "http://leaderboard.test/api/submit-run")
+        self.assertEqual(request.full_url,
+                         "http://leaderboard.test/api/submit-run")
         self.assertEqual(json.loads(request.data), payload)
 
     def test_rejects_bad_leaderboard_url_and_response(self) -> None:

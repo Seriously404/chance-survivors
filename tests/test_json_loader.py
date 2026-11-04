@@ -107,7 +107,8 @@ class JSONLoaderTests(unittest.TestCase):
         """Test that items have valid rarities."""
         items = load_all_items()
 
-        valid_rarities = {"common", "uncommon", "rare", "epic", "legendary", "mythical", "ultimate"}
+        valid_rarities = {"common", "uncommon", "rare",
+                          "epic", "legendary", "mythical", "ultimate"}
 
         for item in items:
             rarity = item.get("rarity", "common")

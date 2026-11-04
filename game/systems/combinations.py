@@ -9,11 +9,14 @@ from pathlib import Path
 from typing import Any
 
 from game.systems.inventory import Inventory
+from game.systems.item_potential import level_potential
 from game.utils.large_number import LargeNumber
 
 
-COMBINATION_RULES_PATH = Path(__file__).resolve().parents[2] / "assets" / "combination_rules.json"
-RARITY_DATA_PATH = Path(__file__).resolve().parents[2] / "assets" / "rarity_multipliers.json"
+COMBINATION_RULES_PATH = Path(__file__).resolve(
+).parents[2] / "assets" / "combination_rules.json"
+RARITY_DATA_PATH = Path(__file__).resolve(
+).parents[2] / "assets" / "rarity_multipliers.json"
 RULES_VERSION = 1
 RARITY_DATA_VERSION = 1
 _NUMERIC_TYPES = (LargeNumber, int, float)
@@ -50,7 +53,8 @@ class StatModifier:
         if not isinstance(stat, str) or not stat:
             raise ValueError("Combination stat modifier needs a stat name")
         if operation not in ("add", "multiply"):
-            raise ValueError("Combination stat modifier operation must be add or multiply")
+            raise ValueError(
+                "Combination stat modifier operation must be add or multiply")
         value = raw.get("value")
         if isinstance(value, bool):
             raise ValueError("Combination stat modifier value must be numeric")
@@ -83,13 +87,19 @@ class CombinationRule:
             raise ValueError(f"{rule_id}.stat_modifiers must be a list")
         return cls(
             rule_id=rule_id,
-            base_types=_string_set(raw.get("base_types"), f"{rule_id}.base_types"),
-            supplement_types=_string_set(raw.get("supplement_types"), f"{rule_id}.supplement_types"),
-            base_tags=_string_set(raw.get("base_tags"), f"{rule_id}.base_tags"),
-            supplement_tags=_string_set(raw.get("supplement_tags"), f"{rule_id}.supplement_tags"),
+            base_types=_string_set(raw.get("base_types"),
+                                   f"{rule_id}.base_types"),
+            supplement_types=_string_set(
+                raw.get("supplement_types"), f"{rule_id}.supplement_types"),
+            base_tags=_string_set(raw.get("base_tags"),
+                                  f"{rule_id}.base_tags"),
+            supplement_tags=_string_set(
+                raw.get("supplement_tags"), f"{rule_id}.supplement_tags"),
             add_tags=_string_set(raw.get("add_tags"), f"{rule_id}.add_tags"),
-            behaviors=_string_set(raw.get("behaviors"), f"{rule_id}.behaviors"),
-            stat_modifiers=tuple(StatModifier.from_dict(modifier) for modifier in modifiers),
+            behaviors=_string_set(raw.get("behaviors"),
+                                  f"{rule_id}.behaviors"),
+            stat_modifiers=tuple(StatModifier.from_dict(modifier)
+                                 for modifier in modifiers),
         )
 
     def matches(self, base: Mapping[str, Any], supplement: Mapping[str, Any]) -> bool:
@@ -168,34 +178,41 @@ class CombinationEngine:
     ) -> None:
         raw_rules = rules if rules is not None else self._load_rules()
         self.rules = tuple(
-            rule if isinstance(rule, CombinationRule) else CombinationRule.from_dict(rule)
+            rule if isinstance(
+                rule, CombinationRule) else CombinationRule.from_dict(rule)
             for rule in raw_rules
         )
         rule_ids = [rule.rule_id for rule in self.rules]
         if len(rule_ids) != len(set(rule_ids)):
             raise ValueError("Combination rule ids must be unique")
-        self.rarity_data = dict(rarity_data) if rarity_data is not None else self._load_rarity_data()
+        self.rarity_data = dict(
+            rarity_data) if rarity_data is not None else self._load_rarity_data()
         if type(self.rarity_data.get("version")) is not int or self.rarity_data["version"] != RARITY_DATA_VERSION:
             raise ValueError("Unsupported rarity multiplier data version")
         multipliers = self.rarity_data.get("multipliers")
         if not isinstance(multipliers, Mapping):
             raise ValueError("Rarity data needs a multiplier map")
-        self.rarity_multipliers = {str(key): LargeNumber(value) for key, value in multipliers.items()}
-        required_rarities = {"common", "uncommon", "rare", "epic", "legendary", "mythical", "ultimate"}
+        self.rarity_multipliers = {str(key): LargeNumber(
+            value) for key, value in multipliers.items()}
+        required_rarities = {"common", "uncommon", "rare",
+                             "epic", "legendary", "mythical", "ultimate"}
         if set(self.rarity_multipliers) != required_rarities:
-            raise ValueError("Rarity data must define every supported rarity exactly once")
+            raise ValueError(
+                "Rarity data must define every supported rarity exactly once")
         if any(isinstance(value, bool) for value in multipliers.values()):
             raise ValueError("Rarity multipliers must be numeric")
         if any(value <= 0 for value in self.rarity_multipliers.values()):
             raise ValueError("Rarity multipliers must be positive")
         raw_level_fraction = self.rarity_data.get("level_add_fraction", "0.1")
-        raw_ultimate_step = self.rarity_data.get("ultimate_tier_step_multiplier", "1.1")
+        raw_ultimate_step = self.rarity_data.get(
+            "ultimate_tier_step_multiplier", "1.1")
         if isinstance(raw_level_fraction, bool) or isinstance(raw_ultimate_step, bool):
             raise ValueError("Rarity growth values must be numeric")
         self.level_add_fraction = LargeNumber(raw_level_fraction)
         self.ultimate_tier_step = LargeNumber(raw_ultimate_step)
         if self.level_add_fraction < 0 or self.ultimate_tier_step < 1:
-            raise ValueError("Level growth must be non-negative and ultimate tier growth at least one")
+            raise ValueError(
+                "Level growth must be non-negative and ultimate tier growth at least one")
 
     @staticmethod
     def _load_rules() -> list[dict[str, Any]]:
@@ -222,11 +239,13 @@ class CombinationEngine:
             raise ValueError(f"Unsupported item rarity: {rarity}") from exc
         if rarity != "ultimate":
             if "ultimate_tier" in item:
-                raise ValueError("Only ultimate items may have an ultimate_tier")
+                raise ValueError(
+                    "Only ultimate items may have an ultimate_tier")
             return multiplier
         tier = item.get("ultimate_tier", 1)
         if type(tier) is not int or not 1 <= tier <= 100:
-            raise ValueError("Ultimate tier must be an integer between 1 and 100")
+            raise ValueError(
+                "Ultimate tier must be an integer between 1 and 100")
         return multiplier * (self.ultimate_tier_step ** (tier - 1))
 
     def _component_stats(self, item: Mapping[str, Any], *, supplement: bool) -> tuple[dict[str, LargeNumber], dict[str, Any]]:
@@ -238,7 +257,8 @@ class CombinationEngine:
             raise ValueError("Item level must be a positive integer")
         output: dict[str, LargeNumber] = {}
         metadata: dict[str, Any] = {}
-        supplement_rarity = self.rarity_multiplier(item) if supplement else LargeNumber(1)
+        supplement_rarity = self.rarity_multiplier(
+            item) if supplement else LargeNumber(1)
         for name, value in stats.items():
             if not isinstance(name, str) or not name:
                 raise ValueError("Item stat names must be non-empty strings")
@@ -246,8 +266,14 @@ class CombinationEngine:
                 metadata[name] = value
                 continue
             if isinstance(value, _NUMERIC_TYPES):
+                # Cooldowns describe how often the base is used, not a bonus
+                # contributed by a different item.
+                if name == "cooldown" and supplement:
+                    continue
                 base_value = LargeNumber(value)
-                level_value = base_value + base_value * self.level_add_fraction * (level - 1)
+                rate = (LargeNumber("-0.02") if name == "cooldown" else self.level_add_fraction) * \
+                    LargeNumber(str(level_potential(item)))
+                level_value = base_value + base_value * rate * (level - 1)
                 output[name] = level_value * supplement_rarity
             else:
                 metadata[name] = value
@@ -270,15 +296,18 @@ class CombinationEngine:
         if not isinstance(base, Mapping):
             raise ValueError("Combination base must be an item object")
         if not isinstance(supplements, Sequence) or isinstance(supplements, (str, bytes)):
-            raise ValueError("Combination supplements must be an ordered sequence")
+            raise ValueError(
+                "Combination supplements must be an ordered sequence")
         base_id, base_type = self._item_identity(base, "Base")
         base_slots = base.get("combinations", [])
         if not isinstance(base_slots, list):
             raise ValueError("Base combination slots must be a list")
         if len(supplements) > len(base_slots):
-            raise ValueError("Combination exceeds the base item's available slots")
+            raise ValueError(
+                "Combination exceeds the base item's available slots")
         if base.get("status") == "supplement":
-            raise ValueError("A combination supplement cannot also be a base item")
+            raise ValueError(
+                "A combination supplement cannot also be a base item")
 
         component_ids = [base_id]
         totals, base_metadata = self._component_stats(base, supplement=False)
@@ -287,7 +316,8 @@ class CombinationEngine:
             for stat, value in totals.items()
         }
         tags = set(_string_set(base.get("tags", []), "base.tags"))
-        behaviors = set(_string_set(base.get("behaviors", []), "base.behaviors"))
+        behaviors = set(_string_set(
+            base.get("behaviors", []), "base.behaviors"))
         rule_ids: list[str] = []
         seen_ids = {base_id}
         metadata: dict[str, Any] = dict(base_metadata)
@@ -295,32 +325,43 @@ class CombinationEngine:
 
         for supplement in supplements:
             if not isinstance(supplement, Mapping):
-                raise ValueError("Combination supplements must be item objects")
-            supplement_id, supplement_type = self._item_identity(supplement, "Supplement")
+                raise ValueError(
+                    "Combination supplements must be item objects")
+            supplement_id, supplement_type = self._item_identity(
+                supplement, "Supplement")
             if supplement_id in seen_ids:
-                raise ValueError("An item cannot be repeated or combined with itself")
+                raise ValueError(
+                    "An item cannot be repeated or combined with itself")
             seen_ids.add(supplement_id)
-            if (base_type == "armor") != (supplement_type == "armor"):
+            if ((base_type == "armor") != (supplement_type == "armor")
+                    and not (base_type == "armor" and supplement.get("fusion_recipe") == "elemental-core")):
                 raise ValueError("Armor can only combine with armor")
             if supplement.get("status") == "active":
-                raise ValueError("An actively equipped item cannot be a supplement")
+                raise ValueError(
+                    "An actively equipped item cannot be a supplement")
             supplement_slots = supplement.get("combinations", [])
             if not isinstance(supplement_slots, list):
                 raise ValueError("Supplement combination slots must be a list")
             if any(value is not None for value in supplement_slots):
-                raise ValueError("A supplement cannot also contain its own supplements")
+                raise ValueError(
+                    "A supplement cannot also contain its own supplements")
 
             component_ids.append(supplement_id)
-            supplement_stats, supplement_metadata = self._component_stats(supplement, supplement=True)
+            supplement_stats, supplement_metadata = self._component_stats(
+                supplement, supplement=True)
             for stat, amount in supplement_stats.items():
                 totals[stat] = totals.get(stat, LargeNumber(0)) + amount
                 trace.setdefault(stat, []).append(
-                    {"source_id": supplement_id, "kind": "supplement", "amount": amount}
+                    {"source_id": supplement_id,
+                        "kind": "supplement", "amount": amount}
                 )
             if supplement_metadata:
-                metadata.setdefault("supplements", {})[supplement_id] = supplement_metadata
-            tags.update(_string_set(supplement.get("tags", []), f"{supplement_id}.tags"))
-            behaviors.update(_string_set(supplement.get("behaviors", []), f"{supplement_id}.behaviors"))
+                metadata.setdefault("supplements", {})[
+                    supplement_id] = supplement_metadata
+            tags.update(_string_set(supplement.get(
+                "tags", []), f"{supplement_id}.tags"))
+            behaviors.update(_string_set(supplement.get(
+                "behaviors", []), f"{supplement_id}.behaviors"))
 
             for rule in self.rules:
                 if not rule.matches(base, supplement):
@@ -330,7 +371,8 @@ class CombinationEngine:
                 behaviors.update(rule.behaviors)
                 for modifier in rule.stat_modifiers:
                     current = totals.get(modifier.stat, LargeNumber(0))
-                    updated = current + modifier.value if modifier.operation == "add" else current * modifier.value
+                    updated = current + \
+                        modifier.value if modifier.operation == "add" else current * modifier.value
                     totals[modifier.stat] = updated
                     trace.setdefault(modifier.stat, []).append({
                         "source_id": rule.rule_id,
@@ -341,14 +383,18 @@ class CombinationEngine:
                     })
 
         # Base rarity applies to every component and custom stat effect.
-        final_stats = {stat: value * base_rarity for stat, value in totals.items()}
+        final_stats = {stat: (max(LargeNumber("0.05"), value / base_rarity)
+                              if stat == "cooldown" else value * base_rarity)
+                       for stat, value in totals.items()}
         for stat, entries in trace.items():
             for entry in entries:
+                scale = LargeNumber(
+                    1) / base_rarity if stat == "cooldown" else base_rarity
                 if entry["kind"].startswith("rule_"):
                     for key in ("before", "amount", "after"):
-                        entry[key] = entry[key] * base_rarity
+                        entry[key] = entry[key] * scale
                 else:
-                    entry["amount"] = entry["amount"] * base_rarity
+                    entry["amount"] = entry["amount"] * scale
 
         name = base.get("name", base_id)
         if not isinstance(name, str):
@@ -360,21 +406,25 @@ class CombinationEngine:
             item_type=base_type,
             rarity=str(base.get("rarity", "common")).lower(),
             level=level,
-            ultimate_tier=base.get("ultimate_tier") if str(base.get("rarity", "common")).lower() == "ultimate" else None,
+            ultimate_tier=base.get("ultimate_tier") if str(
+                base.get("rarity", "common")).lower() == "ultimate" else None,
             stats=final_stats,
             metadata=metadata,
             tags=tuple(sorted(tags)),
             behaviors=tuple(sorted(behaviors)),
             component_ids=tuple(component_ids),
             rules_applied=tuple(rule_ids),
-            contributions={stat: tuple(entries) for stat, entries in trace.items()},
+            contributions={stat: tuple(entries)
+                           for stat, entries in trace.items()},
         )
 
     def evaluate_inventory(self, inventory: Inventory, base_id: str) -> CombinedItem:
         """Evaluate a base and its assigned supplements without mutating inventory."""
         if inventory.is_combination_supplement(base_id):
-            raise ValueError("A combination supplement cannot be used as a base")
+            raise ValueError(
+                "A combination supplement cannot be used as a base")
         base = inventory.get(base_id)
         slots = base.get("combinations", [])
-        supplements = [inventory.get(item_id) for item_id in slots if item_id is not None]
+        supplements = [inventory.get(item_id)
+                       for item_id in slots if item_id is not None]
         return self.evaluate(base, supplements)

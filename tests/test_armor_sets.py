@@ -152,9 +152,12 @@ class ArmorSetTests(unittest.TestCase):
             ),
             make_data([{"id": "one", "name": "One", "bonuses": {"2.0": {}}}]),
             make_data([{"id": "one", "name": "One", "bonuses": {"6": {}}}]),
-            make_data([{"id": "one", "name": "One", "bonuses": {"2": {"unknown": 1}}}]),
-            make_data([{"id": "one", "name": "One", "bonuses": {"2": {"defense": True}}}]),
-            make_data([{"id": "one", "name": "One", "bonuses": {"2": {"defense": math.inf}}}]),
+            make_data(
+                [{"id": "one", "name": "One", "bonuses": {"2": {"unknown": 1}}}]),
+            make_data(
+                [{"id": "one", "name": "One", "bonuses": {"2": {"defense": True}}}]),
+            make_data(
+                [{"id": "one", "name": "One", "bonuses": {"2": {"defense": math.inf}}}]),
         ]
         for config in invalid_configs:
             with self.subTest(config=config), self.assertRaises(ValueError):
@@ -167,7 +170,8 @@ class ArmorSetTests(unittest.TestCase):
             armor_set_bonuses([{"armor_set": 3}], self.definitions)
 
     def test_status_reports_pieces_and_only_active_thresholds(self):
-        status = armor_set_status([{"armor_set": "vanguard"}] * 2, self.definitions)
+        status = armor_set_status(
+            [{"armor_set": "vanguard"}] * 2, self.definitions)
         self.assertEqual(
             status,
             [

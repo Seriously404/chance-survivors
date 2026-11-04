@@ -1,5 +1,6 @@
 """FastAPI leaderboard server with SQLite database."""
 
+from game.leaderboard_api import app as leaderboard_app
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
@@ -7,6 +8,10 @@ import sqlite3
 import os
 
 app = FastAPI(title="Leaderboard API")
+
+# Keep the older server entry point compatible with the game's current
+# leaderboard client and its interactive OpenAPI documentation.
+app.include_router(leaderboard_app.router)
 
 DATABASE_PATH = "game.db"
 
@@ -22,7 +27,7 @@ def init_db():
     """Initialize the database with required tables."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     # Create players table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS players (
@@ -34,7 +39,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
+
     # Create scores table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scores (
@@ -45,7 +50,7 @@ def init_db():
             FOREIGN KEY (player_name) REFERENCES players(name)
         )
     """)
-    
+
     conn.commit()
     conn.close()
 
@@ -76,24 +81,24 @@ async def submit_score(score_data: ScoreSubmit):
     """Submit a new score for a player."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     try:
         # Insert or ignore player
         cursor.execute(
             "INSERT OR IGNORE INTO players (name, total_score, runs_played, best_score) VALUES (?, 0, 0, 0)",
             (score_data.name,)
         )
-        
+
         # Insert score
         cursor.execute(
             "INSERT INTO scores (player_name, score) VALUES (?, ?)",
             (score_data.name, score_data.score)
         )
-        
+
         # Update player stats
         cursor.execute(
             """
-            UPDATE players 
+            UPDATE players
             SET total_score = total_score + ?,
                 runs_played = runs_played + 1,
                 best_score = MAX(best_score, ?)
@@ -101,10 +106,10 @@ async def submit_score(score_data: ScoreSubmit):
             """,
             (score_data.score, score_data.score, score_data.name)
         )
-        
+
         conn.commit()
         return {"status": "success", "message": f"Score submitted for {score_data.name}"}
-    
+
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -117,7 +122,7 @@ async def get_top_scores(limit: int = Query(10, ge=1, le=100)):
     """Get the top scores across all players."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT s.score, p.name
         FROM scores s
@@ -125,10 +130,10 @@ async def get_top_scores(limit: int = Query(10, ge=1, le=100)):
         ORDER BY s.score DESC
         LIMIT ?
     """, (limit,))
-    
+
     results = cursor.fetchall()
     conn.close()
-    
+
     return {"top_scores": [{"name": row["name"], "score": row["score"]} for row in results]}
 
 
@@ -137,24 +142,25 @@ async def get_player_stats(name: str):
     """Get stats for a specific player."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     # Check if player exists
     cursor.execute("SELECT * FROM players WHERE name = ?", (name,))
     player = cursor.fetchone()
-    
+
     if player is None:
         conn.close()
-        raise HTTPException(status_code=404, detail=f"Player '{name}' not found")
-    
+        raise HTTPException(
+            status_code=404, detail=f"Player '{name}' not found")
+
     # Get recent scores
     cursor.execute(
         "SELECT score FROM scores WHERE player_name = ? ORDER BY created_at DESC LIMIT 10",
         (name,)
     )
     recent_scores = [row["score"] for row in cursor.fetchall()]
-    
+
     conn.close()
-    
+
     return PlayerStats(
         name=player["name"],
         total_score=player["total_score"],

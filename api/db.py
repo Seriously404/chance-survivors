@@ -18,7 +18,7 @@ def init_tables():
     """Initialize database tables."""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     # Players table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS players (
@@ -30,7 +30,7 @@ def init_tables():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
+
     # Scores table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scores (
@@ -41,7 +41,7 @@ def init_tables():
             FOREIGN KEY (player_name) REFERENCES players(name)
         )
     """)
-    
+
     conn.commit()
     conn.close()
 
@@ -51,23 +51,23 @@ def add_score(player_name: str, score: float) -> bool:
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        
+
         # Insert or ignore player
         cursor.execute(
             "INSERT OR IGNORE INTO players (name, total_score, runs_played, best_score) VALUES (?, 0, 0, 0)",
             (player_name,)
         )
-        
+
         # Insert score
         cursor.execute(
             "INSERT INTO scores (player_name, score) VALUES (?, ?)",
             (player_name, score)
         )
-        
+
         # Update player stats
         cursor.execute(
             """
-            UPDATE players 
+            UPDATE players
             SET total_score = total_score + ?,
                 runs_played = runs_played + 1,
                 best_score = MAX(best_score, ?)
@@ -75,7 +75,7 @@ def add_score(player_name: str, score: float) -> bool:
             """,
             (score, score, player_name)
         )
-        
+
         conn.commit()
         conn.close()
         return True
@@ -87,7 +87,7 @@ def get_top_scores(limit: int = 10) -> List[Dict[str, Any]]:
     """Get top scores."""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT s.score, p.name
         FROM scores s
@@ -95,10 +95,11 @@ def get_top_scores(limit: int = 10) -> List[Dict[str, Any]]:
         ORDER BY s.score DESC
         LIMIT ?
     """, (limit,))
-    
-    results = [{"name": row["name"], "score": row["score"]} for row in cursor.fetchall()]
+
+    results = [{"name": row["name"], "score": row["score"]}
+               for row in cursor.fetchall()]
     conn.close()
-    
+
     return results
 
 
@@ -106,24 +107,24 @@ def get_player_stats(player_name: str) -> Optional[Dict[str, Any]]:
     """Get player stats."""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     # Check if player exists
     cursor.execute("SELECT * FROM players WHERE name = ?", (player_name,))
     player = cursor.fetchone()
-    
+
     if player is None:
         conn.close()
         return None
-    
+
     # Get recent scores
     cursor.execute(
         "SELECT score FROM scores WHERE player_name = ? ORDER BY created_at DESC LIMIT 10",
         (player_name,)
     )
     recent_scores = [row["score"] for row in cursor.fetchall()]
-    
+
     conn.close()
-    
+
     return {
         "name": player["name"],
         "total_score": player["total_score"],
@@ -137,9 +138,9 @@ def player_exists(player_name: str) -> bool:
     """Check if a player exists."""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     cursor.execute("SELECT 1 FROM players WHERE name = ?", (player_name,))
     result = cursor.fetchone() is not None
-    
+
     conn.close()
     return result

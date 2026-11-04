@@ -83,7 +83,8 @@ class ProbabilitySystem:
         Returns:
             True if the roll succeeds, False otherwise
         """
-        probability = self.calculate_probability(system_name, luck, custom_modifier)
+        probability = self.calculate_probability(
+            system_name, luck, custom_modifier)
         return self.rng.random() < probability
 
     def roll_with_description(
@@ -99,7 +100,8 @@ class ProbabilitySystem:
             Tuple of (success, description)
         """
         config = self.get_config(system_name)
-        probability = self.calculate_probability(system_name, luck, custom_modifier)
+        probability = self.calculate_probability(
+            system_name, luck, custom_modifier)
         success = self.rng.random() < probability
 
         description = (

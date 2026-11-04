@@ -124,6 +124,7 @@ class CombinationEvaluator:
     ) -> dict[str, Any] | None:
         """Detect interactions when an ability is combined with another item."""
         supplement_stats = supplement.get("stats", {})
+        base_stats = base_item.get("stats", {})
 
         # Fire + projectile = AoE explosion
         if base_element == "fire" and supplement_stats.get("cast_type") == "projectile":
@@ -197,7 +198,8 @@ class CombinationEvaluator:
             effects = interaction.get("effects", {})
             for effect_name, effect_value in effects.items():
                 if isinstance(effect_value, (int, float)):
-                    final_stats[effect_name] = final_stats.get(effect_name, 0.0) + float(effect_value)
+                    final_stats[effect_name] = final_stats.get(
+                        effect_name, 0.0) + float(effect_value)
 
         return final_stats
 
@@ -209,13 +211,16 @@ class CombinationEvaluator:
         """Get a human-readable summary of a combination."""
         evaluation = self.evaluate_combination(base_item, supplements)
 
-        lines = [f"Base: {base_item.get('name', base_item.get('id', 'Unknown'))}"]
+        lines = [
+            f"Base: {base_item.get('name', base_item.get('id', 'Unknown'))}"]
         if supplements:
-            lines.append(f"Supplements: {', '.join(s.get('name', s.get('id', 'Unknown')) for s in supplements)}")
+            lines.append(
+                f"Supplements: {', '.join(s.get('name', s.get('id', 'Unknown')) for s in supplements)}")
 
         if evaluation["interactions"]:
             lines.append("Interactions:")
             for interaction in evaluation["interactions"]:
-                lines.append(f"  - {interaction['type']}: {interaction['description']}")
+                lines.append(
+                    f"  - {interaction['type']}: {interaction['description']}")
 
         return "\n".join(lines)

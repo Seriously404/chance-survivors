@@ -18,7 +18,8 @@ class ScoreMilestoneTests(unittest.TestCase):
         )
 
     def test_threshold_and_larger_finite_scores_reach_milestone(self) -> None:
-        self.assertTrue(has_reached_infinity_milestone(INFINITY_MILESTONE_SCORE))
+        self.assertTrue(has_reached_infinity_milestone(
+            INFINITY_MILESTONE_SCORE))
         self.assertTrue(
             has_reached_infinity_milestone(
                 INFINITY_MILESTONE_SCORE + LargeNumber("1e290")

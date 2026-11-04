@@ -35,7 +35,8 @@ def _coefficient_parts(value: Decimal) -> tuple[int, Decimal, int]:
     first_nonzero = next(index for index, digit in enumerate(digits) if digit)
     significant_digits = digits[first_nonzero:]
     magnitude = len(digits) + decimal_exponent - first_nonzero - 1
-    significand = Decimal((0, significant_digits, -(len(significant_digits) - 1)))
+    significand = Decimal(
+        (0, significant_digits, -(len(significant_digits) - 1)))
     return (-1 if sign else 1), significand, magnitude
 
 
@@ -51,19 +52,22 @@ class LargeNumber:
         if isinstance(value, LargeNumber):
             sign, significand, exponent = value.sign, value.significand, value.exponent
         elif isinstance(value, bool):
-            sign, significand, exponent = _coefficient_parts(Decimal(int(value)))
+            sign, significand, exponent = _coefficient_parts(
+                Decimal(int(value)))
         elif isinstance(value, int):
             sign, significand, exponent = _coefficient_parts(Decimal(value))
         elif isinstance(value, float):
             if not math.isfinite(value):
                 raise ValueError("LargeNumber only supports finite values")
-            sign, significand, exponent = _coefficient_parts(Decimal(str(value)))
+            sign, significand, exponent = _coefficient_parts(
+                Decimal(str(value)))
         elif isinstance(value, Decimal):
             sign, significand, exponent = _coefficient_parts(value)
         elif isinstance(value, str):
             sign, significand, exponent = self._parse_string(value)
         else:
-            raise TypeError(f"Unsupported LargeNumber input: {type(value).__name__}")
+            raise TypeError(
+                f"Unsupported LargeNumber input: {type(value).__name__}")
 
         object.__setattr__(self, "sign", sign)
         object.__setattr__(self, "significand", significand)
@@ -77,7 +81,8 @@ class LargeNumber:
         try:
             coefficient = Decimal(match.group("coefficient"))
         except InvalidOperation as exc:
-            raise ValueError(f"Invalid LargeNumber literal: {value!r}") from exc
+            raise ValueError(
+                f"Invalid LargeNumber literal: {value!r}") from exc
         sign, significand, exponent = _coefficient_parts(coefficient)
         if match.group("sign") == "-":
             sign = -sign
@@ -90,9 +95,11 @@ class LargeNumber:
             return cls(0)
         if not significand.is_finite() or significand < 0:
             raise ValueError("Significand must be finite and non-negative")
-        normalized_sign, normalized_significand, shift = _coefficient_parts(significand)
+        normalized_sign, normalized_significand, shift = _coefficient_parts(
+            significand)
         instance = object.__new__(cls)
-        object.__setattr__(instance, "sign", (1 if sign > 0 else -1) * normalized_sign)
+        object.__setattr__(instance, "sign", (1 if sign >
+                           0 else -1) * normalized_sign)
         object.__setattr__(instance, "significand", normalized_significand)
         object.__setattr__(instance, "exponent", int(exponent) + shift)
         return instance
@@ -108,17 +115,20 @@ class LargeNumber:
         if type(sign) is not int or sign not in (-1, 0, 1):
             raise ValueError("Serialized sign must be -1, 0, or 1")
         if not isinstance(significand_text, str) or type(exponent) is not int:
-            raise ValueError("Serialized significand and exponent have invalid types")
+            raise ValueError(
+                "Serialized significand and exponent have invalid types")
         try:
             significand = Decimal(significand_text)
         except InvalidOperation as exc:
             raise ValueError("Serialized significand is invalid") from exc
         if sign == 0:
             if significand != 0 or exponent != 0:
-                raise ValueError("Serialized zero must use sign=0, significand=0, exponent=0")
+                raise ValueError(
+                    "Serialized zero must use sign=0, significand=0, exponent=0")
             return cls(0)
         if not significand.is_finite() or not Decimal(1) <= significand < Decimal(10):
-            raise ValueError("Serialized significand must be finite and in [1, 10)")
+            raise ValueError(
+                "Serialized significand must be finite and in [1, 10)")
         return cls._from_parts(sign, significand, exponent)
 
     @classmethod
@@ -221,7 +231,8 @@ class LargeNumber:
             return LargeNumber(1)
         if power < 0:
             if not self:
-                raise ZeroDivisionError("zero cannot be raised to a negative power")
+                raise ZeroDivisionError(
+                    "zero cannot be raised to a negative power")
             return LargeNumber(1) / (self ** -power)
         if not self:
             return LargeNumber(0)
@@ -276,9 +287,11 @@ class LargeNumber:
         try:
             result = float(f"{self.sign * self.significand}e{self.exponent}")
         except (OverflowError, ValueError) as exc:
-            raise OverflowError("LargeNumber is outside the finite float range") from exc
+            raise OverflowError(
+                "LargeNumber is outside the finite float range") from exc
         if not math.isfinite(result) or result == 0.0:
-            raise OverflowError("LargeNumber is outside the representable float range")
+            raise OverflowError(
+                "LargeNumber is outside the representable float range")
         return result
 
     def format_scientific(self, significant_digits: int = 6) -> str:

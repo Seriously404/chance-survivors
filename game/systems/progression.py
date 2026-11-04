@@ -12,7 +12,8 @@ from typing import Any
 
 from game.systems.numbers import LargeNumber
 
-LEVEL_REQUIREMENTS_PATH = Path(__file__).resolve().parents[2] / "assets" / "level_upgrade_req.json"
+LEVEL_REQUIREMENTS_PATH = Path(__file__).resolve(
+).parents[2] / "assets" / "level_upgrade_req.json"
 # Fifty configured upgrades carry the player from level 1 through level 51.
 # The final configured threshold is the large level-50-to-51 requirement.
 MAX_LEVEL = 51
@@ -28,13 +29,16 @@ def load_level_requirements(path: Path = LEVEL_REQUIREMENTS_PATH) -> list[LargeN
         with path.open("r", encoding="utf-8") as file:
             raw: Any = json.load(file)
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"Could not load level XP requirements from {path}: {exc}") from exc
+        raise ValueError(
+            f"Could not load level XP requirements from {path}: {exc}") from exc
 
     requirements = raw.get("requirements") if isinstance(raw, dict) else raw
     if not isinstance(requirements, list) or len(requirements) != MAX_LEVEL - 1:
-        raise ValueError(f"{path} must contain exactly {MAX_LEVEL - 1} XP requirements")
+        raise ValueError(
+            f"{path} must contain exactly {MAX_LEVEL - 1} XP requirements")
     if any(type(value) is not int or value <= 0 for value in requirements):
-        raise ValueError(f"Every XP requirement in {path} must be a positive integer")
+        raise ValueError(
+            f"Every XP requirement in {path} must be a positive integer")
     return [LargeNumber(req) for req in requirements]
 
 
@@ -44,7 +48,8 @@ class PlayerProgress:
     def __init__(self, requirements: list[LargeNumber] | None = None) -> None:
         self.requirements = requirements if requirements is not None else load_level_requirements()
         if len(self.requirements) != MAX_LEVEL - 1:
-            raise ValueError(f"Progression needs {MAX_LEVEL - 1} XP requirements")
+            raise ValueError(
+                f"Progression needs {MAX_LEVEL - 1} XP requirements")
         self.level = 1
         self.current_exp: LargeNumber = LargeNumber(0)
         self.total_exp: LargeNumber = LargeNumber(0)

@@ -21,7 +21,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = ROOT / "data" / "leaderboard.db"
-DB_PATH = Path(os.environ.get("CHANCE_SURVIVORS_LEADERBOARD_DB", DEFAULT_DB_PATH))
+DB_PATH = Path(os.environ.get(
+    "CHANCE_SURVIVORS_LEADERBOARD_DB", DEFAULT_DB_PATH))
 ADMIN_TOKEN_ENV = "CHANCE_SURVIVORS_ADMIN_TOKEN"
 
 
@@ -44,7 +45,8 @@ def _as_decimal(raw: Any, field_name: str) -> Decimal:
         try:
             value = Decimal(str(raw))
         except (InvalidOperation, TypeError, ValueError) as exc:
-            raise ValueError(f"{field_name} must be a valid numeric value") from exc
+            raise ValueError(
+                f"{field_name} must be a valid numeric value") from exc
     if not value.is_finite():
         raise ValueError(f"{field_name} must be finite")
     return value
@@ -303,7 +305,8 @@ def submit_run(submission: RunSubmission) -> dict[str, Any]:
 @app.post("/admin/clear-leaderboard")
 def clear_leaderboard(authorization: str | None = Header(default=None, alias="Authorization")) -> dict[str, str]:
     if authorization is None or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization header required")
+        raise HTTPException(
+            status_code=401, detail="Authorization header required")
     token = authorization.split(" ", 1)[1].strip()
     if token != _admin_token():
         raise HTTPException(status_code=403, detail="Invalid admin token")
@@ -317,7 +320,8 @@ def _list_entries(limit: int = 25) -> list[dict[str, Any]]:
         rows = connection.execute(
             "SELECT * FROM leaderboard",
         ).fetchall()
-    sorted_rows = sorted(rows, key=lambda row: Decimal(row["score"]), reverse=True)[:limit]
+    sorted_rows = sorted(rows, key=lambda row: Decimal(
+        row["score"]), reverse=True)[:limit]
     results: list[dict[str, Any]] = []
     for index, row in enumerate(sorted_rows, start=1):
         entry = _serialize_entry(row)

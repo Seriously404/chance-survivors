@@ -34,7 +34,8 @@ class CombinationEvaluatorTests(unittest.TestCase):
     def test_aggregate_stats(self):
         """Test stat aggregation from base and supplements."""
         base_item = {"id": "test-base", "stats": {"damage": 10, "health": 20}}
-        supplement = {"id": "test-supplement", "stats": {"damage": 5, "luck": 3}}
+        supplement = {"id": "test-supplement",
+                      "stats": {"damage": 5, "luck": 3}}
 
         combined = self.evaluator._aggregate_stats(base_item, [supplement])
 
@@ -55,7 +56,8 @@ class CombinationEvaluatorTests(unittest.TestCase):
             "type": "ability"
         }
 
-        interactions = self.evaluator._detect_interactions(base_item, [supplement])
+        interactions = self.evaluator._detect_interactions(base_item, [
+                                                           supplement])
 
         # Should detect burning trail interaction
         self.assertGreater(len(interactions), 0)
@@ -71,18 +73,27 @@ class CombinationEvaluatorTests(unittest.TestCase):
             }
         ]
 
-        final = self.evaluator._apply_interactions(combined_stats, interactions)
+        final = self.evaluator._apply_interactions(
+            combined_stats, interactions)
 
         self.assertEqual(final["damage"], 10.0)
         self.assertEqual(final["damage_pct"], 20.0)
         self.assertEqual(final["crit_chance"], 5.0)
+
+    def test_healing_supplement_on_damaging_ability(self):
+        base = {"type": "ability", "stats": {"cast_damage": 10}}
+        heal = {"type": "ability", "stats": {"cast_type": "heal"}}
+        result = self.evaluator.evaluate_combination(base, [heal])
+        self.assertTrue(
+            any(i["type"] == "life_steal" for i in result["interactions"]))
 
     def test_get_combination_summary(self):
         """Test human-readable combination summary."""
         base_item = self.items[0]
         supplement = self.items[1]
 
-        summary = self.evaluator.get_combination_summary(base_item, [supplement])
+        summary = self.evaluator.get_combination_summary(base_item, [
+                                                         supplement])
 
         self.assertIsInstance(summary, str)
         self.assertGreater(len(summary), 0)

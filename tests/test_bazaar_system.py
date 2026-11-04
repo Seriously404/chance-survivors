@@ -2,6 +2,7 @@
 
 import unittest
 import random
+from unittest.mock import patch
 
 from game.systems.bazaar import BazaarManager, build_extended_catalog
 from game.systems.bazaar_service import BazaarService
@@ -49,7 +50,7 @@ class BazaarSystemTests(unittest.TestCase):
         self.assertGreater(len(catalog), 10)
         self.assertTrue(any(item["type"] == "weapon" for item in catalog))
         self.assertTrue(any(item["type"] == "armor" for item in catalog))
-        self.assertTrue(any(item["type"] == "misc" for item in catalog))
+        self.assertTrue(any(item["type"] == "relic" for item in catalog))
 
     def test_rarity_and_level_upgrades_are_supported(self) -> None:
         manager = BazaarManager(build_extended_catalog())
@@ -61,33 +62,128 @@ class BazaarSystemTests(unittest.TestCase):
         self.assertEqual(levelled["level"], 4)
 
     def test_crates_offer_valid_items(self) -> None:
-        manager = BazaarManager(build_extended_catalog(), rng=random.Random(11))
+        manager = BazaarManager(
+            build_extended_catalog(), rng=random.Random(11))
         crate = manager.crates[0]
         rolled = manager.roll_crate(crate, luck=12.0)
-        self.assertIn(rolled["type"], {"weapon", "ability", "armor", "misc"})
+        self.assertIn(rolled["type"], {"weapon", "ability", "armor", "relic"})
         self.assertIn(rolled["rarity"], {"common", "uncommon", "rare", "epic"})
+
+    def test_themed_crate_rewards_and_payment(self) -> None:
+        manager = BazaarManager(build_extended_catalog(),
+                                rng=random.Random(11), seed=1)
+        crate = next(
+            crate for crate in manager.crate_catalog if crate.id == "ember-crate")
+        manager.crates = [crate]
+        rewards = manager.crate_rewards(crate)
+        self.assertTrue(rewards)
+        self.assertTrue(all(item.get("stats", {}).get(
+            "element") == "fire" for item in rewards))
+        wallet = CurrencyWallet()
+        wallet.add("Ember", LargeNumber(crate.cost))
+        wallet.add("Copper", LargeNumber(crate.costs["Copper"]))
+        wallet.add("Gold", LargeNumber(50))
+        item = BazaarService(manager).buy_crate(crate.id, wallet=wallet,
+                                                inventory=self.make_inventory(), item_id="ember-reward", luck=1)
+        self.assertEqual(item["stats"]["element"], "fire")
+        self.assertEqual(wallet.get("Ember"), LargeNumber(0))
+        self.assertEqual(wallet.get("Copper"), LargeNumber(0))
+        self.assertEqual(wallet.get("Gold"), LargeNumber(50))
+
+    def test_multicurrency_purchase_is_atomic_and_luck_gates_rewards(self) -> None:
+        manager = BazaarManager(build_extended_catalog(), seed=1)
+        crate = next(
+            crate for crate in manager.crate_catalog if crate.id == "ember-crate")
+        manager.crates = [crate]
+        inventory = self.make_inventory()
+        wallet = CurrencyWallet()
+        wallet.add("Ember", LargeNumber(crate.cost))
+        with self.assertRaisesRegex(ValueError, "Not enough Copper"):
+            BazaarService(manager).buy_crate(crate.id, wallet=wallet, inventory=inventory,
+                                             item_id="failed", luck=10)
+        self.assertEqual(wallet.get("Ember"), LargeNumber(crate.cost))
+        wallet.add("Copper", LargeNumber(crate.costs["Copper"]))
+        with patch.object(inventory, "add", side_effect=ValueError("rejected")):
+            with self.assertRaisesRegex(ValueError, "rejected"):
+                BazaarService(manager).buy_crate(crate.id, wallet=wallet, inventory=inventory,
+                                                 item_id="failed", luck=10)
+        self.assertEqual(wallet.get("Ember"), LargeNumber(crate.cost))
+        self.assertEqual(wallet.get("Copper"),
+                         LargeNumber(crate.costs["Copper"]))
+        starter = manager.crate_catalog[0]
+        items, low_weights = manager.crate_odds(starter, 0)
+        _, high_weights = manager.crate_odds(starter, 10)
+        rare_indices = [i for i, item in enumerate(
+            items) if item.get("rarity") == "rare"]
+        self.assertTrue(rare_indices)
+        self.assertTrue(
+            all(low_weights[i] == 0 and high_weights[i] > 0 for i in rare_indices))
+
+    def test_market_rejects_non_relics(self) -> None:
+        manager = BazaarManager(build_extended_catalog())
+        weapon = next(
+            item for item in manager.catalog if item["type"] == "weapon")
+        wallet = CurrencyWallet()
+        wallet.add("Gold", LargeNumber(10000))
+        with self.assertRaisesRegex(ValueError, "no longer available"):
+            BazaarService(manager).buy_catalog_item(weapon["id"], wallet=wallet,
+                                                    inventory=self.make_inventory(), item_id="forbidden")
 
     def test_seeded_crate_rolls_are_reproducible(self) -> None:
         catalog = build_extended_catalog()
         crate_a = BazaarManager(catalog, rng=random.Random(4))
         crate_b = BazaarManager(catalog, rng=random.Random(4))
-        results_a = [crate_a.roll_crate(crate_a.crates[0])["id"] for _ in range(5)]
-        results_b = [crate_b.roll_crate(crate_b.crates[0])["id"] for _ in range(5)]
+        results_a = [crate_a.roll_crate(crate_a.crates[0])[
+            "id"] for _ in range(5)]
+        results_b = [crate_b.roll_crate(crate_b.crates[0])[
+            "id"] for _ in range(5)]
         self.assertEqual(results_a, results_b)
+
+    def test_daily_selection_changes_each_minute_and_is_reproducible(self) -> None:
+        first = BazaarManager(build_extended_catalog(), seed=123)
+        second = BazaarManager(build_extended_catalog(), seed=123)
+        daily = next(
+            crate for crate in first.crate_catalog if crate.id == 'daily-crate')
+        before = [item['id'] for item in first.crate_rewards(daily)]
+        first.refresh_crates(60)
+        second.refresh_crates(60)
+        after = [item['id'] for item in first.crate_rewards(daily)]
+        self.assertNotEqual(before, after)
+        self.assertEqual(after, [item['id']
+                         for item in second.crate_rewards(daily)])
+
+    def test_epic_crate_rewards_wait_for_fifteen_minutes(self) -> None:
+        catalog = [
+            {'id': 'early', 'type': 'weapon', 'rarity': 'common'},
+            {'id': 'late', 'type': 'weapon', 'rarity': 'epic'},
+        ]
+        manager = BazaarManager(catalog, seed=3)
+        crate = next(c for c in manager.crate_catalog if c.id ==
+                     'mythic-crate')
+        items, weights = manager.crate_odds(crate, luck=100)
+        self.assertEqual(weights[[item['id']
+                         for item in items].index('late')], 0)
+        manager.refresh_crates(900)
+        items, weights = manager.crate_odds(crate, luck=100)
+        self.assertGreater(weights[[item['id']
+                           for item in items].index('late')], 0)
 
     def test_crate_offers_unlock_and_rotate_on_active_run_time(self) -> None:
         manager = BazaarManager(seed=17)
         initial_ids = {crate.id for crate in manager.crates}
 
-        self.assertEqual(len(initial_ids), 3)
-        self.assertFalse(manager.can_manual_refresh(599))
+        self.assertIn("daily-crate", initial_ids)
+        self.assertIn("ember-crate", initial_ids)
+        self.assertIn("starter-crate", initial_ids)
+        self.assertTrue(manager.can_manual_refresh(599))
 
         manager.refresh_crates(600)
-        self.assertEqual(len(manager.crates), 4)
-        self.assertIn("astral-crate", {crate.id for crate in manager.crates})
+        self.assertIn("daily-crate", {crate.id for crate in manager.crates})
+        self.assertIn("astral-crate",
+                      {crate.id for crate in manager.available_crates(600)})
 
         manager.refresh_crates(1200)
-        self.assertEqual(len(manager.crates), 4)
+        self.assertIn("daily-crate", {crate.id for crate in manager.crates})
         self.assertGreater(
             len({crate.id for crate in manager.crate_catalog}),
             len(manager.crates),
@@ -118,12 +214,14 @@ class BazaarSystemTests(unittest.TestCase):
 
     def test_market_and_crate_purchases_charge_once_and_add_unique_items(self) -> None:
         manager = BazaarManager(build_extended_catalog(), rng=random.Random(2))
+        manager.refresh_crates(900)
         service = BazaarService(manager)
         inventory = self.make_inventory()
         wallet = CurrencyWallet()
         wallet.add("Gold", LargeNumber(1000))
         initial_balance = wallet.get("Gold")
-        catalog_item = manager.catalog[0]
+        catalog_item = next(
+            item for item in manager.catalog if item["type"] == "relic")
         price = manager.catalog_price(catalog_item)
 
         bought = service.buy_catalog_item(
@@ -137,6 +235,7 @@ class BazaarSystemTests(unittest.TestCase):
         self.assertEqual(len(inventory.items), 4)
 
         crate = manager.crates[0]
+        wallet.add(crate.currency, LargeNumber(crate.cost))
         reward = service.buy_crate(
             crate.id,
             wallet=wallet,
@@ -145,7 +244,8 @@ class BazaarSystemTests(unittest.TestCase):
             luck=1,
         )
         self.assertEqual(reward["id"], "shop-2")
-        self.assertEqual(wallet.get("Gold"), initial_balance - price - crate.cost)
+        self.assertEqual(wallet.get("Gold"), initial_balance - price)
+        self.assertEqual(wallet.get(crate.currency), LargeNumber(0))
 
     def test_failed_purchase_does_not_spend_or_mutate_inventory(self) -> None:
         manager = BazaarManager(build_extended_catalog(), rng=random.Random(3))
@@ -153,7 +253,7 @@ class BazaarSystemTests(unittest.TestCase):
         inventory = self.make_inventory()
         wallet = CurrencyWallet()
         before_ids = [item["id"] for item in inventory.items]
-        with self.assertRaisesRegex(ValueError, "Not enough Gold"):
+        with self.assertRaisesRegex(ValueError, "Not enough Copper"):
             service.buy_crate(
                 "starter-crate",
                 wallet=wallet,
@@ -222,7 +322,8 @@ class BazaarSystemTests(unittest.TestCase):
         self.assertNotIn(sold_item, inventory.items)
         self.assertGreater(value, 0)
         with self.assertRaisesRegex(ValueError, "no longer"):
-            service.upgrade_level("missing-item", wallet=wallet, inventory=inventory)
+            service.upgrade_level(
+                "missing-item", wallet=wallet, inventory=inventory)
 
     def test_rarity_attempt_charges_once_and_expands_combination_capacity_on_success(self) -> None:
         manager = BazaarManager(build_extended_catalog(), rng=random.Random(0))
@@ -256,7 +357,8 @@ class BazaarSystemTests(unittest.TestCase):
 
     def test_mythical_upgrade_starts_ultimate_tier_one(self) -> None:
         manager = BazaarManager(rng=random.Random(1))
-        item = {"id": "mythic-item", "rarity": "mythical", "level": 1, "combinations": [None] * 4}
+        item = {"id": "mythic-item", "rarity": "mythical",
+                "level": 1, "combinations": [None] * 4}
 
         manager.upgrade_rarity(item, luck=5, currency_cost=100)
 
@@ -283,7 +385,8 @@ class BazaarSystemTests(unittest.TestCase):
         for _ in range(98):
             manager.upgrade_rarity(item, luck=5, currency_cost=second_cost)
         self.assertEqual(item["ultimate_tier"], 100)
-        self.assertIs(manager.upgrade_rarity(item, luck=100, currency_cost=second_cost), item)
+        self.assertIs(manager.upgrade_rarity(
+            item, luck=100, currency_cost=second_cost), item)
         self.assertEqual(item["ultimate_tier"], 100)
 
     def test_ultimate_subtier_upgrade_is_a_paid_transaction_and_caps_at_100(self) -> None:

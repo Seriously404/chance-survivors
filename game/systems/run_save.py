@@ -12,10 +12,12 @@ from typing import Any
 
 from game.systems.inventory import Inventory
 from game.systems.numbers import LargeNumber
+from game.utils.large_number import LargeNumber as CombatNumber
 
 SAVE_VERSION = 1
 MAX_SAVE_BYTES = 5 * 1024 * 1024
-DEFAULT_SAVE_PATH = Path(__file__).resolve().parents[2] / "data" / "run_save.json"
+DEFAULT_SAVE_PATH = Path(__file__).resolve(
+).parents[2] / "data" / "run_save.json"
 
 
 def configured_save_path() -> Path:
@@ -25,10 +27,12 @@ def configured_save_path() -> Path:
 
 
 def _json_value(value: Any) -> Any:
+    if isinstance(value, CombatNumber):
+        return {"__combat_number__": value.to_dict()}
     if isinstance(value, LargeNumber):
         return {"__large_number__": str(value.to_decimal())}
     if isinstance(value, dict):
-        if set(value) == {"__large_number__"}:
+        if set(value) in ({"__large_number__"}, {"__combat_number__"}):
             raise ValueError("Reserved run-save key: __large_number__")
         return {str(key): _json_value(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
@@ -42,6 +46,8 @@ def _json_value(value: Any) -> Any:
 
 def _decode_value(value: Any) -> Any:
     if isinstance(value, dict):
+        if set(value) == {"__combat_number__"}:
+            return CombatNumber.from_dict(value["__combat_number__"])
         if set(value) == {"__large_number__"}:
             return LargeNumber(value["__large_number__"])
         return {key: _decode_value(item) for key, item in value.items()}
@@ -64,8 +70,8 @@ class RunSave:
         player_name: str,
         elapsed_seconds: float,
         score: LargeNumber,
-        player_health: int,
-        player_max_health: int,
+        player_health: int | float | CombatNumber,
+        player_max_health: int | float | CombatNumber,
         progression_level: int,
         current_exp: LargeNumber,
         total_exp: LargeNumber,
@@ -114,21 +120,30 @@ class RunSave:
             raise ValueError("Unsupported run-save version")
         name = state.get("player_name")
         if not isinstance(name, str) or not name.strip() or len(name.strip()) > 32:
-            raise ValueError("Run save needs a player name of 1 to 32 characters")
+            raise ValueError(
+                "Run save needs a player name of 1 to 32 characters")
         elapsed = state.get("elapsed_seconds")
         if (isinstance(elapsed, bool) or not isinstance(elapsed, (int, float))
                 or not math.isfinite(elapsed) or elapsed < 0):
-            raise ValueError("Elapsed gameplay time must be finite and non-negative")
+            raise ValueError(
+                "Elapsed gameplay time must be finite and non-negative")
         state["elapsed_seconds"] = float(elapsed)
         _nonnegative_number(state.get("score"), "score")
         player = state.get("player")
         progression = state.get("progression")
         if not isinstance(player, dict) or not isinstance(progression, dict):
-            raise ValueError("Run save has invalid player or progression state")
+            raise ValueError(
+                "Run save has invalid player or progression state")
         max_health = player.get("max_health")
         health = player.get("health")
-        if (type(max_health) is not int or type(health) is not int
-                or max_health < 1 or health < 0 or health > max_health):
+        try:
+            if isinstance(health, bool) or isinstance(max_health, bool):
+                raise ValueError
+            health_number = CombatNumber(health)
+            max_health_number = CombatNumber(max_health)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("Run save has invalid player health") from exc
+        if max_health_number < 1 or health_number < 0 or health_number > max_health_number:
             raise ValueError("Run save has invalid player health")
         if type(progression.get("level")) is not int or progression["level"] < 1:
             raise ValueError("Run save needs a positive progression level")
@@ -142,29 +157,34 @@ class RunSave:
         try:
             inventory = Inventory(deepcopy(inventory_state["items"]))
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
-            raise ValueError(f"Run save has invalid inventory items: {exc}") from exc
+            raise ValueError(
+                f"Run save has invalid inventory items: {exc}") from exc
         active_slots = inventory_state.get("active_slots")
         if not isinstance(active_slots, dict) or set(active_slots) != set(inventory.active_slots):
             raise ValueError("Run save has invalid equipment slots")
         equipped_ids: set[str] = set()
         for kind, slot_ids in active_slots.items():
             if not isinstance(slot_ids, list) or len(slot_ids) != len(inventory.active_slots[kind]):
-                raise ValueError(f"Run save has invalid {kind} equipment slots")
+                raise ValueError(
+                    f"Run save has invalid {kind} equipment slots")
             for index, item_id in enumerate(slot_ids):
                 if item_id is not None:
                     if not isinstance(item_id, str) or item_id in equipped_ids:
-                        raise ValueError("An item cannot occupy multiple equipment slots")
+                        raise ValueError(
+                            "An item cannot occupy multiple equipment slots")
                     try:
                         inventory.equip(item_id, kind, index)
                     except (IndexError, KeyError, TypeError, ValueError) as exc:
-                        raise ValueError(f"Run save has invalid {kind} equipment") from exc
+                        raise ValueError(
+                            f"Run save has invalid {kind} equipment") from exc
                     equipped_ids.add(item_id)
         currencies = state.get("currencies")
         if not isinstance(currencies, dict):
             raise ValueError("Run save has invalid currencies")
         for name, amount in currencies.items():
             if not isinstance(name, str) or not name:
-                raise ValueError("Run save currency names must be non-empty strings")
+                raise ValueError(
+                    "Run save currency names must be non-empty strings")
             _nonnegative_number(amount, f"currency {name}")
         if not isinstance(state.get("quests"), dict):
             raise ValueError("Run save has invalid quest state")
@@ -186,7 +206,8 @@ class RunSave:
             or refresh_cycle < -1
             or refresh_cycle > current_cycle
         ):
-            raise ValueError("Run save has invalid bazaar_last_manual_refresh_cycle")
+            raise ValueError(
+                "Run save has invalid bazaar_last_manual_refresh_cycle")
         state["bazaar_seed"] = state.get("bazaar_seed", 0)
         state["bazaar_refresh_count"] = state.get("bazaar_refresh_count", 0)
         state["bazaar_last_manual_refresh_cycle"] = refresh_cycle
@@ -252,7 +273,8 @@ class RunSave:
                 raise ValueError("Run save exceeds the configured size limit")
             contents = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as exc:
-            raise ValueError(f"Could not read run save at {path}: {exc}") from exc
+            raise ValueError(
+                f"Could not read run save at {path}: {exc}") from exc
         return cls.from_json(contents)
 
 

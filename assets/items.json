@@ -58,31 +58,31 @@
       "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
     },
     {
-      "id": "starter-relic", "name": "Fortune Relic", "type": "misc", "rarity": "common", "level": 1,
+      "id": "starter-relic", "name": "Fortune Relic", "type": "relic", "rarity": "common", "level": 1, "description": "Raises luck and damage when combined with equipment.",
       "stats": {"luck": 2, "damage_pct": 5}, "tags": ["luck"], "behaviors": [],
       "combination_slots": 1, "currency_preferences": {"Copper": 1},
       "acquisition": {"sources": ["starter", "bazaar"], "drop_weight": 10}, "base": true, "fusion_only": false
     },
     {
-      "id": "starter-token", "name": "Copper Token", "type": "misc", "rarity": "uncommon", "level": 1,
+      "id": "starter-token", "name": "Copper Token", "type": "relic", "rarity": "uncommon", "level": 1, "description": "Adds health and movement speed to an equipment combination.",
       "stats": {"health": 5, "speed_pct": 2}, "tags": ["copper", "movement"], "behaviors": [],
       "combination_slots": 2, "currency_preferences": {"Copper": 1},
       "acquisition": {"sources": ["starter", "bazaar"], "drop_weight": 8}, "base": true, "fusion_only": false
     },
     {
-      "id": "starter-grenade", "name": "Blast Capsule", "type": "relic", "rarity": "rare", "level": 1,
+      "id": "starter-grenade", "name": "Blast Capsule", "type": "relic", "rarity": "rare", "level": 1, "description": "Adds an area explosion to a compatible combination.",
       "stats": {"area_radius": 2, "damage": 1}, "tags": ["explosive"], "behaviors": ["area_explosion"],
       "combination_slots": 3, "currency_preferences": {"Gold": 1},
       "acquisition": {"sources": ["bazaar"], "drop_weight": 4}, "base": true, "fusion_only": false
     },
     {
-      "id": "starter-homing-lens", "name": "Seeking Lens", "type": "relic", "rarity": "rare", "level": 1,
+      "id": "starter-homing-lens", "name": "Seeking Lens", "type": "relic", "rarity": "rare", "level": 1, "description": "Guides compatible projectiles toward enemies.",
       "stats": {"homing_strength": 1}, "tags": ["homing"], "behaviors": ["homing_guidance"],
       "combination_slots": 3, "currency_preferences": {"Gold": 1},
       "acquisition": {"sources": ["bazaar"], "drop_weight": 4}, "base": true, "fusion_only": false
     },
     {
-      "id": "starter-ricochet-chip", "name": "Ricochet Chip", "type": "relic", "rarity": "epic", "level": 1,
+      "id": "starter-ricochet-chip", "name": "Ricochet Chip", "type": "relic", "rarity": "epic", "level": 1, "description": "Adds a bounce to compatible projectiles.",
       "stats": {"bounce_count": 1}, "tags": ["ricochet"], "behaviors": ["ricochet"],
       "combination_slots": 3, "currency_preferences": {"Gold": 1},
       "acquisition": {"sources": ["bazaar"], "drop_weight": 2}, "base": true, "fusion_only": false
@@ -94,7 +94,7 @@
       "acquisition": {"sources": ["bazaar"], "drop_weight": 12}, "base": true, "fusion_only": false
     },
     {
-      "id": "starter-teleport-sigil", "name": "Blink Sigil", "type": "ability", "rarity": "uncommon", "level": 1,
+      "id": "starter-teleport-sigil", "name": "Blink Sigil", "type": "ability", "rarity": "uncommon", "level": 1, "description": "Teleport toward the cursor, up to three units away.",
       "stats": {"range": 3, "cooldown": 6}, "tags": ["teleportation"], "behaviors": ["blink"],
       "combination_slots": 2, "currency_preferences": {"Copper": 1},
       "acquisition": {"sources": ["bazaar"], "drop_weight": 10}, "base": true, "fusion_only": false

@@ -42,8 +42,10 @@ class ProbabilitySystemTests(unittest.TestCase):
             luck_factor=0.1,
         )
 
-        prob_no_luck = self.system.calculate_probability("test_system", luck=0.0)
-        prob_with_luck = self.system.calculate_probability("test_system", luck=10.0)
+        prob_no_luck = self.system.calculate_probability(
+            "test_system", luck=0.0)
+        prob_with_luck = self.system.calculate_probability(
+            "test_system", luck=10.0)
 
         self.assertLess(prob_no_luck, prob_with_luck)
         self.assertGreaterEqual(prob_with_luck, prob_no_luck)
@@ -92,7 +94,8 @@ class ProbabilitySystemTests(unittest.TestCase):
             luck_factor=0.1,
         )
 
-        success, description = self.system.roll_with_description("test_system", luck=5.0)
+        success, description = self.system.roll_with_description(
+            "test_system", luck=5.0)
 
         self.assertIsInstance(success, bool)
         self.assertIsInstance(description, str)
@@ -122,8 +125,10 @@ class ProbabilitySystemTests(unittest.TestCase):
             luck_factor=0.0,
         )
 
-        prob_no_modifier = self.system.calculate_probability("test_system", custom_modifier=0.0)
-        prob_with_modifier = self.system.calculate_probability("test_system", custom_modifier=0.2)
+        prob_no_modifier = self.system.calculate_probability(
+            "test_system", custom_modifier=0.0)
+        prob_with_modifier = self.system.calculate_probability(
+            "test_system", custom_modifier=0.2)
 
         self.assertLess(prob_no_modifier, prob_with_modifier)
 

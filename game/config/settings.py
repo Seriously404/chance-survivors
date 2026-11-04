@@ -23,7 +23,7 @@ player_max_health: int = 100
 # -------------------------
 
 # Enemy spawn delay is in milliseconds.
-enemy_spawn_delay: int = 2000
+enemy_spawn_delay: int = 1200
 
 # -------------------------
 # Bullet settings
@@ -39,7 +39,7 @@ basic_bullet_speed_modifier: float = 3.0
 enemy_types: Dict[str, Dict[str, Any]] = {
     "basic": {
         "speed": 1.0,
-        "damage": 10,
+        "damage": 15,
         "resistances": {},
         "turning_speed": 1.0,
         "size": 30,
@@ -48,7 +48,7 @@ enemy_types: Dict[str, Dict[str, Any]] = {
     },
     "swift": {
         "speed": 1.6,
-        "damage": 14,
+        "damage": 21,
         "resistances": {"slow": 0.2},
         "turning_speed": 1.25,
         "size": 24,
@@ -57,7 +57,7 @@ enemy_types: Dict[str, Dict[str, Any]] = {
     },
     "brute": {
         "speed": 0.7,
-        "damage": 18,
+        "damage": 27,
         "resistances": {"fire": 0.4},
         "turning_speed": 0.8,
         "size": 38,
@@ -66,7 +66,7 @@ enemy_types: Dict[str, Dict[str, Any]] = {
     },
     "ranged": {
         "speed": 0.9,
-        "damage": 16,
+        "damage": 24,
         "resistances": {"pierce": 0.15},
         "turning_speed": 1.1,
         "size": 28,
@@ -75,7 +75,7 @@ enemy_types: Dict[str, Dict[str, Any]] = {
     },
     "necromancer": {
         "speed": 0.8,
-        "damage": 14,
+        "damage": 21,
         "resistances": {"shadow": 0.5},
         "turning_speed": 0.9,
         "size": 32,
@@ -84,7 +84,7 @@ enemy_types: Dict[str, Dict[str, Any]] = {
     },
     "shadow": {
         "speed": 1.35,
-        "damage": 12,
+        "damage": 18,
         "resistances": {"light": 0.5},
         "turning_speed": 1.5,
         "size": 24,

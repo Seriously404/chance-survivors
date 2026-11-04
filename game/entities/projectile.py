@@ -25,6 +25,20 @@ class Projectile:
     bounces_remaining: int = 0
     homing_strength: float = 0.0
     exploded: bool = False
+    elemental_core: dict | None = None
+    heal_on_damage: bool = False
+    previous_x: float | None = None
+    previous_y: float | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("explosion_radius", "homing_strength"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise ValueError(
+                    f"{name} must be a non-negative finite number")
+        if type(self.bounces_remaining) is not int or self.bounces_remaining < 0:
+            raise ValueError(
+                "bounces_remaining must be a non-negative integer")
 
     @classmethod
     def create_from_player(
@@ -58,6 +72,7 @@ class Projectile:
 
     def move(self, dt: float) -> None:
         """Move the projectile by its speed and direction."""
+        self.previous_x, self.previous_y = self.x, self.y
         self.x += self.dx * self.speed * dt
         self.y += self.dy * self.speed * dt
 
@@ -84,12 +99,11 @@ class Projectile:
 
     def steer_towards(self, enemies: List[Any], dt: float) -> None:
         """Steer the projectile towards the nearest living unhit enemy.
-        
+
         Args:
             enemies: List of enemy objects to check.
             dt: Delta time for steering strength.
         """
-        import math
         nearest = None
         nearest_dist = float("inf")
         for enemy in enemies:
@@ -99,39 +113,42 @@ class Projectile:
             if dist < nearest_dist:
                 nearest_dist = dist
                 nearest = enemy
-        
+
         if nearest is None:
             return
-        
-        angle = math.atan2(nearest.y - self.y, nearest.x - self.x)
-        blend = min(1.0, self.homing_strength * dt)
-        self.dx = self.dx * (1 - blend) + math.cos(angle) * blend
-        self.dy = self.dy * (1 - blend) + math.sin(angle) * blend
-        mag = math.hypot(self.dx, self.dy)
-        if mag > 0:
-            self.dx /= mag
-            self.dy /= mag
+
+        target_angle = math.atan2(nearest.y - self.y, nearest.x - self.x)
+        current_angle = math.atan2(self.dy, self.dx)
+        difference = (target_angle - current_angle +
+                      math.pi) % (2 * math.pi) - math.pi
+        maximum_turn = self.homing_strength * max(0.0, dt)
+        self.angle = current_angle + \
+            max(-maximum_turn, min(maximum_turn, difference))
+        self.dx = math.cos(self.angle)
+        self.dy = math.sin(self.angle)
 
     def detonate(self, enemies: List[Any], collision_system) -> List[Any]:
         """Detonate explosive projectile, damaging all enemies in radius.
-        
+
         Args:
             enemies: List of enemy objects.
             collision_system: CollisionSystem instance for distance checks.
-            
+
         Returns:
             List of enemies damaged by explosion.
         """
         if self.explosion_radius <= 0 or self.exploded:
             return []
-        
+
         self.exploded = True
         damaged = []
         for enemy in enemies:
             if enemy in self.hit_enemies:
                 continue
-            dist = collision_system._get_distance(self.x, self.y, enemy.x, enemy.y)
-            hit_dist = (10.0 + 5.0) / collision_system.pixels_per_unit  # enemy size + bullet radius
+            dist = collision_system._get_distance(
+                self.x, self.y, enemy.x, enemy.y)
+            # enemy size + bullet radius
+            hit_dist = (10.0 + 5.0) / collision_system.pixels_per_unit
             if dist <= min(self.explosion_radius, hit_dist):
                 self.hit_enemies.append(enemy)
                 damaged.append(enemy)

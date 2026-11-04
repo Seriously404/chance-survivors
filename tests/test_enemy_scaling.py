@@ -32,13 +32,14 @@ class EnemyScalingTests(unittest.TestCase):
         unscaled = EnemyScaling().scale_stats(base_stats, 0)
         scaled = EnemyScaling(threat_level=1).scale_stats(base_stats, 0)
 
-        self.assertEqual(unscaled["score_multiplier"], base_stats["score_multiplier"])
+        self.assertEqual(unscaled["score_multiplier"],
+                         base_stats["score_multiplier"])
         self.assertEqual(scaled["score_multiplier"], 3)
 
     def test_spawn_delay_has_a_positive_floor(self) -> None:
         scaling = EnemyScaling(threat_level=20)
         self.assertLess(scaling.spawn_delay_ms(2000, 3600), 2000)
-        self.assertEqual(scaling.spawn_delay_ms(2000, 10_000_000), 250)
+        self.assertEqual(scaling.spawn_delay_ms(2000, 10_000_000), 100)
 
     def test_spawner_creates_scaled_enemy_instances(self) -> None:
         scaling = EnemyScaling(threat_level=2)
@@ -47,7 +48,8 @@ class EnemyScalingTests(unittest.TestCase):
         spawner.spawn(0.0, 0.0, enemies, elapsed_seconds=600, scaling=scaling)
 
         self.assertEqual(len(enemies), 1)
-        self.assertGreater(enemies[0].max_health, enemy_types["basic"]["max_health"])
+        self.assertGreater(enemies[0].max_health,
+                           enemy_types["basic"]["max_health"])
         self.assertGreater(enemies[0].score_multiplier, 1)
         self.assertGreater(enemies[0].damage, 0)
 

@@ -85,7 +85,8 @@ class SpawnerSystem:
             stats = scaling.scale_stats(stats, elapsed_seconds)
         group_count = stats.get("spawn_group_count", 1)
         if type(group_count) is not int or not 1 <= group_count <= 8:
-            raise ValueError(f"Invalid spawn_group_count for enemy {enemy_name!r}")
+            raise ValueError(
+                f"Invalid spawn_group_count for enemy {enemy_name!r}")
         group_radius = stats.get("spawn_group_radius", 0.0)
         if (
             isinstance(group_radius, bool)
@@ -93,7 +94,8 @@ class SpawnerSystem:
             or not math.isfinite(group_radius)
             or group_radius < 0
         ):
-            raise ValueError(f"Invalid spawn_group_radius for enemy {enemy_name!r}")
+            raise ValueError(
+                f"Invalid spawn_group_radius for enemy {enemy_name!r}")
 
         # Generate a random offset around the player and avoid the zero-vector
         # edge case where both random values land on 0.

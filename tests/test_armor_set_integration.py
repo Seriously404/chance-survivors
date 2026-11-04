@@ -49,14 +49,15 @@ class ArmorSetIntegrationTests(unittest.TestCase):
         service = BazaarService(manager)
         inventory = Inventory([])
         wallet = CurrencyWallet()
-        wallet.add("Gold", LargeNumber(1000))
-
-        bought = service.buy_catalog_item(
-            "bulwark-helm",
-            wallet=wallet,
-            inventory=inventory,
-            item_id="owned-bulwark-helm",
-        )
+        crate = manager.crates[0]
+        wallet.add(crate.currency, LargeNumber(crate.cost))
+        piece = next(item for item in manager.crate_rewards(
+            crate) if item["id"] == "bulwark-helm")
+        with patch.object(manager, "roll_crate", return_value=piece):
+            bought = service.buy_crate(
+                crate.id, wallet=wallet, inventory=inventory,
+                item_id="owned-bulwark-helm", luck=0,
+            )
 
         self.assertEqual(bought["armor_set"], "bulwark")
         self.assertEqual(bought["armor_slot"], "headpiece")
@@ -124,10 +125,11 @@ class ArmorSetIntegrationTests(unittest.TestCase):
         self.assertEqual(bonuses["defense"], 3)
         self.assertEqual(bonuses["health"], 20)
         self.assertEqual(bonuses["speed_pct"], 8)
-        self.assertEqual(bonuses["luck"], 2)
+        self.assertEqual(bonuses["luck"], 3)
 
     def test_set_piece_cannot_be_equipped_in_another_armor_slot(self) -> None:
-        inventory = Inventory([_armor_piece("bulwark-helm", "bulwark", "headpiece")])
+        inventory = Inventory(
+            [_armor_piece("bulwark-helm", "bulwark", "headpiece")])
 
         with self.assertRaisesRegex(ValueError, "belongs in the headpiece slot"):
             inventory.equip("bulwark-helm", "armor", 0)

@@ -15,11 +15,13 @@ class BulletType:
 
 
 def load_bullet_types(path: Path | None = None) -> dict[str, BulletType]:
-    config_path = path or Path(__file__).resolve().parents[2] / "assets" / "bullet_types.json"
+    config_path = path or Path(__file__).resolve(
+    ).parents[2] / "assets" / "bullet_types.json"
     try:
         raw = json.loads(config_path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict) or not raw:
-            raise ValueError("expected a non-empty object keyed by bullet type")
+            raise ValueError(
+                "expected a non-empty object keyed by bullet type")
         result = {}
         for key, data in raw.items():
             if not isinstance(data, dict):
@@ -34,8 +36,11 @@ def load_bullet_types(path: Path | None = None) -> dict[str, BulletType]:
             if not isinstance(speed, (int, float)) or speed <= 0:
                 raise ValueError(f"{key}.speed_modifier must be positive")
             if not isinstance(piercing, int) or piercing < 0 or not isinstance(automatic, bool):
-                raise ValueError(f"{key} needs non-negative integer piercing and boolean automatic")
-            result[key] = BulletType(key, float(cooldown), damage, float(speed), piercing, automatic)
+                raise ValueError(
+                    f"{key} needs non-negative integer piercing and boolean automatic")
+            result[key] = BulletType(key, float(
+                cooldown), damage, float(speed), piercing, automatic)
         return result
     except (OSError, json.JSONDecodeError, ValueError) as exc:
-        raise RuntimeError(f"Could not load bullet configuration at {config_path}: {exc}") from exc
+        raise RuntimeError(
+            f"Could not load bullet configuration at {config_path}: {exc}") from exc

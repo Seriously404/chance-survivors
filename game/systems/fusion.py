@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from itertools import combinations
 from copy import deepcopy
 import hashlib
 import json
@@ -38,6 +39,9 @@ class FusionRecipe:
         min_rarity: str = "rare",
         min_level: int = 2,
         stats: dict[str, float] | None = None,
+        unlock_level: int = 1,
+        required_elements: tuple[str, ...] = (),
+        required_fusion: str | None = None,
     ) -> None:
         self.id = recipe_id
         self.name = name
@@ -48,6 +52,9 @@ class FusionRecipe:
         self.min_rarity = min_rarity.lower()
         self.min_level = max(1, int(min_level))
         self.stats = dict(stats or {})
+        self.unlock_level = unlock_level
+        self.required_elements = tuple(required_elements)
+        self.required_fusion = required_fusion
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -60,10 +67,34 @@ class FusionRecipe:
             "min_rarity": self.min_rarity,
             "min_level": self.min_level,
             "stats": deepcopy(self.stats),
+            "unlock_level": self.unlock_level,
+            "required_elements": list(self.required_elements),
+            "required_fusion": self.required_fusion,
         }
 
 
 DEFAULT_FUSION_RECIPES = [
+    FusionRecipe("sandevistan", "Sandevistan", "ability", "ultimate",
+                 "An ultimate dash that slows the world and accelerates movement and ability recovery.",
+                 ("ability", "ability", "relic"), min_rarity="ultimate", min_level=20,
+                 unlock_level=51, required_fusion="elemental-core"),
+    FusionRecipe("field-rifle", "Field Rifle", "weapon", "uncommon",
+                 "A practical weapon reinforced with spare armor.", (
+                     "weapon", "armor"),
+                 min_rarity="common", min_level=1, stats={"damage_pct": 8, "health": 10}),
+    FusionRecipe("battle-charm", "Battle Charm", "relic", "uncommon",
+                 "A charm that combines an ability with a relic.", (
+                     "ability", "relic"),
+                 min_rarity="common", min_level=1, stats={"damage_pct": 6, "luck": 0.1}),
+    FusionRecipe("elemental-core", "Elemental Core", "relic", "legendary",
+                 "A core made from one ability of each elemental type.",
+                 ("ability",) * 6, min_rarity="common", min_level=1, unlock_level=8,
+                 required_elements=("fire", "frost", "light", "shadow", "arcane", "nature")),
+    FusionRecipe("prismatic-rifle", "Prismatic Rifle", "weapon", "legendary",
+                 "A weapon forged around an Elemental Core.", (
+                     "weapon", "relic"),
+                 min_rarity="common", min_level=1, unlock_level=15,
+                 required_fusion="elemental-core", stats={"damage_pct": 20}),
     FusionRecipe(
         "ember-ward-sentinel",
         "Ember Ward Sentinel",
@@ -73,6 +104,7 @@ DEFAULT_FUSION_RECIPES = [
         ("ability", "armor"),
         min_rarity="rare",
         min_level=2,
+        unlock_level=4,
         stats={"damage_pct": 18.0, "health": 28.0, "luck": 3.0},
     ),
     FusionRecipe(
@@ -84,6 +116,7 @@ DEFAULT_FUSION_RECIPES = [
         ("weapon", "ability"),
         min_rarity="epic",
         min_level=2,
+        unlock_level=10,
         stats={"damage_pct": 26.0, "speed_pct": 10.0, "luck": 4.0},
     ),
     FusionRecipe(
@@ -92,20 +125,22 @@ DEFAULT_FUSION_RECIPES = [
         "armor",
         "epic",
         "A heavy fused armor set core that shifts survivability and speed.",
-        ("armor", "misc"),
+        ("armor", "relic"),
         min_rarity="rare",
         min_level=2,
+        unlock_level=6,
         stats={"defense": 12.0, "health": 44.0, "speed_pct": 8.0},
     ),
     FusionRecipe(
         "starfire-echo",
         "Starfire Echo",
-        "misc",
+        "relic",
         "mythical",
         "A relic-like fusion object that amplifies luck and explosive output.",
-        ("misc", "ability"),
+        ("relic", "ability"),
         min_rarity="epic",
         min_level=2,
+        unlock_level=12,
         stats={"luck": 9.0, "damage_pct": 15.0, "speed_pct": 6.0},
     ),
 ]
@@ -114,7 +149,7 @@ DEFAULT_FUSION_RECIPES = [
 class FusionManager:
     """Create permanent fusion items from valid source inventory entries."""
 
-    UNLOCK_LEVEL = 50
+    UNLOCK_LEVEL = 1
 
     def __init__(self, recipes: list[FusionRecipe] | None = None) -> None:
         self.recipes = list(recipes or DEFAULT_FUSION_RECIPES)
@@ -166,14 +201,28 @@ class FusionManager:
             )
         source_ids = [str(item.get("id", "")) for item in source_items]
         if any(not item_id for item_id in source_ids) or len(set(source_ids)) != len(source_ids):
-            raise ValueError("Fusion sources must have distinct, stable item IDs.")
-        expected_types = Counter(required.lower() for required in recipe.required_types)
-        actual_types = Counter(str(item.get("type", "")).lower() for item in source_items)
+            raise ValueError(
+                "Fusion sources must have distinct, stable item IDs.")
+        expected_types = Counter(required.lower()
+                                 for required in recipe.required_types)
+        actual_types = Counter(str(item.get("type", "")).lower()
+                               for item in source_items)
         if actual_types != expected_types:
             required = " + ".join(recipe.required_types)
-            raise ValueError(f"{recipe.name} requires {required} source items.")
+            raise ValueError(
+                f"{recipe.name} requires {required} source items.")
+        if recipe.required_elements:
+            elements = Counter(str(item.get("stats", {}).get(
+                "element", "")).lower() for item in source_items)
+            if elements != Counter(recipe.required_elements):
+                raise ValueError(
+                    f"{recipe.name} requires abilities with: {', '.join(recipe.required_elements)}.")
+        if recipe.required_fusion and not any(item.get("fusion_recipe") == recipe.required_fusion for item in source_items):
+            raise ValueError(
+                f"{recipe.name} requires {recipe.required_fusion}.")
         for item, required_type in zip(
-            sorted(source_items, key=lambda source: str(source.get("type", "")).lower()),
+            sorted(source_items, key=lambda source: str(
+                source.get("type", "")).lower()),
             sorted(recipe.required_types, key=str.lower),
         ):
             if not self.is_valid_candidate(item, required_type, recipe):
@@ -198,6 +247,37 @@ class FusionManager:
                 continue
             return candidate
         return None
+
+    def find_sources(self, candidates: list[dict[str, Any]], recipe_id: str,
+                     player_level: int, preferred_id: str | None = None) -> list[dict[str, Any]]:
+        """Find a complete set without consuming anything, preferring the selected item."""
+        recipe = self.recipe_by_id(recipe_id)
+        if player_level < recipe.unlock_level:
+            raise ValueError(
+                f"{recipe.name} unlocks at player level {recipe.unlock_level}.")
+        eligible = [item for item in candidates if item.get("status") not in
+                    {"active", "supplement", "combination_base"}]
+        eligible = [item for item in eligible if any(self.is_valid_candidate(item, kind, recipe)
+                                                     for kind in recipe.required_types)]
+        if recipe.required_elements:
+            available = Counter(str(item.get("stats", {}).get(
+                "element", "")).lower() for item in eligible)
+            if any(available[element] < count for element, count in Counter(recipe.required_elements).items()):
+                raise ValueError(
+                    "Missing compatible unequipped ingredients for this recipe.")
+            eligible = [item for item in eligible if item.get(
+                "stats", {}).get("element") in recipe.required_elements]
+        for preferred_only in ((True, False) if preferred_id else (False,)):
+            for group in combinations(eligible, len(recipe.required_types)):
+                if preferred_only and not any(str(item.get("id")) == preferred_id for item in group):
+                    continue
+                try:
+                    self.validate_sources(list(group), recipe)
+                except ValueError:
+                    continue
+                return list(group)
+        raise ValueError(
+            "Missing compatible unequipped ingredients for this recipe.")
 
     def match_recipe(self, main_item: dict[str, Any], source_items: list[dict[str, Any]]) -> FusionRecipe:
         if not main_item:
@@ -242,22 +322,28 @@ class FusionManager:
             for stat_name, stat_value in item_stats.items():
                 if not isinstance(stat_value, (int, float)):
                     continue
-                stats[stat_name] = stats.get(stat_name, 0.0) + float(stat_value)
+                stats[stat_name] = stats.get(
+                    stat_name, 0.0) + float(stat_value)
         for stat_name, bonus in recipe.stats.items():
             stats[stat_name] = stats.get(stat_name, 0.0) + float(bonus)
 
-        rarity_multiplier = RARITY_MULTIPLIERS.get(rarity, 1.0)
-        stats = {key: value * rarity_multiplier for key, value in stats.items()}
         stats.update(output_metadata)
+        if recipe.id == "sandevistan":
+            stats = {"script": "sandevistan", "cooldown": 90.0,
+                     "dash_distance": 4.0, "dash_duration": 0.2,
+                     "time_shift_duration": 6.0}
         source_ids = sorted(str(item.get("id")) for item in selected)
-        identity = json.dumps([recipe.id, source_ids], separators=(",", ":"), ensure_ascii=True)
-        identity_suffix = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+        identity = json.dumps([recipe.id, source_ids],
+                              separators=(",", ":"), ensure_ascii=True)
+        identity_suffix = hashlib.sha256(
+            identity.encode("utf-8")).hexdigest()[:16]
 
         result = {
             "id": f"fusion-{recipe.id}-{identity_suffix}",
             "name": recipe.name,
             "type": recipe.item_type,
             "rarity": rarity,
+            "base_rarity": rarity,
             "level": total_level,
             "stats": stats,
             "combinations": [None] * RARITY_COMBINATION_SLOTS[rarity],
@@ -269,4 +355,11 @@ class FusionManager:
         }
         if output_tags:
             result["tags"] = output_tags
+        if recipe.id == "elemental-core":
+            result["tags"] = ["elemental-core"]
+        if recipe.item_type == "armor":
+            armor_source = next(
+                item for item in selected if item.get("type") == "armor")
+            if "armor_slot" in armor_source:
+                result["armor_slot"] = armor_source["armor_slot"]
         return result

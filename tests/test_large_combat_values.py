@@ -35,9 +35,11 @@ class LargeCombatValueTests(unittest.TestCase):
         player = Player(health="1e600", max_health="1e600")
         collision = CollisionSystem(200)
 
-        collision.check_enemy_player_collisions([enemy], player, {"scaled": stats}, defense="1e450")
+        collision.check_enemy_player_collisions(
+            [enemy], player, {"scaled": stats}, defense="1e450")
 
-        expected = LargeNumber("1e600") - (LargeNumber("1e500") - LargeNumber("1e450"))
+        expected = LargeNumber("1e600") - \
+            (LargeNumber("1e500") - LargeNumber("1e450"))
         self.assertEqual(player.health, expected)
         self.assertEqual(player.max_health, LargeNumber("1e600"))
         self.assertFalse(player.health == 0)

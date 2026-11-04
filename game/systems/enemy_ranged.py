@@ -36,7 +36,8 @@ def update_ranged_attacks(
             or value <= 0
             for value in (interval, attack_range, projectile_speed)
         ):
-            raise ValueError(f"Invalid ranged attack configuration for {enemy.type!r}")
+            raise ValueError(
+                f"Invalid ranged attack configuration for {enemy.type!r}")
 
         distance = math.hypot(player_x - enemy.x, player_y - enemy.y)
         if distance > attack_range:
