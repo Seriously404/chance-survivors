@@ -4,6 +4,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Tuple
 
+from game.utils.large_number import LargeNumber
 
 @dataclass
 class Player:
@@ -11,9 +12,13 @@ class Player:
 
     x: float = 0.0
     y: float = 0.0
-    health: int = 100
-    max_health: int = 100
+    health: LargeNumber | int | str = 100
+    max_health: LargeNumber | int | str = 100
     angle: float = 0.0
+
+    def __post_init__(self) -> None:
+        self.health = LargeNumber(self.health)
+        self.max_health = LargeNumber(self.max_health)
 
     def move(self, dx: float, dy: float, dt: float, speed_multiplier: float = 1.0) -> None:
         """Move the player by the given delta, normalized by magnitude."""
@@ -32,9 +37,12 @@ class Player:
         else:
             self.angle = math.atan2(direction_y, direction_x)
 
-    def take_damage(self, damage: int) -> None:
+    def take_damage(self, damage: LargeNumber | int | float | str) -> None:
         """Apply damage to the player, clamping health to minimum 0."""
-        self.health = max(0, self.health - damage)
+        amount = LargeNumber(damage)
+        if amount < 0:
+            raise ValueError("Damage must be non-negative")
+        self.health = max(LargeNumber(0), self.health - amount)
 
     def is_alive(self) -> bool:
         """Check if the player is still alive."""
@@ -44,6 +52,6 @@ class Player:
         """Reset the player to initial state."""
         self.x = 0.0
         self.y = 0.0
-        self.health = max_health
-        self.max_health = max_health
+        self.health = LargeNumber(max_health)
+        self.max_health = LargeNumber(max_health)
         self.angle = 0.0

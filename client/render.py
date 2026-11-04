@@ -3,8 +3,12 @@ import math
 import pygame
 
 from client.input import InputHandler
+<<<<<<< HEAD
 from game.systems.elements import ELEMENTS, element_label, normalize_element
 from game.systems.enemy_visibility import enemy_visibility_alpha
+=======
+from game.utils.large_number import LargeNumber
+>>>>>>> birch/projectile-collision-effects
 
 
 class Renderer:
@@ -462,7 +466,11 @@ class Renderer:
         if max_health <= 0:
             return
 
-        health_ratio = max(0, min(1, current_health / max_health))
+        ratio = current_health / max_health
+        if isinstance(ratio, LargeNumber):
+            health_ratio = min(1.0, max(0.0, ratio.to_float()))
+        else:
+            health_ratio = max(0.0, min(1.0, ratio))
 
         background_rect = pygame.Rect(
             center_x - width / 2,
@@ -1311,6 +1319,22 @@ class Renderer:
         self._text("Inventory · drag a supplement to a combination slot",(right.left+8,right.top+7))
         self._draw_inventory_grid(items,right)
         if base:
+            preview = state.get("combined_item")
+            if preview and preview.get("base_id") == str(base.get("id")):
+                preview_y = left.bottom-86
+                self._text("Evaluated combination",(left.left+12,preview_y))
+                preview_y += 20
+                contributions = preview.get("contributions",{})
+                for stat_name,stat_value in list(preview.get("stats",{}).items())[:3]:
+                    sources = " + ".join(contributions.get(stat_name,[]))
+                    text = f"{stat_name}: {stat_value} ({sources})"
+                    while text and self.font.size(text)[0] > left.width-24:
+                        text = text[:-4] + "…" if len(text) > 4 else text[:-1]
+                    self._text(text,(left.left+12,preview_y))
+                    preview_y += 18
+                behaviors = ", ".join(preview.get("behaviors",[]))
+                if behaviors:
+                    self._text(f"Effects: {behaviors}"[:64],(left.left+12,left.bottom-18))
             for slot_index,combo_id in enumerate(base.get("combinations",[])):
                 if combo_id is None: continue
                 item_rect=self._item_rects.get(str(combo_id)); slot_rect=self._drop_targets.get(f"combo:{base['id']}:{slot_index}")
@@ -1913,6 +1937,7 @@ class Renderer:
                 self._draw_combo_markers(rect,item)
                 self._draw_cooldown_overlay(rect,state.get("weapon_cooldowns",[0,0])[i])
         self._button("pause", "Resume" if state.get("paused") else "Pause", (right-60,top+18),100,34)
+<<<<<<< HEAD
         quest_checks = [
             quest for quest in state.get("quests", [])
             if quest.get("status") == "active"
@@ -1926,6 +1951,14 @@ class Renderer:
                 target = float(quest.get("target", 1.0))
                 label = f"{quest.get('name', 'Quest')}: {progress:.0f}/{target:.0f}"
                 self._text(f"- {label}", (right-170, self.screen_height//2-48 + index * 28))
+=======
+        self._button("increase_difficulty",
+                     f"Difficulty {state.get('difficulty_level', 0)} +",
+                     (right-75,top+58),130,32)
+        self._text("Quests",(right-105,self.screen_height//2-75))
+        self._text("- No active quests",(right-105,self.screen_height//2-48))
+        self._text("- Quest list placeholder",(right-105,self.screen_height//2-26))
+>>>>>>> birch/projectile-collision-effects
         self._button("inventory","Inventory",(right-60,bottom-100),100,34)
         self._button("upgrades","Upgrades",(right-60,bottom-58),100,34)
         wallet=state.get("currency",{})

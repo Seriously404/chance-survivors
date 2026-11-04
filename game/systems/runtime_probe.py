@@ -22,13 +22,20 @@ from game.entities.player import Player
 from game.systems.bullets import load_bullet_types
 from game.systems.collision import CollisionSystem
 from game.systems.currency import CurrencyWallet
+<<<<<<< HEAD
 from game.systems.enemy_catalog import build_enemy_roster
 from game.systems.enemy_abilities import update_enemy_abilities
 from game.systems.enemy_ranged import update_ranged_attacks
 from game.systems.items import create_initial_inventory, player_bonuses, spawnable_items
 from game.systems.numbers import LargeNumber
+=======
+from game.systems.items import create_initial_inventory, player_bonuses, player_speed_multiplier, spawnable_items
+>>>>>>> birch/projectile-collision-effects
 from game.systems.progression import PlayerProgress, award_enemy_kill
+from game.systems.scoring import RunScore
+from game.systems.combinations import CombinationEngine
 from game.systems.weapons import projectile_for_weapon
+from game.utils.large_number import LargeNumber
 
 
 enemy_types = build_enemy_roster(base_enemy_types)
@@ -38,6 +45,7 @@ class RuntimeProbe:
     """Inspectable and controllable instance built from the game's systems."""
 
     def __init__(self) -> None:
+<<<<<<< HEAD
         self.player = Player(health=player_max_health, max_health=player_max_health)
         self.inventory = create_initial_inventory()
         self.player.max_health = player_max_health + int(player_bonuses(self.inventory)["health"])
@@ -54,12 +62,31 @@ class RuntimeProbe:
         self.elapsed = 0.0
         self._spawned = 0
         self._catalog = spawnable_items()
+=======
+        self.player=Player(health=player_max_health,max_health=player_max_health)
+        self.inventory=create_initial_inventory()
+        self.combination_engine = CombinationEngine()
+        self.player.max_health=LargeNumber(player_max_health)+player_bonuses(self.inventory)["health"]
+        self.player.health=self.player.max_health
+        self.bullet_types=load_bullet_types()
+        self.collision=CollisionSystem(200)
+        self.wallet=CurrencyWallet()
+        self.progress=PlayerProgress()
+        self.bullets=[]
+        self.enemies=[]
+        self.weapon_cooldowns=[0.0,0.0]
+        self.score=RunScore()
+        self.elapsed=0.0
+        self._spawned=0
+        self._catalog=spawnable_items()
+>>>>>>> birch/projectile-collision-effects
 
     def status(self) -> dict[str, Any]:
         return {
-            "player":{"x":self.player.x,"y":self.player.y,"health":self.player.health,
-                      "max_health":self.player.max_health,"angle":self.player.angle},
+            "player":{"x":self.player.x,"y":self.player.y,"health":str(self.player.health),
+                      "max_health":str(self.player.max_health),"angle":self.player.angle},
             "inventory":{"count":len(self.inventory.items),"active_slots":self.inventory.active_slots,
+<<<<<<< HEAD
                           "bonuses":player_bonuses(self.inventory)},
             "bullets":[{"type":b.bullet_type,"damage":b.damage,"piercing":b.piercing} for b in self.bullets],
             "enemy_projectiles":[
@@ -72,6 +99,14 @@ class RuntimeProbe:
             "level": self.progress.level,
             "experience": self.progress.current_exp.format(),
             "elapsed": self.elapsed,
+=======
+                          "bonuses":{name: str(value) for name, value in player_bonuses(self.inventory).items()}},
+            "bullets":[{"type":b.bullet_type,"damage":str(b.damage),"piercing":b.piercing} for b in self.bullets],
+            "enemies":[{"type":e.type,"x":e.x,"y":e.y,"health":str(e.health)} for e in self.enemies],
+            "currency":{name: str(amount) for name, amount in self.wallet.amounts.items()},
+            "score":str(self.score.total_score),"level":self.progress.level,
+            "experience":self.progress.current_exp,"elapsed":self.elapsed,
+>>>>>>> birch/projectile-collision-effects
         }
 
     def execute(self, command: dict[str, Any]) -> dict[str, Any]:
@@ -83,26 +118,28 @@ class RuntimeProbe:
             stats=enemy_types[kind]
             enemy=Enemy.create_from_type(kind,stats,float(command.get("x",0.08)),float(command.get("y",0)))
             if "health" in command:
-                enemy.health=max(1,int(command["health"])); enemy.max_health=enemy.health
+                enemy.health=LargeNumber(max(1,int(command["health"]))); enemy.max_health=enemy.health
             self.enemies.append(enemy)
-            return {"enemy_index":len(self.enemies)-1,"health":enemy.health}
+            return {"enemy_index":len(self.enemies)-1,"health":str(enemy.health)}
         if action=="fire":
             slot=int(command.get("slot",0))
             if slot not in (0,1): raise ValueError("weapon slot must be 0 or 1")
             if self.weapon_cooldowns[slot]>0: return {"fired":False,"cooldown":self.weapon_cooldowns[slot]}
             item_id=self.inventory.active_slots["weapons"][slot]
             item=next((i for i in self.inventory.items if i["id"]==item_id),None)
+            combined_item = self.combination_engine.evaluate_inventory(self.inventory, item_id) if item else None
             projectile,cooldown,automatic=projectile_for_weapon(
-                self.player,float(command.get("angle",0)),item,slot,self.bullet_types,bullet_base_speed,
+                self.player,float(command.get("angle",0)),combined_item,slot,self.bullet_types,bullet_base_speed,
                 player_bonuses(self.inventory)["damage_pct"])
             self.bullets.append(projectile); self.weapon_cooldowns[slot]=cooldown
-            return {"fired":True,"type":projectile.bullet_type,"damage":projectile.damage,
+            return {"fired":True,"type":projectile.bullet_type,"damage":str(projectile.damage),
                     "piercing":projectile.piercing,"cooldown":cooldown,"automatic":automatic}
         if action=="step":
             dt=float(command.get("dt",1/60))
             if not 0 < dt <= 10: raise ValueError("dt must be greater than 0 and at most 10 seconds")
             self.elapsed+=dt
             self.weapon_cooldowns=[max(0,v-dt) for v in self.weapon_cooldowns]
+<<<<<<< HEAD
             update_enemy_abilities(
                 self.enemies,
                 enemy_types,
@@ -169,12 +206,28 @@ class RuntimeProbe:
                 "projectile_damage": projectile_damage,
                 "state": self.status(),
             }
+=======
+            for bullet in self.bullets:
+                bullet.steer_towards(self.enemies, dt)
+                bullet.move(dt)
+            self.bullets,self.enemies=self.collision.check_bullet_enemy_collisions(
+                self.bullets,self.enemies,enemy_types)
+            killed=len(self.collision.killed_enemies)
+            for enemy in self.collision.killed_enemies:
+                self.score.award(LargeNumber(10) * enemy.reward_multiplier)
+                self.wallet.reward_for_kill(
+                    luck=player_bonuses(self.inventory)["luck"],
+                    reward_multiplier=enemy.reward_multiplier,
+                )
+                award_enemy_kill(self.progress)
+            return {"killed":killed,"state":self.status()}
+>>>>>>> birch/projectile-collision-effects
         if action=="move_player":
             dt=float(command.get("dt",1/60))
             bonuses=player_bonuses(self.inventory)
             self.player.move(float(command.get("dx",0)),float(command.get("dy",0)),dt,
-                             1+bonuses["speed_pct"]/100)
-            return {"x":self.player.x,"y":self.player.y,"speed_multiplier":1+bonuses["speed_pct"]/100}
+                             player_speed_multiplier(bonuses["speed_pct"]))
+            return {"x":self.player.x,"y":self.player.y,"speed_multiplier":player_speed_multiplier(bonuses["speed_pct"])}
         if action=="enemy_attack":
             index=int(command.get("index",0))
             if not 0<=index<len(self.enemies): raise IndexError("enemy index out of range")
@@ -182,7 +235,7 @@ class RuntimeProbe:
             health_before=self.player.health
             self.player=self.collision.check_enemy_player_collisions(
                 self.enemies,self.player,enemy_types,player_bonuses(self.inventory)["defense"])
-            return {"damage_taken":health_before-self.player.health,"health":self.player.health}
+            return {"damage_taken":str(health_before-self.player.health),"health":str(self.player.health)}
         if action=="spawn_item":
             template=next((i for i in self._catalog if i["id"]==command.get("item_id")),None)
             if template is None: raise ValueError("Unknown catalog item_id")
@@ -224,7 +277,11 @@ class RuntimeProbe:
         self.execute({"action":"step","dt":0.02})
         assert rapid["type"]=="rapid_fire" and rapid["automatic"] and rapid["piercing"]==0
         assert heavy["type"]=="heavy_shot" and not heavy["automatic"] and heavy["piercing"]>0
+<<<<<<< HEAD
         assert self.score==10 and self.progress.current_exp==10 and not self.enemies
+=======
+        assert self.score.total_score==10 and self.progress.current_exp==1 and not self.enemies
+>>>>>>> birch/projectile-collision-effects
         self._assert_invariants()
         return {"rapid_fire":rapid,"heavy_shot":heavy,"state":self.status(),"invariants":"passed"}
 

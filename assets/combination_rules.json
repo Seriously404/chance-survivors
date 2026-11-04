@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "explosive-delivery",
+      "base_tags": [],
+      "supplement_tags": ["explosive"],
+      "add_tags": ["area_damage"],
+      "behaviors": ["area_explosion"],
+      "stat_modifiers": [
+        {"stat": "area_radius", "operation": "add", "value": "2"}
+      ]
+    },
+    {
+      "id": "homing-guidance",
+      "supplement_tags": ["homing"],
+      "add_tags": ["guided"],
+      "behaviors": ["homing_guidance"],
+      "stat_modifiers": [
+        {"stat": "homing_strength", "operation": "add", "value": "1"}
+      ]
+    },
+    {
+      "id": "ricochet-impact",
+      "supplement_tags": ["ricochet"],
+      "behaviors": ["ricochet"],
+      "stat_modifiers": [
+        {"stat": "bounce_count", "operation": "add", "value": "1"}
+      ]
+    },
+    {
+      "id": "elemental-firearm",
+      "base_tags": ["elemental"],
+      "supplement_types": ["weapon"],
+      "add_tags": ["hybrid_damage"],
+      "behaviors": ["weapon_damage_component"]
+    },
+    {
+      "id": "fire-teleport-trail",
+      "base_types": ["ability"],
+      "base_tags": ["fire"],
+      "supplement_tags": ["teleportation"],
+      "add_tags": ["burning_trail"],
+      "behaviors": ["burning_teleport_trail"],
+      "stat_modifiers": [
+        {"stat": "trail_damage", "operation": "add", "value": "2"}
+      ]
+    },
+    {
+      "id": "firearm-element",
+      "base_types": ["weapon"],
+      "supplement_types": ["ability"],
+      "supplement_tags": ["elemental"],
+      "add_tags": ["hybrid_damage"],
+      "behaviors": ["ability_damage_component"]
+    }
+  ]
+}

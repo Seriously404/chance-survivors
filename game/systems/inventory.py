@@ -42,8 +42,14 @@ class Inventory:
         self.items: list[dict[str, Any]] = list(items or [])
         if len(self.items) > self.CAPACITY:
             raise ValueError("Inventory exceeds 200 slots")
-        if len({item["id"] for item in self.items}) != len(self.items):
+        if any(not isinstance(item, dict) for item in self.items):
+            raise ValueError("Inventory entries must be item objects")
+        item_ids = [item.get("id") for item in self.items]
+        if any(not isinstance(item_id, str) or not item_id for item_id in item_ids):
+            raise ValueError("Inventory items need non-empty string ids")
+        if len(set(item_ids)) != len(self.items):
             raise ValueError("Inventory item IDs must be unique")
+        self._validate_combination_records(self.items)
         self.active_slots: dict[str, list[str | None]] = {
             name: [None] * count for name, count in self.SLOT_COUNTS.items()
         }
@@ -58,8 +64,15 @@ class Inventory:
     def add(self, item: dict[str, Any]) -> int:
         if len(self.items) >= self.CAPACITY:
             raise OverflowError("Inventory is full")
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str) or not item["id"]:
+            raise ValueError("Inventory items need non-empty string ids")
         if any(existing["id"] == item["id"] for existing in self.items):
             raise ValueError(f"Duplicate inventory item ID: {item['id']}")
+        proposed_items = self.items + [item]
+        supplement_ids = self._validate_combination_records(proposed_items)
+        active_ids = {item_id for slots in self.active_slots.values() for item_id in slots if item_id is not None}
+        if active_ids.intersection(supplement_ids):
+            raise ValueError("An actively equipped item cannot be a combination supplement")
         self.items.append(item)
         self._refresh_statuses()
         return len(self.items) - 1
@@ -67,31 +80,99 @@ class Inventory:
     def is_combination_supplement(self, item_id: str) -> bool:
         return any(item_id in item["combinations"] for item in self.items)
 
+    @staticmethod
+    def _validate_combination_records(items: list[dict[str, Any]]) -> set[str]:
+        """Validate the complete base/supplement graph without changing it."""
+        if any(not isinstance(item, dict) for item in items):
+            raise ValueError("Inventory entries must be item objects")
+        if any(not isinstance(item.get("id"), str) or not item["id"] for item in items):
+            raise ValueError("Items need non-empty ids for combinations")
+        by_id = {item["id"]: item for item in items}
+        owners: dict[str, str] = {}
+        base_ids: set[str] = set()
+        for base in items:
+            base_id = base["id"]
+            base_type = base.get("type")
+            slots = base.get("combinations")
+            if not isinstance(base_type, str) or not base_type:
+                raise ValueError(f"Item {base_id!r} needs a non-empty type for combinations")
+            if not isinstance(slots, list):
+                raise ValueError(f"Item {base_id!r} combination slots must be a list")
+            for supplement_id in slots:
+                if supplement_id is None:
+                    continue
+                if not isinstance(supplement_id, str) or supplement_id not in by_id:
+                    raise ValueError(f"Item {base_id!r} references an unknown combination supplement")
+                if supplement_id == base_id:
+                    raise ValueError("An item cannot be combined with itself")
+                if supplement_id in owners:
+                    raise ValueError("A combination supplement can belong to only one base item")
+                supplement_type = by_id[supplement_id].get("type")
+                if not isinstance(supplement_type, str):
+                    raise ValueError(f"Item {supplement_id!r} has no valid type")
+                if (base_type == "armor") != (supplement_type == "armor"):
+                    raise ValueError("Armor can only be combined with armor; non-armor with non-armor")
+                owners[supplement_id] = base_id
+                base_ids.add(base_id)
+
+        if base_ids.intersection(owners):
+            raise ValueError("An item cannot be both a combination base and a supplement")
+        return set(owners)
+
     def assign_combination(self, base_id: str, combo_index: int,
                            supplement_id: str | None) -> None:
         base = self.get(base_id)
         combos = base["combinations"]
+        if type(combo_index) is not int:
+            raise IndexError("Combination slot index must be an integer")
         if not 0 <= combo_index < len(combos):
             raise IndexError("Combination slot is outside this item's rarity capacity")
+
+        # Reject pre-existing corrupt graphs and compute a candidate ownership
+        # graph before changing any item slots.
+        self._validate_combination_records(self.items)
+        proposed_slots = {item["id"]: list(item["combinations"]) for item in self.items}
         if supplement_id is not None:
+            if not isinstance(supplement_id, str):
+                raise ValueError("Combination supplement id must be a string or None")
             supplement = self.get(supplement_id)
             if supplement_id == base_id:
                 raise ValueError("An item cannot be combined with itself")
-            if supplement["type"] == "armor":
-                raise ValueError("Armor cannot be used as a combination supplement")
             if any(supplement_id in slots for slots in self.active_slots.values()):
                 raise ValueError("An actively equipped item cannot become a combination supplement")
-            if self.is_combination_supplement(supplement_id):
-                old_base = next(item for item in self.items if supplement_id in item["combinations"])
-                if old_base["id"] != base_id:
+            if any(value is not None for value in supplement["combinations"]):
+                raise ValueError("A combination base cannot also be used as a supplement")
+            if (base["type"] == "armor") != (supplement["type"] == "armor"):
+                raise ValueError("Armor can only be combined with armor; non-armor with non-armor")
+
+            old_base_id = next(
+                (owner_id for owner_id, slots in proposed_slots.items() if supplement_id in slots),
+                None,
+            )
+            if old_base_id is not None:
+                if old_base_id != base_id:
                     raise ValueError("An item already used in another combination cannot be moved")
-                old_index = old_base["combinations"].index(supplement_id)
-                displaced = combos[combo_index]
-                combos[combo_index] = supplement_id
-                combos[old_index] = displaced
-                self._refresh_statuses()
-                return
-        combos[combo_index] = supplement_id
+                old_index = proposed_slots[base_id].index(supplement_id)
+                if old_index != combo_index:
+                    displaced = proposed_slots[base_id][combo_index]
+                    proposed_slots[base_id][combo_index] = supplement_id
+                    proposed_slots[base_id][old_index] = displaced
+            else:
+                proposed_slots[base_id][combo_index] = supplement_id
+        else:
+            proposed_slots[base_id][combo_index] = None
+
+        proposed_items = [
+            {**item, "combinations": proposed_slots[item["id"]]}
+            for item in self.items
+        ]
+        supplement_ids = self._validate_combination_records(proposed_items)
+        active_ids = {item_id for slots in self.active_slots.values() for item_id in slots if item_id is not None}
+        if active_ids.intersection(supplement_ids):
+            raise ValueError("An actively equipped item cannot be a combination supplement")
+
+        for item in self.items:
+            item["combinations"] = proposed_slots[item["id"]]
         self._refresh_statuses()
 
     def equip(self, item_id: str, slot_kind: str, slot_index: int) -> None:

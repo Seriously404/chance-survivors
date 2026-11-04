@@ -28,6 +28,7 @@ from game.systems.bullets import load_bullet_types
 from game.systems.currency import CurrencyWallet, CurrencyNotifications
 from game.systems.inventory import Inventory
 from game.systems.progression import PlayerProgress, award_enemy_kill
+<<<<<<< HEAD
 from game.systems.items import (
     armor_set_status,
     create_initial_inventory,
@@ -49,6 +50,14 @@ from game.systems.abilities import ability_cooldown, cast_ability
 from game.systems.leaderboard_client import build_run_submission, submit_run
 from game.systems.run_save import RunSave, configured_save_path
 from game.systems.score_milestone import has_reached_infinity_milestone
+=======
+from game.systems.scoring import RunScore
+from game.systems.items import create_initial_inventory, spawnable_items, player_bonuses
+from game.systems.weapons import projectile_for_weapon
+from game.utils.large_number import LargeNumber
+from game.systems.combinations import CombinationEngine
+from game.systems.items import player_speed_multiplier
+>>>>>>> birch/projectile-collision-effects
 from copy import deepcopy
 
 
@@ -162,6 +171,25 @@ def create_bullet(
     )
 
 
+def _combination_preview(engine: CombinationEngine, inventory: Inventory, item_id: str | None) -> dict | None:
+    if not item_id:
+        return None
+    try:
+        combined = engine.evaluate_inventory(inventory, item_id)
+    except (KeyError, ValueError):
+        return None
+    return {
+        "base_id": combined.base_id,
+        "stats": {name: str(value) for name, value in combined.stats.items()},
+        "behaviors": list(combined.behaviors),
+        "rules_applied": list(combined.rules_applied),
+        "contributions": {
+            name: [f"{part['source_id']}: {part['amount']}" for part in parts]
+            for name, parts in combined.contributions.items()
+        },
+    }
+
+
 def main() -> None:
     """Main game loop."""
     # Initialize systems
@@ -182,9 +210,14 @@ def main() -> None:
     spawn_catalog = bazaar_manager.catalog
     spawn_counter = 0
     progress = PlayerProgress()
+<<<<<<< HEAD
     absolute_score = LargeNumber(0)
     quest_manager = QuestManager()
     settings.mission_score_bonus_pct = quest_manager.total_bonus_pct()
+=======
+    run_score = RunScore(mission_score_bonus_pct)
+    combination_engine = CombinationEngine()
+>>>>>>> birch/projectile-collision-effects
     game_state = GameStateManager()
     collision_system = CollisionSystem(PIXELS_PER_UNIT)
     spawner = SpawnerSystem(enemy_types, enemy_spawn_delay)
@@ -334,10 +367,14 @@ def main() -> None:
                     enemy_projectiles.clear()
                     renderer.reset_timer()
                     enemy_spawn_timer = 0
+<<<<<<< HEAD
                     run_elapsed_seconds = 0.0
                     enemy_scaling = EnemyScaling()
                     ability_vfx = []
                     absolute_score = LargeNumber(0)
+=======
+                    run_score = RunScore(mission_score_bonus_pct)
+>>>>>>> birch/projectile-collision-effects
                     wallet = CurrencyWallet()
                     notifications = CurrencyNotifications()
                     inventory = create_initial_inventory()
@@ -356,9 +393,9 @@ def main() -> None:
                     weapon_cooldowns = [0.0, 0.0]
                     ability_cooldowns = [0.0] * 10
                     bonuses = player_bonuses(inventory)
-                    player.max_health = player_max_health + int(bonuses["health"])
+                    player.max_health = LargeNumber(player_max_health) + bonuses["health"]
                     player.health = player.max_health
-                    applied_health_bonus=int(bonuses["health"])
+                    applied_health_bonus=bonuses["health"]
                     paused = False
                     menu_error = ""
                     upload_status = "Upload is optional; your score is not sent unless you choose Upload."
@@ -562,6 +599,8 @@ def main() -> None:
                     elif action.startswith("tab_"):
                         renderer.menu_tab = action[4:]
                         game_state.open_panel(renderer.menu_tab)
+                    elif action == "increase_difficulty":
+                        spawner.increase_difficulty()
                     elif action.startswith("upgrade_"):
                         renderer.upgrade_tab = action[8:]
                     elif action.startswith("quest_lock:"):
@@ -693,11 +732,15 @@ def main() -> None:
                     if float(effect["remaining"]) > dt
                 ]
                 bonuses=player_bonuses(inventory)
+<<<<<<< HEAD
                 relic_summary = relic_effect_summary(inventory)
                 current_health_bonus=int(bonuses["health"])
+=======
+                current_health_bonus=bonuses["health"]
+>>>>>>> birch/projectile-collision-effects
                 if current_health_bonus != applied_health_bonus:
-                    player.max_health=player_max_health+current_health_bonus
-                    player.health=max(0,min(player.max_health,player.health+current_health_bonus-applied_health_bonus))
+                    player.max_health=LargeNumber(player_max_health)+current_health_bonus
+                    player.health=max(LargeNumber(0),min(player.max_health,player.health+current_health_bonus-applied_health_bonus))
                     applied_health_bonus=current_health_bonus
                 weapon_cooldowns=[max(0.0,value-dt) for value in weapon_cooldowns]
                 ability_cooldowns=[max(0.0,value-dt) for value in ability_cooldowns]
@@ -767,8 +810,12 @@ def main() -> None:
                     if fire_position is None or weapon_cooldowns[slot_index]>0:
                         continue
                     player_angle=get_player_rotation(fire_position,renderer.screen_width,renderer.screen_height)
+                    combined_weapon = (
+                        combination_engine.evaluate_inventory(inventory, str(weapon_id))
+                        if weapon is not None else None
+                    )
                     projectile,cooldown,_=projectile_for_weapon(
-                        player,player_angle,weapon,slot_index,bullet_types,
+                        player,player_angle,combined_weapon,slot_index,bullet_types,
                         bullet_base_speed,bonuses["damage_pct"])
                     bullets.append(projectile)
                     weapon_cooldowns[slot_index]=cooldown
@@ -801,7 +848,8 @@ def main() -> None:
 
                 # Get player movement
                 player_dx, player_dy = renderer.get_movement()
-                player.move(player_dx, player_dy, dt,1+bonuses["speed_pct"]/100)
+                speed_multiplier = player_speed_multiplier(bonuses["speed_pct"])
+                player.move(player_dx, player_dy, dt, speed_multiplier)
 
                 # Update bullets
                 despawn_distance = (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT) * 1.5
@@ -810,6 +858,7 @@ def main() -> None:
                     if not bullet.should_despawn(player.x, player.y, despawn_distance)
                 ]
                 for bullet in bullets:
+                    bullet.steer_towards(enemies, dt)
                     bullet.move(dt)
 
                 # Update enemies
@@ -860,6 +909,7 @@ def main() -> None:
                     enemies,
                     enemy_types,
                 )
+<<<<<<< HEAD
                 for _enemy in [*ability_kills, *collision_system.killed_enemies]:
                     if not _enemy.reward_eligible:
                         continue
@@ -873,6 +923,13 @@ def main() -> None:
                         )
                     else:
                         currency, amount = wallet.reward_for_kill(luck=bonuses["luck"])
+=======
+                for _enemy in collision_system.killed_enemies:
+                    run_score.award(LargeNumber(10) * _enemy.reward_multiplier)
+                    currency, amount = wallet.reward_for_kill(
+                        luck=bonuses["luck"], reward_multiplier=_enemy.reward_multiplier
+                    )
+>>>>>>> birch/projectile-collision-effects
                     notifications.add(currency, amount)
                     quest_manager.register_kill(getattr(_enemy, "type", None))
                     award_enemy_kill(
@@ -907,19 +964,32 @@ def main() -> None:
                 )
 
                 # Prepare game state for rendering
+<<<<<<< HEAD
                 settings.mission_score_bonus_pct = quest_manager.total_bonus_pct()
                 relic_summary = relic_effect_summary(inventory)
+=======
+                preview = (
+                    _combination_preview(combination_engine, inventory, renderer.selected_base_id)
+                    if renderer.menu_tab == "upgrades" and renderer.upgrade_tab == "combination"
+                    else None
+                )
+>>>>>>> birch/projectile-collision-effects
                 game_state_dict = {
                     "player": player,
                     "bullets": bullets,
                     "enemy_projectiles": enemy_projectiles,
                     "enemies": enemies,
                     "enemy_types": enemy_types,
+<<<<<<< HEAD
                     "absolute_score": absolute_score,
                     "total_score": absolute_score.scale_by_percent(settings.mission_score_bonus_pct),
                     "infinity_milestone_reached": has_reached_infinity_milestone(
                         absolute_score.scale_by_percent(settings.mission_score_bonus_pct)
                     ),
+=======
+                    "absolute_score": str(run_score.base_score),
+                    "total_score": str(run_score.total_score),
+>>>>>>> birch/projectile-collision-effects
                     "currency": wallet.amounts,
                     "notifications": notifications.items,
                     "paused": paused,
@@ -931,14 +1001,19 @@ def main() -> None:
                     "next_level_exp": progress.exp_to_next_level,
                     "total_experience": progress.total_exp,
                     "luck": bonuses["luck"],
+<<<<<<< HEAD
                     "speed": 1 + bonuses["speed_pct"] / 100,
                     "run_elapsed_ms": int(run_elapsed_seconds * 1000),
                     "threat_level": enemy_scaling.threat_level,
                     "enemy_scale": enemy_scaling.multiplier(run_elapsed_seconds).to_eng_string(),
+=======
+                    "speed": speed_multiplier,
+>>>>>>> birch/projectile-collision-effects
                     "weapon_cooldowns": weapon_cooldowns,
                     "ability_cooldowns": ability_cooldowns,
                     "ability_vfx": ability_vfx,
                     "spawn_catalog": spawn_catalog,
+<<<<<<< HEAD
                     "bazaar": _bazaar_view_state(
                         bazaar_manager,
                         inventory,
@@ -954,6 +1029,11 @@ def main() -> None:
                     "relics": relic_summary["items"],
                     "relic_summary": relic_summary["summary"],
                     "armor_set_status": armor_set_status(inventory),
+=======
+                    "difficulty_level": spawner.difficulty_level,
+                    "active_scaling_time": spawner.scaling.active_time_seconds,
+                    "combined_item": preview,
+>>>>>>> birch/projectile-collision-effects
                 }
 
                 renderer.draw(game_state_dict)
@@ -985,6 +1065,7 @@ def main() -> None:
                 })
             elif game_state.is_playing():
                 bonuses=player_bonuses(inventory)
+<<<<<<< HEAD
                 settings.mission_score_bonus_pct = quest_manager.total_bonus_pct()
                 relic_summary = relic_effect_summary(inventory)
                 total_score = absolute_score.scale_by_percent(settings.mission_score_bonus_pct)
@@ -1013,6 +1094,22 @@ def main() -> None:
                                "quests": quest_manager.to_state(), "quest_bonus_pct": settings.mission_score_bonus_pct,
                                "relics": relic_summary["items"], "relic_summary": relic_summary["summary"],
                                "armor_set_status": armor_set_status(inventory)})
+=======
+                preview = (
+                    _combination_preview(combination_engine, inventory, renderer.selected_base_id)
+                    if renderer.menu_tab == "upgrades" and renderer.upgrade_tab == "combination"
+                    else None
+                )
+                renderer.draw({"player": player, "bullets": bullets, "enemies": enemies, "enemy_types": enemy_types,
+                               "absolute_score": str(run_score.base_score), "total_score": str(run_score.total_score), "currency": wallet.amounts,
+                               "notifications": notifications.items, "paused": paused, "actions": actions,
+                               "items":inventory.items,"active_slots":inventory.active_slots,"level":progress.level,
+                               "experience":progress.current_exp,"next_level_exp":progress.exp_to_next_level,
+                               "total_experience":progress.total_exp,"luck":bonuses["luck"],"speed":player_speed_multiplier(bonuses["speed_pct"]),
+                               "weapon_cooldowns":weapon_cooldowns,"ability_cooldowns":ability_cooldowns,"spawn_catalog":spawn_catalog,
+                               "difficulty_level":spawner.difficulty_level,"active_scaling_time":spawner.scaling.active_time_seconds,
+                               "combined_item":preview})
+>>>>>>> birch/projectile-collision-effects
 
     finally:
         if game_state.is_playing():

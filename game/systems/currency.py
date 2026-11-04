@@ -6,6 +6,7 @@ precision loss or overflow.
 import math
 import random
 
+<<<<<<< HEAD
 from game.systems.numbers import LargeNumber
 
 from .game_definitions import load_currencies
@@ -52,6 +53,27 @@ class CurrencyWallet:
             amount = LargeNumber(rng.randint(3, 7))
             currency = "Copper"
         self.amounts[currency] = self.amounts.get(currency, LargeNumber(0)) + amount
+=======
+from game.utils.large_number import LargeNumber
+
+
+class CurrencyWallet:
+    def __init__(self):
+        self.amounts = {"Copper": LargeNumber(0), "Gold": LargeNumber(0)}
+
+    def reward_for_kill(self, rng=random, luck: LargeNumber | int | float | str = 0.0,
+                        reward_multiplier: LargeNumber | int | float | str = 1) -> tuple[str, LargeNumber]:
+        luck_value = LargeNumber(luck)
+        if luck_value <= 0:
+            gold_chance = 0.08
+        elif luck_value >= 84:
+            gold_chance = 0.5
+        else:
+            gold_chance = 0.08 + luck_value.to_float() * 0.005
+        currency, base_amount = ("Gold", 1) if rng.random() < gold_chance else ("Copper", rng.randint(3, 7))
+        amount = LargeNumber(base_amount) * LargeNumber(reward_multiplier)
+        self.amounts[currency] = self.amounts.get(currency, 0) + amount
+>>>>>>> birch/projectile-collision-effects
         return currency, amount
 
     def reward_for_enemy(
