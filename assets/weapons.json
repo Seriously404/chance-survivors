@@ -102,7 +102,9 @@
       "type": "weapon",
       "rarity": "rare",
       "level": 1,
-      "tags": ["sniper"],
+      "tags": [
+        "sniper"
+      ],
       "stats": {
         "bullet_type": "heavy_shot",
         "damage": 22,
@@ -176,7 +178,10 @@
         "pellet_range": 8,
         "element": "fire"
       },
-      "description": "A fire shotgun that fires 6 pellets with burn effects."
+      "description": "Fire six spreading fire pellets. Each leaves a short fire trail that damages enemies inside it for up to two seconds.",
+      "tags": [
+        "trail:fire"
+      ]
     },
     {
       "id": "homing-devastator",
@@ -194,6 +199,29 @@
         "element": "arcane"
       },
       "description": "An alien weapon with homing bullets that track enemies."
+    },
+    {
+      "id": "engineer-repair-gun",
+      "name": "Patchwork Repair Gun",
+      "type": "weapon",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "script": "repair_gun",
+        "repair": true,
+        "repair_fraction": 0.025,
+        "bullet_type": "repair",
+        "damage": 0,
+        "cooldown": 0.45,
+        "speed_modifier": 3,
+        "piercing": 0,
+        "element": "nature"
+      },
+      "tags": [
+        "engineering_support"
+      ],
+      "description": "Engineer mode: Fire green repair bolts at the relay or placed defenses. Each bolt restores 2.5% maximum building health before upgrades, capped at 8%. Healing bonuses apply. Never damages enemies, never repairs destroyed structures, and misses consume no currency.",
+      "engineer_only": true
     }
   ]
 }

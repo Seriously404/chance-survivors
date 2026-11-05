@@ -9,6 +9,7 @@ from game.systems.bazaar import BazaarManager, RARITY_ORDER
 from game.systems.currency import CurrencyWallet
 from game.systems.inventory import Inventory, RARITY_COMBINATION_SLOTS
 from game.systems.numbers import LargeNumber
+from game.systems.liquidation import BASIS_KEY, paid_value_gold, record_investment
 
 
 class BazaarService:
@@ -77,6 +78,7 @@ class BazaarService:
         cost = self.manager.rarity_upgrade_cost(item)
         self._require_funds(wallet, cost)
         staged = deepcopy(item)
+        record_investment(staged, {self.CURRENCY: cost})
         self.manager.upgrade_rarity(staged, luck=luck, currency_cost=cost)
         self._spend(wallet, cost)
         original_rarity = item.get("rarity")
@@ -102,6 +104,7 @@ class BazaarService:
         cost = self.manager.level_upgrade_cost(item)
         self._require_funds(wallet, cost)
         staged = deepcopy(item)
+        record_investment(staged, {self.CURRENCY: cost})
         self.manager.upgrade_level(staged, currency_cost=cost)
         self._spend(wallet, cost)
         item.clear()
@@ -114,7 +117,7 @@ class BazaarService:
         wallet: CurrencyWallet,
         inventory: Inventory,
         trader_bonus: float = 0.0,
-    ) -> int:
+    ) -> LargeNumber:
         item = self._owned_item(inventory, item_id)
         if any(item_id in slots for slots in inventory.active_slots.values()):
             raise ValueError("Unequip this item before selling it.")
@@ -156,6 +159,7 @@ class BazaarService:
         costs: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         item = deepcopy(definition)
+        item["definition_id"] = definition.get("definition_id", definition.get("id"))
         item.setdefault("base_rarity", item.get("rarity", "common"))
         item["id"] = item_id
         rarity = str(item.get("rarity", "common")).lower()
@@ -165,6 +169,7 @@ class BazaarService:
                         * RARITY_COMBINATION_SLOTS[rarity])
         item.setdefault("status", "normal")
         charges = costs or {currency: cost}
+        item[BASIS_KEY] = str(paid_value_gold(charges))
         original_amounts = deepcopy(wallet.amounts)
         original_items = deepcopy(inventory.items)
         original_slots = deepcopy(inventory.active_slots)

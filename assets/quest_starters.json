@@ -1,0 +1,52 @@
+{
+  "description": "Common, non-saleable contract loan kits. These definitions are not crate or market rewards.",
+  "packages": {
+    "ability_only": ["contract-arc-bolt", "contract-arc-pulse", "contract-mending-spark"],
+    "fire_only": ["contract-fire-bolt", "contract-flame-ring", "contract-mending-spark"],
+    "sentry_only": ["contract-scout-sentry", "contract-field-turret"]
+  },
+  "items": [
+    {
+      "id": "contract-arc-bolt", "name": "Contract Arc Bolt", "role": "primary",
+      "description": "A contract's repeatable attack: fire a single arcane bolt for 12 damage every 0.75 seconds. Aim and release its ability key. Replaces weaker basic bolts in your active slots; no sale value.",
+      "tags": ["elemental", "arcane"],
+      "stats": {"script": "projectile", "cast_type": "projectile", "element": "arcane", "cast_damage": 12, "cooldown": 0.75, "cast_speed_modifier": 3}
+    },
+    {
+      "id": "contract-fire-bolt", "name": "Contract Fire Bolt", "role": "primary",
+      "description": "A pyromancer's repeatable attack: fire one bolt for 12 fire damage every 0.75 seconds. Replaces weaker basic bolts in your active slots. Pair it with Flame Ring for groups; no sale value.",
+      "tags": ["elemental", "fire"],
+      "stats": {"script": "projectile", "cast_type": "projectile", "element": "fire", "cast_damage": 12, "cooldown": 0.75, "cast_speed_modifier": 3}
+    },
+    {
+      "id": "contract-arc-pulse", "name": "Contract Arc Pulse", "role": "area",
+      "description": "Release a close-range arcane pulse for 14 damage to every enemy within 0.85 world units. Its five-second cooldown makes it a crowd answer alongside your frequent bolt; no sale value.",
+      "tags": ["elemental", "arcane", "area"],
+      "stats": {"script": "nova", "cast_type": "nova", "element": "arcane", "cast_damage": 14, "cooldown": 5, "cast_radius": 0.85}
+    },
+    {
+      "id": "contract-flame-ring", "name": "Contract Flame Ring", "role": "area",
+      "description": "Release a ring around yourself for 14 fire damage to enemies within 0.85 world units. Use its five-second cooldown for groups while Fire Bolt handles distant targets; no sale value.",
+      "tags": ["elemental", "fire", "area"],
+      "stats": {"script": "nova", "cast_type": "nova", "element": "fire", "cast_damage": 14, "cooldown": 5, "cast_radius": 0.85}
+    },
+    {
+      "id": "contract-mending-spark", "name": "Contract Mending Spark", "role": "healing",
+      "description": "Restore 12 health with a seven-second cooldown. Casting at full health spends no cooldown. This defensive skill is allowed in Spellbound and Trial by Fire; no sale value.",
+      "tags": ["healing"],
+      "stats": {"script": "heal", "cast_type": "heal", "heal_amount": 12, "cooldown": 7}
+    },
+    {
+      "id": "contract-scout-sentry", "name": "Contract Scout Sentry", "role": "mobile_sentry",
+      "description": "Deploy a moving sentry for 18 seconds. It follows you and fires 12-damage light shots once per second. Its twenty-second cooldown overlaps Field Turret so a single expired summon does not end your offense; no sale value.",
+      "tags": ["sentry", "light"],
+      "stats": {"script": "sentinel", "cast_type": "sentinel", "element": "light", "summon_damage": 12, "summon_duration": 18, "cooldown": 20}
+    },
+    {
+      "id": "contract-field-turret", "name": "Contract Field Turret", "role": "fixed_turret",
+      "description": "Deploy a stationary turret for 22 seconds. It fires 14-damage arcane shots once per second and can be redeployed every 24 seconds. Alternate its placement with Scout Sentry and keep moving; no sale value.",
+      "tags": ["turret", "arcane"],
+      "stats": {"script": "turret", "cast_type": "turret", "element": "arcane", "summon_damage": 14, "summon_duration": 22, "cooldown": 24}
+    }
+  ]
+}

@@ -14,6 +14,7 @@ from typing import Any
 
 from game.systems.inventory import RARITY_COMBINATION_SLOTS
 from game.systems.json_loader import load_abilities, load_armor, load_weapons, load_relics
+from game.systems.liquidation import sell_quote
 
 RARITY_ORDER = [
     "common",
@@ -26,7 +27,7 @@ RARITY_ORDER = [
 ]
 
 RARITY_TIER = {rarity: index for index, rarity in enumerate(RARITY_ORDER)}
-CRATE_LUCK_REQUIREMENTS = (0, 0, 1, 4, 10, 25, 60)
+CRATE_LUCK_REQUIREMENTS = (0, 0, 4, 12, 35, 100, 250)
 
 
 @dataclass(frozen=True)
@@ -165,6 +166,7 @@ class BazaarManager:
         self.elapsed_seconds = 0.0
         self.daily_cycle = 0
         self.current_crate_cycle = -1
+        self.engineer_available = False
         self.refresh_crates(0)
 
     def refresh_crates(self, elapsed_seconds: float) -> None:
@@ -294,12 +296,10 @@ class BazaarManager:
 
     def catalog_price(self, item: dict[str, Any]) -> int:
         rank = self.rarity_rank(item.get("rarity", "common"))
-        return (rank + 1) * 100 + _validated_level(item) * 25
+        return max(125, (rank + 1) ** 3 * 45 + _validated_level(item) * 25)
 
-    def sell_value(self, item: dict[str, Any], *, trader_bonus: float = 0.0) -> int:
-        rarity_index = self.rarity_rank(item.get("rarity", "common"))
-        base = 5 + rarity_index * 10 + _validated_level(item) * 4
-        return int(base * (1.0 + float(trader_bonus)))
+    def sell_value(self, item: dict[str, Any], *, trader_bonus: float = 0.0):
+        return sell_quote(item, trader_bonus)
 
     def roll_crate(
         self,
@@ -329,7 +329,7 @@ class BazaarManager:
                 weights.append(0.0)
                 continue
             weight = 1.0 / (1.0 + abs(rank - bias) * 2.0)
-            weight *= 1.0 + rank * min(luck, 100.0) * 0.025
+            weight *= (0.35 ** rank) * (1.0 + rank * math.log1p(min(luck, 1e300)) * .1)
             if item.get("stats", {}).get("script") == "teleport":
                 weight *= 0.08
             weights.append(weight)
@@ -341,6 +341,7 @@ class BazaarManager:
         items = [item for item in self.catalog
                  if item.get("type") in ("weapon", "armor", "ability")
                  and not item.get("fusion_only", False)
+                and (not item.get("engineer_only", False) or self.engineer_available)
                  and self.rarity_rank(item.get("rarity", "common")) <= rarity_cap
                  and (not crate.element or item.get("stats", {}).get("element") == crate.element
                       or item.get("element") == crate.element)]

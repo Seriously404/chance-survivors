@@ -6,6 +6,7 @@ import pygame
 
 from client.input import InputHandler
 from client.tutorial import INTRO_PAGES
+from client.ui_guidance import GuidanceUI
 from game.systems.elements import ELEMENTS, element_label, normalize_element
 from game.systems.enemy_visibility import enemy_visibility_alpha
 from game.utils.large_number import LargeNumber
@@ -14,7 +15,7 @@ from game.systems.bazaar import RARITY_ORDER
 from game.systems.currency import CURRENCY_DEFINITIONS
 
 
-class Renderer:
+class Renderer(GuidanceUI):
     """Handles all rendering and display operations."""
 
     def __init__(self, screen_width: int, screen_height: int, pixels_per_unit: int):
@@ -98,7 +99,10 @@ class Renderer:
         self._frame_dt = 1 / 60
         self._camera = None
         self._enemy_health_seen = {}
+        self._enemy_crits_seen = {}
         self._damage_feedback = []
+        self._player_health_seen = None
+        self._damage_flash_remaining = 0.0
         self.codex_tab = 'guide'
         self.intro_page = 0
         self.codex_page = 0
@@ -122,6 +126,9 @@ class Renderer:
         """
         running, shots, actions = self.input_handler.process_events(
             self.mode, self._name_entry)
+        captured = self._guidance_input(running, shots, actions)
+        if captured is not None:
+            return captured
         if self._tutorial_capture and (self.input_handler.click_release is not None
                                        or self.input_handler.drag_release is not None):
             self.input_handler.click_release = None
@@ -266,11 +273,21 @@ class Renderer:
             self.input_handler.drag_release = None
             self._drag_item_id = None
         for action in actions:
-            if action == "codex_detail_prev":
+            if action == "context_help":
+                self._context_help_key = self._menu_help_key()
+                self._context_help_page = 0
+            elif action == "codex_detail_prev":
                 self.codex_detail_page = max(0, self.codex_detail_page - 1)
             elif action == "codex_detail_next":
                 self.codex_detail_page += 1
-            elif action.startswith(("codex_select:", "codex_tab:")):
+            elif self.mode == "CODEX" and action in ("inventory_up", "inventory_down"):
+                direction = -1 if action == "inventory_up" else 1
+                if self.input_handler.mouse_position[0] >= 350:
+                    self.codex_detail_page = max(0, self.codex_detail_page + direction)
+                else:
+                    actions.append("codex_prev" if direction < 0 else "codex_next")
+            elif (action.startswith(("codex_select:", "codex_tab:"))
+                  or action in ("codex_prev", "codex_next")):
                 self.codex_detail_page = 0
             elif action == "fusion_codex":
                 self.fusion_codex = not self.fusion_codex
@@ -361,12 +378,18 @@ class Renderer:
                 self._rarity_pool = {}
             elif action.startswith("select:"):
                 self.selected_item_id = action.split(":", 1)[1]
+                self.bazaar_detail_scroll = 0
                 if (self.panel and self.menu_tab == "combination"
                         and self.upgrade_tab == "combination" and not dragged_this_frame):
                     item = next((entry for entry in getattr(self, "_last_state", {}).get("items", [])
                                  if str(entry.get("id")) == self.selected_item_id), None)
                     if item and item.get("type") in ("armor", "weapon", "ability"):
                         self.selected_base_id = self.selected_item_id
+            elif action in ("inventory_up", "inventory_down") and not self.panel:
+                direction = -1 if action == "inventory_up" else 1
+                rect = self._scroll_regions.get("hud_currency")
+                if rect and rect.collidepoint(self.input_handler.mouse_position):
+                    self.currency_offset = max(0, self.currency_offset + direction)
             elif action in ("inventory_up", "inventory_down") and self.panel:
                 direction = -1 if action == "inventory_up" else 1
                 self._scroll_at(self.input_handler.mouse_position, direction)
@@ -450,7 +473,10 @@ class Renderer:
         self.start_time = pygame.time.get_ticks()
         self._camera = None
         self._enemy_health_seen.clear()
+        self._enemy_crits_seen.clear()
         self._damage_feedback.clear()
+        self._player_health_seen = None
+        self._damage_flash_remaining = 0.0
 
     # -------------------------
     # Coordinate conversion
@@ -472,6 +498,12 @@ class Renderer:
         camera = self._camera or (player_x, player_y)
         x, y = self.world_to_screen(player_x, player_y, *camera)
         return math.atan2(y - mouse_position[1], mouse_position[0] - x)
+
+    def cursor_world(self, player_x, player_y):
+        camera_x, camera_y = self._camera or (player_x, player_y)
+        x, y = self.get_mouse_position()
+        return (camera_x + (x - self.screen_width / 2) / self.pixels_per_unit,
+                camera_y - (y - self.screen_height / 2) / self.pixels_per_unit)
 
     # -------------------------
     # Rendering
@@ -501,7 +533,7 @@ class Renderer:
                 2
             )
 
-    def draw_player(self, angle, health, max_health, position=None):
+    def draw_player(self, angle, health, max_health, position=None, shield=0):
         player_size = 30
 
         player_surface = pygame.Surface(
@@ -535,6 +567,8 @@ class Renderer:
 
         rect = rotated.get_rect(center=(center_x, center_y))
         self.screen.blit(rotated, rect)
+        if LargeNumber(shield) > 0:
+            pygame.draw.circle(self.screen, (115, 205, 250), (int(center_x), int(center_y)), player_size // 2 + 7, 2)
 
         # Only show the player's healthbar when damaged
         if health < max_health:
@@ -584,20 +618,47 @@ class Renderer:
                 self.draw_health_bar(
                     rect.centerx, rect.top - 9, enemy.health, enemy.max_health)
 
+    def _draw_player_damage_feedback(self, player):
+        health = LargeNumber(player.health)
+        if self._player_health_seen is not None and health < self._player_health_seen:
+            self._damage_flash_remaining = .3
+        self._player_health_seen = health
+        self._damage_flash_remaining = max(0.0, self._damage_flash_remaining - self._frame_dt)
+        if self._damage_flash_remaining:
+            strength = self._damage_flash_remaining / .3
+            color = (round(110 + 100 * strength), 35, 40)
+            pygame.draw.rect(self.screen, color, self.screen.get_rect(), max(2, round(6 * strength)))
+
+    def _draw_defeat_feedback(self, effects, camera_x, camera_y):
+        """Render a bounded world-space pulse for confirmed enemy defeats."""
+        for effect in effects[-64:]:
+            if effect["remaining"] <= 0:
+                continue
+            x, y = self.world_to_screen(effect["x"], effect["y"], camera_x, camera_y)
+            progress = max(0.0, min(1.0, 1 - effect["remaining"] / .35))
+            radius = max(2, int(5 + 18 * progress))
+            color = tuple(round(value * (1 - progress * .65)) for value in (210, 235, 155))
+            pygame.draw.circle(self.screen, color, (int(x), int(y)), radius, 2)
+
     def _draw_damage_feedback(self, enemies, camera_x, camera_y):
         """Show short, bounded damage popups without affecting simulation."""
         current = {}
+        current_crits = {}
         for enemy in enemies:
             key = id(enemy)
             health = LargeNumber(enemy.health)
+            critical_count = getattr(enemy, "critical_hit_count", 0)
             previous = self._enemy_health_seen.get(key)
             if previous is not None and health < previous:
                 self._damage_feedback.append({
                     "x": enemy.x, "y": enemy.y, "amount": previous - health,
                     "remaining": 0.7,
+                    "critical": critical_count > self._enemy_crits_seen.get(key, 0),
                 })
             current[key] = health
+            current_crits[key] = critical_count
         self._enemy_health_seen = current
+        self._enemy_crits_seen = current_crits
         self._damage_feedback = self._damage_feedback[-50:]
         remaining = []
         for effect in self._damage_feedback:
@@ -607,7 +668,10 @@ class Renderer:
             remaining.append(effect)
             x, y = self.world_to_screen(effect["x"], effect["y"], camera_x, camera_y)
             age = 0.7 - effect["remaining"]
-            label = self.font.render(str(effect["amount"]), True, (255, 225, 145))
+            critical = effect.get("critical", False)
+            text = ("CRIT " if critical else "") + str(effect["amount"])
+            color = (255, 150, 80) if critical else (255, 225, 145)
+            label = self.font.render(text, True, color)
             label.set_alpha(max(0, min(255, int(effect["remaining"] / 0.7 * 255))))
             self.screen.blit(label, label.get_rect(center=(int(x), int(y - 30 - age * 25))))
         self._damage_feedback = remaining
@@ -662,7 +726,20 @@ class Renderer:
         origin = (int(center[0]), int(center[1]))
         mouse = self.input_handler.mouse_position
         angle = math.atan2(mouse[1]-origin[1], mouse[0]-origin[0])
-        if script == "teleport":
+        if script in {"wall", "arc_turret", "flame_turret", "frost_turret", "turret"}:
+            max_distance = self.pixels_per_unit * 3.5
+            distance = min(max_distance, math.hypot(mouse[0] - origin[0], mouse[1] - origin[1]))
+            target = (round(origin[0] + math.cos(angle) * distance),
+                      round(origin[1] + math.sin(angle) * distance))
+            color = (120, 235, 185)
+            pygame.draw.line(self.screen, color, origin, target, 1)
+            preview = pygame.Rect(target[0] - 16, target[1] - 12, 32, 24)
+            pygame.draw.rect(self.screen, color, preview, 2, border_radius=3)
+            self._text("Release to deploy", (preview.x - 30, preview.bottom + 6))
+        elif script in {"repair_pulse", "overclock", "architect_protocol"}:
+            pygame.draw.circle(self.screen, (100, 225, 190), origin,
+                               round(3.5 * self.pixels_per_unit), 2)
+        elif script == "teleport":
             distance = item_stat(item, "teleport_range",
                                  5) * self.pixels_per_unit
             dest = (int(origin[0]+math.cos(angle)*distance),
@@ -830,6 +907,9 @@ class Renderer:
             surface = self.font.render(text, True, (235, 240, 236))
             self.screen.blit(surface, surface.get_rect(
                 center=(center_x, 138 + index * 28)))
+        if state.get('end_reason'):
+            label = self.font.render(state['end_reason'], True, (240, 185, 125))
+            self.screen.blit(label, label.get_rect(center=(center_x, 212)))
         if state.get("infinity_milestone_reached", False):
             milestone = self.font.render(
                 "INFINITY MILESTONE REACHED - SCORE IS FINITE",
@@ -925,8 +1005,10 @@ class Renderer:
             self.codex_page = max(0, min(self.codex_page, len(INTRO_PAGES) - 1))
             heading, lines = INTRO_PAGES[self.codex_page]
             self._text(f"{heading}  ·  {self.codex_page + 1}/{len(INTRO_PAGES)}", (25, 65))
-            for index, line in enumerate(lines):
-                self._text(line, (25, 90 + index * 30))
+            rows = [(line, None) for text in lines
+                    for line in self._codex_wrap(text, self.screen_width - 50)]
+            self._draw_codex_rows(rows, 25, 95, self.screen_width - 50,
+                                  navigation_center=self.screen_width - 200)
             self._button('codex_prev', 'Previous', (95, self.screen_height-25), 130, 30)
             self._button('codex_next', 'Next', (255, self.screen_height-25), 130, 30)
             pygame.display.flip()
@@ -939,6 +1021,8 @@ class Renderer:
         start = self.codex_page*page_size
         for index, entry in enumerate(entries[start:start+page_size]):
             name = entry.get('name', 'Item')
+            while name and self.font.size(name)[0] > 280:
+                name = name[:-2] + '…'
             self._button(f'codex_select:{start+index}',
                          name, (175, 85+index*32), 300, 29)
         self._button('codex_prev', 'Previous',
@@ -956,65 +1040,68 @@ class Renderer:
                 self._draw_item_tooltip({})
                 pygame.display.flip()
                 return
-            self._text(entry.get('name', 'Item'), (x, y))
-            y += 25
-            lines = [entry.get('description', '')]
+            lines = [entry.get('name', 'Item'), entry.get('description', '')]
             if self.codex_tab == 'items':
                 lines += [
                     f"Type: {entry.get('type', '')}  |  Base rarity: {entry.get('rarity', '')}"]
             elif self.codex_tab == 'fusions':
                 lines += ['Requires: ' + ', '.join(entry.get('required_elements') or entry.get('required_types', [])),
                           f"Unlock level: {entry.get('unlock_level', 1)}"]
-            max_width = self.screen_width-x-20
-            for line in lines:
-                words = str(line).split()
-                current = ''
-                for word in words:
-                    candidate = (current + ' ' + word).strip()
-                    if current and self.font.size(candidate)[0] > max_width:
-                        self._text(current, (x, y))
-                        y += 20
-                        current = word
-                    else:
-                        current = candidate
-                if current:
-                    self._text(current, (x, y))
-                    y += 24
+            max_width = self.screen_width - x - 20
+            rows = [(line, None) for text in lines
+                    for line in self._codex_wrap(text, max_width - 8)]
+            self._draw_codex_rows(rows, x, y, max_width)
         pygame.display.flip()
 
+    def _codex_wrap(self, text, width):
+        """Wrap descriptions, including a single word wider than the panel."""
+        def text_width(value):
+            return self._currency_text_surface(value, (240, 240, 245)).get_width()
+
+        rows = []
+        line = ""
+        for word in str(text).split():
+            while word and text_width(word) > width:
+                if line:
+                    rows.append(line)
+                    line = ""
+                end = len(word)
+                while end > 1 and text_width(word[:end]) > width:
+                    end -= 1
+                rows.append(word[:end])
+                word = word[end:]
+            candidate = f"{line} {word}".strip()
+            if line and text_width(candidate) > width:
+                rows.append(line)
+                line = word
+            else:
+                line = candidate
+        if line:
+            rows.append(line)
+        return rows
+
     def _draw_codex_crate_details(self, entry, x, y):
-        """Paginate complete crate descriptions and the exact luck-one reward odds."""
+        """Show complete rewards using the same weighted odds as crate purchase."""
         right = self.screen_width - 18
         width = right - x
         rows = []
 
         def add_wrapped(text):
-            line = ""
-            for word in str(text).split():
-                while word and self.font.size(word)[0] > width - 8:
-                    if line:
-                        rows.append((line, None))
-                        line = ""
-                    end = len(word)
-                    while end > 1 and self.font.size(word[:end])[0] > width - 8:
-                        end -= 1
-                    rows.append((word[:end], None))
-                    word = word[end:]
-                candidate = f"{line} {word}".strip()
-                if line and self.font.size(candidate)[0] > width - 8:
-                    rows.append((line, None))
-                    line = word
-                else:
-                    line = candidate
-            if line:
-                rows.append((line, None))
+            rows.extend((line, None) for line in self._codex_wrap(text, width - 8))
 
+        # Keep the preview context visible on every page, even late reward pages.
+        luck = entry.get('preview_luck', 1)
+        context = f"Title preview · luck {luck:g} · live build odds may differ"
+        for line in self._codex_wrap(context, width - 8):
+            self._text(line, (x, y))
+            y += 22
         add_wrapped(entry.get('name', 'Crate'))
         add_wrapped(entry.get('description', ''))
         add_wrapped("Cost: " + ", ".join(f"{value} {name}" for name, value
                                          in entry.get('costs', {}).items()))
         add_wrapped(f"Bias: {entry.get('bias', 'common')}. Availability rotates in the Bazaar.")
-        add_wrapped("Preview at luck 1; odds change with luck. Hover rewards for details.")
+        add_wrapped("All possible rewards below. Hover an item for its effects.")
+        add_wrapped("Rewards showing 0% need more luck, not more time.")
         rewards = entry.get('rewards', [])
         if not rewards:
             add_wrapped("No rewards available.")
@@ -1026,7 +1113,16 @@ class Renderer:
                 name, chance = reward
                 item = {'name': name, 'type': 'item', 'rarity': 'common'}
             percentage = f"{chance * 100:.3g}%" if chance else "0%"
-            rows.append(((str(item.get('name', 'Item')), percentage), item))
+            name_lines = self._codex_wrap(item.get('name', 'Item'),
+                                          width - 35 - self.font.size(percentage)[0])
+            for index, line in enumerate(name_lines):
+                rows.append(((line, percentage if index == 0 else ''), item))
+
+        self._draw_codex_rows(rows, x, y, width)
+
+    def _draw_codex_rows(self, rows, x, y, width, navigation_center=None):
+        """Paginate complete text and item rows within the available viewport."""
+        right = x + width
 
         row_height = 24
         visible = max(1, (self.screen_height - y - 60) // row_height)
@@ -1043,16 +1139,12 @@ class Renderer:
                 self._draw_rarity_icon(item, icon)
                 self._register_item_hover(pygame.Rect(x, line_y, width, 22), item)
                 name, percentage = label
-                max_label_width = width - 35 - self.font.size(percentage)[0]
-                truncated = False
-                while name and self.font.size(name + ('…' if truncated else ''))[0] > max_label_width:
-                    name, truncated = name[:-1], True
-                self._text(name + ('…' if truncated else ''), (x + 25, line_y + 2))
+                self._text(name, (x + 25, line_y + 2))
                 self._text(percentage, (right - self.font.size(percentage)[0] - 3, line_y + 2))
             else:
                 self._text(label, (x, line_y + 2))
         self.screen.set_clip(prior_clip)
-        center = x + width // 2
+        center = navigation_center if navigation_center is not None else x + width // 2
         self._button('codex_detail_prev', 'Previous', (center - 125, self.screen_height - 25), 105, 30)
         self._text(f'{self.codex_detail_page + 1} / {pages}', (center - 18, self.screen_height - 33))
         self._button('codex_detail_next', 'Next', (center + 125, self.screen_height - 25), 105, 30)
@@ -1123,6 +1215,9 @@ class Renderer:
         """
         self._last_state = state
         self.screen.fill((30, 30, 30))
+        if self._draw_main_quest_choice(state.get("main_quest_choice")):
+            pygame.display.flip()
+            return
 
         if self.panel:
             self._draw_game_menu(state)
@@ -1130,6 +1225,7 @@ class Renderer:
             self._draw_drag_ghost(state)
             self._draw_notifications(state)
             self._draw_run_tutorial(state.get("tutorial"))
+            self._draw_context_help()
             pygame.display.flip()
             return
 
@@ -1148,7 +1244,7 @@ class Renderer:
             player.x, player.y, camera_x, camera_y)
         self.draw_grid(camera_x, camera_y)
         self.draw_player(player.angle, player.health,
-                         player.max_health, player_screen)
+                         player.max_health, player_screen, player.shield)
         self.draw_bullets(bullets, camera_x, camera_y)
         self.draw_enemy_projectiles(
             state.get("enemy_projectiles", []),
@@ -1162,13 +1258,19 @@ class Renderer:
             pygame.draw.circle(self.screen, color, (int(x), int(y)), max(
                 2, int(self.pixels_per_unit * .12)), 2)
         for ally in state.get("summons", []):
+            if getattr(ally, "structure_kind", "summon") != "summon":
+                continue
             x, y = self.world_to_screen(ally.x, ally.y, camera_x, camera_y)
             pygame.draw.circle(self.screen, (100, 220, 255) if ally.mobile else (
                 230, 190, 100), (int(x), int(y)), 8)
         self.draw_enemies(enemies, enemy_types, camera_x, camera_y)
+        self._draw_engineering(state.get("engineering"), camera_x, camera_y)
+        self._draw_defeat_feedback(state.get("defeat_vfx", []), camera_x, camera_y)
         self._draw_damage_feedback(enemies, camera_x, camera_y)
+        self._draw_player_damage_feedback(player)
         self._draw_ability_aim(state, player_screen)
         self._draw_game_ui(state)
+        self._draw_item_tooltip(state)
         self._draw_run_tutorial(state.get("tutorial"))
 
         pygame.display.flip()
@@ -1181,7 +1283,7 @@ class Renderer:
                            self.screen_height - 125, width, 76)
         pygame.draw.rect(self.screen, (20, 29, 35), card, border_radius=7)
         pygame.draw.rect(self.screen, (105, 195, 185), card, 2, border_radius=7)
-        self._text(f"Guide {tutorial['step']}/{tutorial['total']} · {tutorial['title']}",
+        self._text(f"Practice {tutorial['step']}/{tutorial['total']} · {tutorial['title']}",
                    (card.left + 10, card.top + 7))
         words = tutorial["text"].split()
         line = ""
@@ -1223,7 +1325,7 @@ class Renderer:
                          (0, 0, self.screen_width, 50))
         tabs = [("inventory", "Inventory"), ("quests", "Quests"), ("overview",
                                                                    "Overview"), ("combination", "Combination"), ("bazaar", "Bazaar")]
-        tab_width = min(160, (self.screen_width-112)//len(tabs))
+        tab_width = min(160, (self.screen_width-172)//len(tabs))
         for i, (key, label) in enumerate(tabs):
             active = self.menu_tab == key
             self._button(f"tab_{key}", label, (12+i *
@@ -1232,6 +1334,7 @@ class Renderer:
                 pygame.draw.line(self.screen, (225, 225, 225),
                                  (12+i*tab_width+8, 47), (12+(i+1)*tab_width-16, 47), 3)
         self._button("close_menu", "Close", (self.screen_width-48, 25), 82, 36)
+        self._button("context_help", "Help", (self.screen_width-125, 25), 58, 36)
         pygame.draw.line(self.screen, (125, 125, 125),
                          (0, 50), (self.screen_width, 50), 1)
         top = 58
@@ -1760,7 +1863,9 @@ class Renderer:
             self._text("Main quests" if kind ==
                        "main" else "Side quests (max 3 active)", (rect.left + 10, rect.top + 8))
             entries = [q for q in quests if q.get("type") == kind and q.get(
-                "status") in ("active", "available", "completed")]
+                "status") in ("active", "available", "completed")
+                and not (kind == "main" and q.get("status") == "available"
+                         and "main_quest_choice" in state)]
             if kind == "main" and any(q.get("status") == "available" for q in entries):
                 self._button("quest_decline_main", "Skip main quest",
                              (rect.right - 77, rect.top + 14), 140, 24)
@@ -1836,6 +1941,16 @@ class Renderer:
         area = outer.inflate(-16, -16)
         pygame.draw.rect(self.screen, (46, 46, 46), area, border_radius=5)
         if self.upgrade_tab == "combination":
+            progress = state.get("combination_progress")
+            if progress:
+                discovered = progress.get("discovered", 0)
+                required = progress.get("required", 3)
+                minimum = progress.get("minimum_base_level", 2)
+                self._text(f"Ability discoveries: {discovered}/{required} · Base item level {minimum}+ required",
+                           (area.x + 10, area.y + 7))
+                self._text("Combination unlocked" if progress.get("ready") else "Discover distinct abilities to unlock combinations. No waiting timer.",
+                           (area.x + 10, area.y + 26))
+                area = pygame.Rect(area.x, area.y + 48, area.width, area.height - 48)
             self._draw_combination_menu(state, area)
             return
         level = state.get("level", 1)
@@ -1980,6 +2095,7 @@ class Renderer:
 
     def _draw_combination_menu(self, state, area):
         from game.systems.combinations import CombinationEngine
+        from game.systems.combat_bonuses import combined_local_stat
         items = state.get("items", [])
         by_id = {str(item.get("id")): item for item in items}
         left = pygame.Rect(area.left+10, area.top+10,
@@ -2019,7 +2135,7 @@ class Renderer:
                              preview_rect, border_radius=4)
             pygame.draw.rect(self.screen, (100, 180, 100),
                              preview_rect, 1, border_radius=4)
-            self._text("Effective stats (updates immediately)",
+            self._text("Combined effects · live preview",
                        (preview_rect.left+10, preview_rect.top+6))
             # Get current supplements
             current_supplements = [by_id.get(str(sid))
@@ -2027,19 +2143,30 @@ class Renderer:
             current_supplements = [s for s in current_supplements if s]
             try:
                 evaluation = CombinationEngine().evaluate(base, current_supplements)
-                final_stats = evaluation.stats
-                y = preview_rect.top+26
-                for stat_name, stat_value in final_stats.items():
-                    if y + 18 > preview_rect.bottom:
-                        break
-                    self._text(f"{stat_name}: {stat_value}",
-                               (preview_rect.left+10, y))
-                    y += 18
+                lines = []
+                if evaluation.metadata.get("owned_relic_ids"):
+                    lines.append("Owned relic passives apply once.")
+                    lines.append("Special effects transfer here.")
+                for stat_name in evaluation.stats:
+                    stat_value = combined_local_stat(evaluation, stat_name)
+                    lines.append(f"{stat_name.replace('_', ' ')}: {stat_value}")
                 if any(s.get("type") == "ability" and s.get("stats", {}).get(
                         "script", s.get("stats", {}).get("cast_type")) in {"heal", "mend_ward"}
-                       for s in current_supplements) and y + 18 <= preview_rect.bottom:
-                    self._text("Heals for damage dealt",
-                               (preview_rect.left+10, y))
+                       for s in current_supplements):
+                    budget = combined_local_stat(evaluation, "heal_amount")
+                    lines.append(f"Heals actual damage dealt, up to {budget} per cast.")
+                content = pygame.Rect(preview_rect.left + 4, preview_rect.top + 25,
+                                      preview_rect.width - 8, preview_rect.height - 30)
+                lines = [row for line in lines
+                         for row in self._codex_wrap(line, content.width - 12)]
+                self._scroll_regions["combination_stats_scroll"] = content.copy()
+                visible = max(1, content.height // 18)
+                offset = self._smooth_scroll("combination_stats_scroll", max(0, len(lines) - visible))
+                previous_clip = self.screen.get_clip()
+                self.screen.set_clip(content)
+                for index in range(int(offset), min(len(lines), int(offset) + visible + 2)):
+                    self._text(lines[index], (content.left + 6, content.top + (index - offset) * 18))
+                self.screen.set_clip(previous_clip)
             except ValueError:
                 self._text("This combination is invalid.",
                            (preview_rect.left+10, preview_rect.top+26))
@@ -2507,9 +2634,22 @@ class Renderer:
             self._draw_rarity_gamble(left, selected, state)
             return
         previous_clip = self.screen.get_clip()
-        self.screen.set_clip(left.inflate(-8, -8))
-        self._draw_item_details(selected, left.left +
-                                10, left.top + 35, left.width - 20)
+        details = pygame.Rect(left.left + 8, left.top + 34, left.width - 16,
+                              max(20, left.height - 132))
+        self._scroll_regions["bazaar_detail_scroll"] = details.copy()
+        detail_width = left.width - 20
+        description_rows = len(self._codex_wrap(selected.get("description", ""), detail_width))
+        visible_stats = [key for key in selected.get("stats", {})
+                         if key not in {"element", "script", "cast_type", "bullet_type", "automatic"}]
+        height = (96 + (18 * description_rows + 4 if description_rows else 0)
+                  + 20 * len(visible_stats)
+                  + 20 * bool(selected.get("armor_slot"))
+                  + 20 * bool(selected.get("armor_set"))
+                  + 20 * bool(selected.get("stats", {}).get("element")))
+        offset = self._smooth_scroll("bazaar_detail_scroll", max(0, (height - details.height) / 20))
+        self.screen.set_clip(details)
+        self._draw_item_details(selected, left.left + 10,
+                                details.top - offset * 20, detail_width)
         self.screen.set_clip(previous_clip)
         item_id = str(selected.get("id"))
         prices = state.get("bazaar", {}).get(
@@ -2535,6 +2675,8 @@ class Renderer:
                 "wallet", {}).get("Gold", 0)
             self._text(f"{'Value' if tab == 'sell' else 'Owned / cost'}: {prices.get(price_key, 0) if tab == 'sell' else f'{wallet_gold} / {prices.get(price_key, 0)}'} Gold",
                        (left.left + 10, left.bottom - 64))
+            if tab == "sell":
+                self._text("Purchased items return a partial refund.", (left.left + 10, left.bottom - 88))
             self._button(f"{action}:{item_id}", label,
                          (left.centerx, left.bottom - 25), left.width - 20, 32)
 
@@ -2790,6 +2932,36 @@ class Renderer:
         return result_surf
 
     def _draw_game_ui(self, state):
+        """Scale the entire combat HUD proportionally with monitor resolution."""
+        physical_screen = self.screen
+        physical_width, physical_height = self.screen_width, self.screen_height
+        scale = max(1.0, min(physical_width / 800, physical_height / 450))
+        virtual_size = (round(physical_width / scale), round(physical_height / scale))
+        self._hover_slots = []
+        self._item_rects = {}
+        self._scroll_regions = {}
+        if scale == 1:
+            self._draw_game_ui_unscaled(state)
+            return
+        canvas = pygame.Surface(virtual_size, pygame.SRCALPHA)
+        try:
+            self.screen = canvas
+            self.screen_width, self.screen_height = virtual_size
+            self._draw_game_ui_unscaled(state)
+        finally:
+            self.screen = physical_screen
+            self.screen_width, self.screen_height = physical_width, physical_height
+        physical_screen.blit(pygame.transform.smoothscale(canvas, (physical_width, physical_height)), (0, 0))
+
+        def scaled(rect):
+            return pygame.Rect(round(rect.x * scale), round(rect.y * scale),
+                               round(rect.width * scale), round(rect.height * scale))
+
+        self._buttons = {key: scaled(rect) for key, rect in self._buttons.items()}
+        self._hover_slots = [(scaled(rect), item) for rect, item in self._hover_slots]
+        self._scroll_regions = {key: scaled(rect) for key, rect in self._scroll_regions.items()}
+
+    def _draw_game_ui_unscaled(self, state):
         self._buttons = {}
         if "currency_up" in state.get("actions", []):
             self.currency_offset = max(0, self.currency_offset - 1)
@@ -2831,6 +3003,7 @@ class Renderer:
             item = by_id.get(str(item_id)) if item_id else None
             pygame.draw.rect(self.screen, (105, 105, 105), rect, 2)
             if item:
+                self._register_item_hover(rect, item)
                 pygame.draw.rect(self.screen, (70, 220, 115), rect, 2)
                 self._draw_rarity_icon(item, rect.inflate(-8, -8))
                 self._draw_combo_markers(rect, item)
@@ -2845,17 +3018,19 @@ class Renderer:
                 active.get("armor", [])) else None
             item = by_id.get(str(item_id)) if item_id else None
             if item:
+                self._register_item_hover(rect, item)
                 pygame.draw.rect(self.screen, (70, 220, 115), rect, 2)
                 self._draw_rarity_icon(item, rect.inflate(-8, -8))
                 self._draw_combo_markers(rect, item)
         for i in range(2):
             rect = pygame.Rect(0, 0, 34, 34)
-            rect.topleft = (left, self.screen_height//2+20+i*38)
+            rect.topleft = (left + 42, top + 95 + i * 38)
             pygame.draw.rect(self.screen, (105, 105, 105), rect, 2)
             item_id = active.get("weapons", [])[i] if i < len(
                 active.get("weapons", [])) else None
             item = by_id.get(str(item_id)) if item_id else None
             if item:
+                self._register_item_hover(rect, item)
                 pygame.draw.rect(self.screen, (70, 220, 115), rect, 2)
                 self._draw_rarity_icon(item, rect.inflate(-8, -8))
                 self._draw_combo_markers(rect, item)
@@ -2863,6 +3038,15 @@ class Renderer:
                     rect, state.get("weapon_cooldowns", [0, 0])[i])
         self._button("pause", "Resume" if state.get("paused")
                      else "Pause", (right-60, top+18), 100, 34)
+        engineering = state.get("engineering")
+        if engineering:
+            objective = getattr(engineering, "objective", None)
+            if objective:
+                self._text(f"Core: {objective.health} / {objective.max_health}",
+                           (right - 220, top + 87))
+            self._text(f"Wave {getattr(engineering, 'wave', 1)} · "
+                       f"{getattr(engineering, 'wave_kills', 0)} / {getattr(engineering, 'wave_target', 0)}",
+                       (right - 220, top + 108))
         quest_checks = [
             quest for quest in state.get("quests", [])
             if quest.get("status") == "active"
@@ -2893,10 +3077,7 @@ class Renderer:
         for i, (name, amount) in enumerate(currency_rows[self.currency_offset:self.currency_offset+visible_currencies]):
             self._text(f"{name}: {amount}", (currency_left, clip.top+i*20))
         self.screen.set_clip(None)
-        self._button("currency_up", "▲",
-                     (currency_left+210, bottom-42), 26, 22)
-        self._button("currency_down", "▼",
-                     (currency_left+210, bottom-17), 26, 22)
+        self._scroll_regions["hud_currency"] = clip
         self._draw_notifications(state)
         if state.get("paused") or self.panel:
             title = "Paused" if state.get("paused") and not self.panel else (

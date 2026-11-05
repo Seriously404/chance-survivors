@@ -131,6 +131,19 @@ class UIRegressionTests(unittest.TestCase):
         self.assertAlmostEqual(r.aim_angle(
             (screen_pos[0]+10, screen_pos[1]), player.x, player.y), 0)
 
+    def test_critical_feedback_does_not_mark_later_normal_hits(self):
+        from game.entities.enemy import Enemy
+        r = self.renderer
+        enemy = Enemy("test", health=100)
+        r._frame_dt = .01
+        r._draw_damage_feedback([enemy], 0, 0)
+        enemy.take_damage(20, critical=True)
+        r._draw_damage_feedback([enemy], 0, 0)
+        self.assertTrue(r._damage_feedback[-1]["critical"])
+        enemy.take_damage(10)
+        r._draw_damage_feedback([enemy], 0, 0)
+        self.assertFalse(r._damage_feedback[-1]["critical"])
+
     def test_damage_feedback_appears_and_expires(self):
         from game.entities.enemy import Enemy
         r = self.renderer
@@ -157,7 +170,7 @@ class UIRegressionTests(unittest.TestCase):
         with patch('client.render.pygame.draw.circle', wraps=pygame.draw.circle) as circles:
             r._draw_ability_aim({'items': [base, supplement],
                                  'active_slots': {'abilities': ['nova']}}, (400, 225))
-        self.assertEqual(circles.call_args.args[3], 300)
+        self.assertEqual(circles.call_args.args[3], 105)  # 1.5 * .35 * 200 pixels.
 
     def test_new_run_equips_basic_fireball(self):
         from game.systems.items import create_initial_inventory

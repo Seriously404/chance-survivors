@@ -5,6 +5,7 @@ import copy
 
 from game.entities.projectile import Projectile
 from game.systems.combinations import CombinedItem
+from game.systems.combat_bonuses import combined_local_stat, HealingBudget
 from game.systems.items import item_stat
 from game.utils.large_number import LargeNumber
 
@@ -12,7 +13,9 @@ DEFAULT_WEAPON_TYPES = ("rapid_fire", "heavy_shot")
 
 
 def projectile_for_weapon(player, angle, weapon, slot_index, bullet_types,
-                          base_speed, damage_bonus_pct=0.0):
+                          base_speed, damage_bonus_pct=0.0, *,
+                          elemental_bonus_pct=0.0, healing_bonus_pct=0.0,
+                          critical_chance_bonus=0.0):
     if weapon is None:
         raise ValueError("Cannot fire an empty weapon slot")
     combined = isinstance(weapon, CombinedItem)
@@ -59,6 +62,13 @@ def projectile_for_weapon(player, angle, weapon, slot_index, bullet_types,
     projectile = Projectile.create_from_player(
         player.x, player.y, angle, speed, base_speed, damage, piercing,
         bullet_name, str(metadata.get("element", "physical")).lower())
+    local_crit = (combined_local_stat(weapon, "crit_chance") if combined
+                  else stat("crit_chance", 0))
+    projectile.critical_chance = local_crit.to_float() + critical_chance_bonus
+    projectile.friendly_repair = bool(metadata.get('repair', False))
+    projectile.repair_fraction = min(.08, max(0.0, bounded('repair_fraction', .025)))
+    projectile.elemental_bonus_pct = elemental_bonus_pct
+    projectile.healing_bonus_pct = healing_bonus_pct
     projectile.damage_components = [
         {"element": part["element"], "damage": part["damage"] * (1 + damage_bonus_pct / 100)}
         for part in metadata.get("hybrid_damage_components", [])
@@ -67,6 +77,8 @@ def projectile_for_weapon(player, angle, weapon, slot_index, bullet_types,
         part.get("script", part.get("cast_type")) in {"heal", "mend_ward"}
         for part in metadata.get("supplements", {}).values()
     )
+    if projectile.heal_on_damage:
+        projectile.healing_budget = HealingBudget(stat('heal_amount', 0))
     tags = weapon.tags if combined else weapon.get('tags', [])
     projectile.trail_element = next(
         (tag.split(':', 1)[1] for tag in tags if tag.startswith('trail:')), None)
@@ -81,10 +93,14 @@ def projectile_for_weapon(player, angle, weapon, slot_index, bullet_types,
 
 
 def projectiles_for_weapon(player, angle, weapon, slot_index, bullet_types,
-                           base_speed, damage_bonus_pct=0.0):
+                           base_speed, damage_bonus_pct=0.0, *,
+                           elemental_bonus_pct=0.0, healing_bonus_pct=0.0,
+                           critical_chance_bonus=0.0):
     """Create the complete volley, including the shotgun's spread."""
     projectile, cooldown, automatic = projectile_for_weapon(
-        player, angle, weapon, slot_index, bullet_types, base_speed, damage_bonus_pct)
+        player, angle, weapon, slot_index, bullet_types, base_speed, damage_bonus_pct,
+        elemental_bonus_pct=elemental_bonus_pct, healing_bonus_pct=healing_bonus_pct,
+        critical_chance_bonus=critical_chance_bonus)
     if projectile.bullet_type != "shotgun":
         return [projectile], cooldown, automatic
     stats = weapon.stats if isinstance(

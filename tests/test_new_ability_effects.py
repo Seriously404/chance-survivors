@@ -74,7 +74,7 @@ class NewAbilityEffectsTests(unittest.TestCase):
             'script': 'projectile', 'area_radius': .8})
         inventory = Inventory([nova, burst])
         inventory.assign_combination('nova', 0, 'burst')
-        enemy = Enemy('test', x=.6, health=100, max_health=100)
+        enemy = Enemy('test', x=.25, health=100, max_health=100)
         cast_ability(effective_ability(inventory, inventory.get('nova')),
                      Player(), [enemy], angle=0, base_speed=1,
                      enemy_types={'test': {'resistances': {}}})

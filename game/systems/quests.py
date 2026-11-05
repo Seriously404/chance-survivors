@@ -11,6 +11,7 @@ from game.systems.numbers import LargeNumber
 from game.utils.large_number import LargeNumber as CombatNumber
 
 from .game_definitions import load_quests
+from .main_quest_choices import MainQuestChoices
 
 
 @dataclass
@@ -60,6 +61,7 @@ class Quest:
             "completed": bool(self.completed),
             "failed": bool(self.failed),
             "lock_on_accept": bool(self.lock_on_accept),
+            "restriction_mode": self.restriction_mode,
             "percent_complete": float(self.percent_complete()),
         }
 
@@ -67,10 +69,10 @@ class Quest:
 QUEST_BLUEPRINTS: list[dict[str, Any]] = load_quests()
 
 
-class QuestManager:
+class QuestManager(MainQuestChoices):
     """Track active, failed, and completed quests for a run."""
 
-    def __init__(self, blueprints: list[dict[str, Any]] | None = None) -> None:
+    def __init__(self, blueprints: list[dict[str, Any]] | None = None, *, rng=None) -> None:
         self.blueprints = [deepcopy(item)
                            for item in (blueprints or QUEST_BLUEPRINTS)]
         self.active_quests: list[Quest] = []
@@ -82,6 +84,7 @@ class QuestManager:
         self.time_survived = 0.0
         self.main_quest: Quest | None = None
         self.main_quest_declined = False
+        self._init_main_choices(rng)
         self._sync_unlocked_quests()
 
     def _quest_id_set(self, quests: list[Quest]) -> set[str]:
@@ -135,6 +138,7 @@ class QuestManager:
 
     def register_level(self, level: int) -> None:
         self.level = max(1, int(level))
+        self._ensure_main_offers()
         self._sync_unlocked_quests()
         for quest in list(self.active_quests):
             if quest.condition == "level_reached":
@@ -238,12 +242,15 @@ class QuestManager:
                     "id": quest.id,
                     "progress": quest.progress,
                     "lock_on_accept": quest.lock_on_accept,
+                    "reward_power": quest.reward_power,
+                    "condition": quest.condition,
+                    "target": quest.target,
                 }
                 for quest in quests
             ]
 
         return {
-            "version": 1,
+            "version": 2,
             "level": self.level,
             "kills_total": self.kills_total,
             "kills_by_enemy": dict(self.kills_by_enemy),
@@ -253,6 +260,7 @@ class QuestManager:
             "failed": compact(self.failed_quests),
             "main_quest_id": self.main_quest.id if self.main_quest else None,
             "main_quest_declined": self.main_quest_declined,
+            **self._main_choice_save_state(),
         }
 
     @classmethod
@@ -263,7 +271,7 @@ class QuestManager:
     ) -> QuestManager:
         """Restore a validated quest snapshot without replaying progress events."""
         if (not isinstance(state, dict) or type(state.get("version")) is not int
-                or state.get("version") != 1):
+                or state.get("version") not in (1, 2)):
             raise ValueError("Unsupported quest-save version")
         level = state.get("level")
         kills_total = state.get("kills_total")
@@ -321,6 +329,25 @@ class QuestManager:
                     raise ValueError(
                         "Quest save has invalid restriction state")
                 quest = manager._build_quest(blueprints_by_id[quest_id])
+                if quest.quest_type == 'main':
+                    power = entry.get('reward_power', quest.reward_power)
+                    target_value = entry.get('target', quest.target)
+                    condition = entry.get('condition', quest.condition)
+                    if (isinstance(power, bool) or not isinstance(power, (int, float))
+                            or not math.isfinite(power) or not 1 <= power <= 2
+                            or isinstance(target_value, bool) or not isinstance(target_value, (int, float))
+                            or not math.isfinite(target_value) or target_value <= 0
+                            or condition not in {quest.condition, 'kills_total'}):
+                        raise ValueError('Quest save has invalid main quest challenge.')
+                    quest.reward_power = float(power)
+                    if quest.condition == 'level_reached':
+                        if condition == 'kills_total':
+                            quest.description = 'Defeat 200 enemies after accepting. ' + '; '.join(quest.restrictions)
+                        else:
+                            quest.description = quest.description.replace(
+                                f'level {int(quest.target)}', f'level {int(target_value)}', 1)
+                    quest.target = float(target_value)
+                    quest.condition = condition
                 quest.progress = float(progress)
                 quest.completed = key == "completed"
                 quest.failed = key == "failed"
@@ -336,6 +363,9 @@ class QuestManager:
         )
         if main_quest_id is not None and manager.main_quest is None:
             raise ValueError("Quest save references an invalid main quest")
+        if manager.main_quest is not None and manager.main_quest_declined:
+            raise ValueError('Quest save both selects and declines a main quest.')
+        manager._restore_main_choices(state)
         return manager
 
     def lock_main_quest(self, quest_id: str) -> bool:
@@ -372,10 +402,29 @@ class QuestManager:
         if quest is None or quest.failed:
             return False
         kind = item.get("type")
+        mode = quest.restriction_mode
+        script = item.get('stats', {}).get('script')
+        if mode == 'engineer':
+            if kind == 'weapon':
+                return 'engineering_support' not in item.get('tags', [])
+            if kind == 'ability':
+                return script not in {'sentinel', 'turret', 'wall', 'arc_turret',
+                                      'flame_turret', 'frost_turret', 'repair_pulse',
+                                      'overclock', 'architect_protocol'}
+        if mode == 'weapon_only' and kind == 'ability':
+            return True
+        if mode == 'no_armor' and kind == 'armor':
+            return True
+        if mode == 'fire_only' and kind in {'weapon', 'ability'}:
+            if kind == 'ability' and script in {'heal', 'mend_ward', 'ward', 'dash', 'teleport'}:
+                return False
+            return item.get('stats', {}).get('element') != 'fire'
         if quest.restriction_mode in ("ability_only", "sentry_only") and kind == "weapon":
             return True
         if quest.restriction_mode == "sentry_only" and kind == "ability":
-            if item.get("stats", {}).get("script") not in {"sentinel", "turret"}:
+            if item.get("stats", {}).get("script") not in {
+                "sentinel", "turret", "arc_turret", "flame_turret", "frost_turret"
+            }:
                 return True
         tags = item.get("tags", [])
         if not isinstance(tags, list):

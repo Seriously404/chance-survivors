@@ -1,6 +1,7 @@
 """Collision detection system."""
 
 import math
+import random
 from typing import List, Tuple, Any
 
 from game.entities.projectile import Projectile
@@ -8,6 +9,8 @@ from game.entities.enemy_projectile import EnemyProjectile
 from game.entities.enemy import Enemy
 from game.entities.player import Player
 from game.systems.elements import resolve_damage_components
+from game.systems.criticals import resolve_critical_hit
+from game.systems.combat_bonuses import heal_from_damage
 from game.systems.elemental_core import weakened_resistances, apply_lingering
 from game.utils.large_number import LargeNumber
 
@@ -18,13 +21,14 @@ class CollisionSystem:
     BULLET_RADIUS: float = 5
     PLAYER_SIZE: float = 30
 
-    def __init__(self, pixels_per_unit: int):
+    def __init__(self, pixels_per_unit: int, *, rng=None):
         """Initialize the collision system.
 
         Args:
             pixels_per_unit: Conversion factor from world units to pixels.
         """
         self.pixels_per_unit = pixels_per_unit
+        self.rng = rng if rng is not None else random
         self.killed_enemies: list[Enemy] = []
 
     def _calculate_collision_distance(
@@ -107,6 +111,10 @@ class CollisionSystem:
         self.killed_enemies = []
 
         for i, bullet in enumerate(bullets):
+            # Support shots never damage enemies, even when a building was
+            # missed or no engineering objective is active.
+            if bullet.friendly_repair:
+                continue
             start_x = bullet.previous_x if bullet.previous_x is not None else bullet.x
             start_y = bullet.previous_y if bullet.previous_y is not None else bullet.y
             dx, dy = bullet.x - start_x, bullet.y - start_y
@@ -139,18 +147,23 @@ class CollisionSystem:
                         "resistances", {}), bullet.elemental_core)
                     if bullet.elemental_core else enemy_types[enemy.type].get("resistances", {}),
                     bullet.damage_components,
+                    elemental_bonus_pct=bullet.elemental_bonus_pct,
                 )
+                resolved, critical = resolve_critical_hit(
+                    resolved, bullet.critical_chance, rng=self.rng)
                 effective_damage = sum(resolved.values(), LargeNumber(0))
                 health_before = enemy.health
-                enemy.take_damage(effective_damage, elemental_damage=resolved)
+                enemy.take_damage(effective_damage, elemental_damage=resolved,
+                                  critical=critical)
                 if player is not None and bullet.heal_on_damage:
                     dealt = min(LargeNumber(health_before),
                                 LargeNumber(effective_damage))
-                    player.health = min(player.max_health,
-                                        player.health + dealt)
+                    heal_from_damage(player, dealt, bullet.healing_bonus_pct,
+                                     bullet.healing_budget)
                 if bullet.elemental_core:
                     apply_lingering(enemy, bullet.damage,
-                                    bullet.elemental_core)
+                                    bullet.elemental_core,
+                                    elemental_bonus_pct=bullet.elemental_bonus_pct)
 
                 # Check if enemy dies
                 if enemy.is_dead():
@@ -181,18 +194,23 @@ class CollisionSystem:
                                 ) if bullet.elemental_core else
                                 enemy_types[other_enemy.type].get("resistances", {}),
                                 bullet.damage_components,
+                                elemental_bonus_pct=bullet.elemental_bonus_pct,
                             )
+                            resolved, critical = resolve_critical_hit(
+                                resolved, bullet.critical_chance, rng=self.rng)
                             effective_damage = sum(resolved.values(), LargeNumber(0))
                             health_before = other_enemy.health
-                            other_enemy.take_damage(effective_damage, elemental_damage=resolved)
+                            other_enemy.take_damage(effective_damage, elemental_damage=resolved,
+                                                    critical=critical)
                             if bullet.elemental_core:
                                 apply_lingering(other_enemy, bullet.damage,
-                                                bullet.elemental_core)
+                                                bullet.elemental_core,
+                                                elemental_bonus_pct=bullet.elemental_bonus_pct)
                             if player is not None and bullet.heal_on_damage:
                                 dealt = min(LargeNumber(health_before),
                                             LargeNumber(effective_damage))
-                                player.health = min(
-                                    player.max_health, player.health + dealt)
+                                heal_from_damage(player, dealt, bullet.healing_bonus_pct,
+                                     bullet.healing_budget)
                             if other_enemy.is_dead():
                                 enemies_to_remove.add(k)
                                 self.killed_enemies.append(other_enemy)

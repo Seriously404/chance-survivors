@@ -58,13 +58,13 @@
       "acquisition": {"sources": ["starter"], "drop_weight": 0}, "base": true, "fusion_only": false
     },
     {
-      "id": "starter-relic", "name": "Fortune Relic", "type": "relic", "rarity": "common", "level": 1, "description": "Raises luck and damage when combined with equipment.",
+      "id": "starter-relic", "name": "Fortune Relic", "type": "relic", "rarity": "common", "level": 1, "description": "Raises luck and damage while owned, including while combined. These passive bonuses apply once.",
       "stats": {"luck": 2, "damage_pct": 5}, "tags": ["luck"], "behaviors": [],
       "combination_slots": 1, "currency_preferences": {"Copper": 1},
       "acquisition": {"sources": ["starter", "bazaar"], "drop_weight": 10}, "base": true, "fusion_only": false
     },
     {
-      "id": "starter-token", "name": "Copper Token", "type": "relic", "rarity": "uncommon", "level": 1, "description": "Adds health and movement speed to an equipment combination.",
+      "id": "starter-token", "name": "Copper Token", "type": "relic", "rarity": "uncommon", "level": 1, "description": "Raises maximum health and movement speed while owned, including while combined. These passive bonuses apply once.",
       "stats": {"health": 5, "speed_pct": 2}, "tags": ["copper", "movement"], "behaviors": [],
       "combination_slots": 2, "currency_preferences": {"Copper": 1},
       "acquisition": {"sources": ["starter", "bazaar"], "drop_weight": 8}, "base": true, "fusion_only": false

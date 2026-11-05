@@ -1,6 +1,37 @@
 {
-  "rapid_fire": {"cooldown": 0.16, "damage": 3, "speed_modifier": 3.0, "piercing": 0, "automatic": true},
-  "heavy_shot": {"cooldown": 0.75, "damage": 8, "speed_modifier": 2.0, "piercing": 2, "automatic": false},
-  "shotgun": {"cooldown": 0.9, "damage": 12, "speed_modifier": 2.0, "piercing": 0, "automatic": false},
-  "homing": {"cooldown": 0.25, "damage": 28, "speed_modifier": 3.8, "piercing": 1, "automatic": true}
+  "rapid_fire": {
+    "cooldown": 0.16,
+    "damage": 3,
+    "speed_modifier": 3.0,
+    "piercing": 0,
+    "automatic": true
+  },
+  "heavy_shot": {
+    "cooldown": 0.75,
+    "damage": 8,
+    "speed_modifier": 2.0,
+    "piercing": 2,
+    "automatic": false
+  },
+  "shotgun": {
+    "cooldown": 0.9,
+    "damage": 12,
+    "speed_modifier": 2.0,
+    "piercing": 0,
+    "automatic": false
+  },
+  "homing": {
+    "cooldown": 0.25,
+    "damage": 28,
+    "speed_modifier": 3.8,
+    "piercing": 1,
+    "automatic": true
+  },
+  "repair": {
+    "cooldown": 0.45,
+    "damage": 1,
+    "speed_modifier": 3,
+    "piercing": 0,
+    "automatic": true
+  }
 }

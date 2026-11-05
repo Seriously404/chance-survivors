@@ -50,14 +50,14 @@ class EnemyScalingTests(unittest.TestCase):
         for minute in (15, 20, 25, 30):
             before = scaling.multiplier((minute - 1) * 60)
             after = scaling.multiplier(minute * 60)
-            self.assertAlmostEqual(float(after / before), 1.09)
+            self.assertAlmostEqual(float(after / before), 1.14)
 
     def test_extreme_enemy_can_be_killed_and_rewards_survive(self) -> None:
         scaling = EnemyScaling()
         stats = scaling.scale_stats(enemy_types['basic'], 60 * 8300)
         enemy = Enemy.create_from_type('basic', stats, 0, 0)
         self.assertGreater(enemy.max_health, 10 ** 308)
-        enemy.take_damage(CombatNumber('1e320'))
+        enemy.take_damage(CombatNumber(enemy.max_health) * 2)
         self.assertTrue(enemy.is_dead())
         wallet = CurrencyWallet()
         _, amount = wallet.reward_for_kill(multiplier=enemy.score_multiplier)
@@ -72,7 +72,7 @@ class EnemyScalingTests(unittest.TestCase):
         enemies = []
         spawner.spawn(0.0, 0.0, enemies, elapsed_seconds=600, scaling=scaling)
 
-        self.assertEqual(len(enemies), 1)
+        self.assertEqual(len(enemies), scaling.horde_size())
         self.assertGreater(enemies[0].max_health,
                            enemy_types["basic"]["max_health"])
         self.assertGreater(enemies[0].score_multiplier, 1)

@@ -504,7 +504,7 @@
         "damage_pct": 4,
         "elemental_dmg": 5
       },
-      "description": "A helm infused with elemental power."
+      "description": "A helm infused with elemental power. Increases nonphysical damage while equipped, including elemental portions of combined attacks. Physical damage is unchanged."
     },
     {
       "id": "elemental-robe",
@@ -518,7 +518,7 @@
         "damage_pct": 6,
         "elemental_dmg": 8
       },
-      "description": "A robe that channels elemental forces."
+      "description": "A robe that channels elemental forces. Increases nonphysical damage while equipped, including elemental portions of combined attacks. Physical damage is unchanged."
     },
     {
       "id": "elemental-boots",
@@ -532,7 +532,7 @@
         "speed_pct": 3,
         "elemental_dmg": 4
       },
-      "description": "Boots that enhance elemental attacks."
+      "description": "Boots that enhance elemental attacks. Increases nonphysical damage while equipped, including elemental portions of combined attacks. Physical damage is unchanged."
     },
     {
       "id": "elemental-ring",
@@ -546,7 +546,7 @@
         "damage_pct": 3,
         "elemental_dmg": 3
       },
-      "description": "A ring that completes the elemental set."
+      "description": "A ring that completes the elemental set. Increases nonphysical damage while equipped, including elemental portions of combined attacks. Physical damage is unchanged."
     }
   ]
 }

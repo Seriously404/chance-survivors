@@ -8,8 +8,7 @@ class MainQuestChoiceTests(unittest.TestCase):
     def test_three_choices_decline_and_restore(self):
         quests = QuestManager()
         quests.register_level(8)
-        self.assertEqual(
-            len([q for q in quests.available_quests() if q.quest_type == "main"]), 3)
+        self.assertEqual(len(quests.main_choice_state()['offers']), 3)
         self.assertTrue(quests.decline_main_quest())
         restored = QuestManager.from_save_state(quests.to_save_state())
         self.assertFalse(

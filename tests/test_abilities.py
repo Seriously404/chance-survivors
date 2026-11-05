@@ -152,6 +152,18 @@ if __name__ == "__main__":
 
 
 class CatalogAbilityTests(unittest.TestCase):
+    def _defense_for(self, ability):
+        from game.systems.engineering import EngineeringDefense
+        from game.systems.items import create_item_catalog
+        if ability['stats']['script'] not in {'overclock', 'repair_pulse'}:
+            return None
+        defense = EngineeringDefense()
+        turret = next(i for i in create_item_catalog()
+                      if i['id'] == 'engineer-turret')
+        structure = defense.deploy(turret, Player(), 0)
+        structure.health /= 2
+        return defense
+
     def test_every_catalog_ability_casts_its_configured_script(self):
         from game.systems.items import create_item_catalog
         abilities = [item for item in create_item_catalog()
@@ -161,7 +173,8 @@ class CatalogAbilityTests(unittest.TestCase):
             with self.subTest(ability=ability['id']):
                 self.assertIn('script', ability['stats'])
                 result = cast_ability(ability, Player(health=50), [], angle=0,
-                                      base_speed=1, enemy_types=enemy_types)
+                                      base_speed=1, enemy_types=enemy_types,
+                                      engineering=self._defense_for(ability))
                 self.assertTrue(result.consumed)
 
     def test_blink_moves_toward_aim(self):
@@ -235,5 +248,6 @@ class CatalogAbilityTests(unittest.TestCase):
                 self.assertEqual(
                     equipped['stats']['script'], definition['stats']['script'])
                 result = cast_ability(equipped, Player(health=50), [], angle=0,
-                                      base_speed=1, enemy_types=enemy_types)
+                                      base_speed=1, enemy_types=enemy_types,
+                                      engineering=self._defense_for(equipped))
                 self.assertTrue(result.consumed)

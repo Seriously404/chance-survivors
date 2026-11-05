@@ -11,6 +11,8 @@ from typing import Any
 
 from game.systems.inventory import RARITY_COMBINATION_SLOTS
 from game.systems.json_loader import load_rarity_scaling
+from game.systems.liquidation import BASIS_KEY, liquidation_basis
+from game.systems.numbers import LargeNumber
 
 RARITY_ORDER = [
     "common",
@@ -74,6 +76,10 @@ class FusionRecipe:
 
 
 DEFAULT_FUSION_RECIPES = [
+    FusionRecipe("architect-protocol", "Architect Protocol", "ability", "ultimate",
+                 "For eight seconds, overclock nearby defenses and double their shot damage. Requires active nearby structures; does not repair or create them. A progress-earned engineering ultimate with a long recovery.",
+                 ("ability", "ability", "relic"), min_rarity="mythical", min_level=12,
+                 unlock_level=30, required_fusion="elemental-core"),
     FusionRecipe("sandevistan", "Sandevistan", "ability", "ultimate",
                  "An ultimate dash that slows the world and accelerates movement and ability recovery.",
                  ("ability", "ability", "relic"), min_rarity="ultimate", min_level=20,
@@ -332,6 +338,9 @@ class FusionManager:
             stats = {"script": "sandevistan", "cooldown": 90.0,
                      "dash_distance": 4.0, "dash_duration": 0.2,
                      "time_shift_duration": 6.0}
+        if recipe.id == "architect-protocol":
+            stats = {"script": "architect_protocol", "cooldown": 120.0}
+            output_tags = ["engineering", "engineering_support"]
         source_ids = sorted(str(item.get("id")) for item in selected)
         identity = json.dumps([recipe.id, source_ids],
                               separators=(",", ":"), ensure_ascii=True)
@@ -352,6 +361,7 @@ class FusionManager:
             "fusion_origin": source_ids,
             "fusion_only": True,
             "description": recipe.description,
+            BASIS_KEY: str(sum((liquidation_basis(item) for item in selected), LargeNumber(0))),
         }
         if output_tags:
             result["tags"] = output_tags

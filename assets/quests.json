@@ -133,11 +133,13 @@
       "quest_type": "main",
       "unlock_level": 8,
       "reward_pct": 0.0,
-      "reward_power": 2.0,
+      "reward_power": 1.25,
       "condition": "level_reached",
       "target": 15,
       "restriction_mode": "sentry_only",
-      "restrictions": ["No weapons; only sentry and turret abilities"]
+      "restrictions": [
+        "No weapons; only sentry and turret abilities"
+      ]
     },
     {
       "id": "side-kill-shooter",
@@ -256,6 +258,67 @@
       "reward_pct": 18.0,
       "condition": "bazaar_purchases",
       "target": 10
+    },
+    {
+      "id": "main-engineer",
+      "name": "The Engineer",
+      "description": "Defend a fragile command core through ten assault waves. Build walls and turrets, repair your defenses and coordinate support skills. Ordinary gear can still empower combinations.",
+      "quest_type": "main",
+      "unlock_level": 8,
+      "reward_pct": 0,
+      "reward_power": 1.5,
+      "condition": "defense_waves",
+      "target": 10,
+      "restriction_mode": "engineer",
+      "restrictions": [
+        "Active weapons and abilities must be engineering equipment; any compatible supplements are allowed."
+      ]
+    },
+    {
+      "id": "main-ballistics",
+      "name": "Ballistics Oath",
+      "description": "Defeat 200 enemies with weapons and no active abilities. Your default Spacebar dash remains available. A replacement rifle is supplied if needed.",
+      "quest_type": "main",
+      "unlock_level": 8,
+      "reward_pct": 0,
+      "reward_power": 1.35,
+      "condition": "kills_total",
+      "target": 200,
+      "restriction_mode": "weapon_only",
+      "restrictions": [
+        "No active abilities. Default movement dash remains available."
+      ]
+    },
+    {
+      "id": "main-glass-cannon",
+      "name": "Glass Horizon",
+      "description": "Defeat 180 enemies without wearing armor. Keep your weapons and abilities, trade safety for score, and use the default dash to avoid damage.",
+      "quest_type": "main",
+      "unlock_level": 8,
+      "reward_pct": 0,
+      "reward_power": 1.5,
+      "condition": "kills_total",
+      "target": 180,
+      "restriction_mode": "no_armor",
+      "restrictions": [
+        "No equipped armor, including accessories."
+      ]
+    },
+    {
+      "id": "main-pyromancer",
+      "name": "Trial by Fire",
+      "description": "Deal 8000 fire damage using fire weapons and offensive abilities. Healing, shields and movement skills remain available. Fire equipment is supplied when needed.",
+      "quest_type": "main",
+      "unlock_level": 8,
+      "reward_pct": 0,
+      "reward_power": 1.5,
+      "condition": "elemental_damage",
+      "element": "fire",
+      "target": 8000,
+      "restriction_mode": "fire_only",
+      "restrictions": [
+        "Only fire damage sources may be actively equipped; defensive and movement abilities are allowed."
+      ]
     }
   ]
 }

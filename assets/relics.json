@@ -11,7 +11,7 @@
         "crit_chance": 1,
         "score_bonus_pct": 1.5
       },
-      "description": "Increases luck while owned."
+      "description": "Raises luck and score rewards while owned. Adds critical hit chance: successful direct hits deal double damage. Does not make trails or lingering damage critical. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "monkeys-paw",
@@ -25,7 +25,7 @@
         "speed_pct": 4,
         "crit_chance": 2
       },
-      "description": "Increases luck, damage and movement speed while owned."
+      "description": "Raises luck, damage and movement speed while owned. Its bonuses are fixed; it does not roll random penalties. Adds critical hit chance: successful direct hits deal double damage. Does not make trails or lingering damage critical. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "echo-prism",
@@ -38,7 +38,7 @@
         "crit_chance": 3,
         "score_bonus_pct": 2
       },
-      "description": "Increases damage while owned."
+      "description": "Raises damage and score rewards while owned. It does not repeat attacks; combine it to add its damage bonus to a build. Adds critical hit chance: successful direct hits deal double damage. Does not make trails or lingering damage critical. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "iron-nest",
@@ -51,7 +51,7 @@
         "defense": 3,
         "speed_pct": -2
       },
-      "description": "A stubborn ward that makes you harder to kill but slower to move."
+      "description": "Raises maximum health and defense while owned, at the cost of movement speed. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "glass-heart",
@@ -64,7 +64,7 @@
         "luck": 4,
         "healing_pct": 5
       },
-      "description": "Increases maximum health and luck while owned."
+      "description": "Raises maximum health, luck and health restoration while owned. Improves healing casts and damage-to-health conversion, but does not increase shields or grant a healing ability. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "void-bell",
@@ -78,7 +78,7 @@
         "crit_chance": 4,
         "score_bonus_pct": 4
       },
-      "description": "Increases damage and luck while owned."
+      "description": "Raises damage, luck and score rewards while owned. Adds critical hit chance: successful direct hits deal double damage. Does not make trails or lingering damage critical. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "lucky-box-legendary",
@@ -90,7 +90,7 @@
         "luck": 8,
         "damage_pct": 6
       },
-      "description": "A legendary box of fortune."
+      "description": "A stronger fortune relic that raises luck and damage while owned. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "chaos-core",
@@ -103,7 +103,7 @@
         "damage_pct": 12,
         "speed_pct": 8
       },
-      "description": "A mythical core of pure chaos."
+      "description": "Raises luck, damage and movement speed while owned. A fixed legendary bonus rather than a random effect. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "moon-sigil",
@@ -116,7 +116,7 @@
         "damage_pct": 12,
         "speed_pct": 6
       },
-      "description": "A sigil blessed by the moon."
+      "description": "Raises luck, damage and movement speed while owned. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "inferno-core",
@@ -128,7 +128,10 @@
         "damage_pct": 16,
         "luck": 4
       },
-      "description": "A core burning with infernal power."
+      "description": "Raises damage and luck while owned. Combine with a weapon, projectile ability, moving sentry or teleport to leave fire trails. Each patch lasts two seconds and deals fire damage to enemies inside it. Owned passive bonuses apply once, including while combined.",
+      "tags": [
+        "trail:fire"
+      ]
     },
     {
       "id": "shimmer-petal",
@@ -140,7 +143,7 @@
         "luck": 5,
         "speed_pct": 8
       },
-      "description": "A petal that shimmers with speed."
+      "description": "Raises luck and movement speed while owned. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "ricochet-amulet",
@@ -152,8 +155,10 @@
         "damage_pct": 10,
         "luck": 2
       },
-      "tags": ["ricochet"],
-      "description": "Increases damage and luck while owned. Combine with a weapon or projectile ability to make its shots bounce to another enemy."
+      "tags": [
+        "ricochet"
+      ],
+      "description": "Increases damage and luck while owned. Combine with a weapon or projectile ability to make its shots bounce to another enemy. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "sentinel-heart-relic",
@@ -166,7 +171,7 @@
         "defense": 5,
         "luck": 3
       },
-      "description": "A heart-shaped relic that provides massive health and defense."
+      "description": "Raises maximum health, defense and luck while owned. This relic does not summon a sentinel. Owned passive bonuses apply once, including while combined."
     },
     {
       "id": "ember-gloves",
@@ -191,7 +196,21 @@
         "health": 18,
         "damage_pct": 7
       },
-      "description": "A lattice that protects and enhances."
+      "description": "Raises maximum health, damage and luck while owned. This relic does not summon or shield a sentry. Owned passive bonuses apply once, including while combined."
+    },
+    {
+      "id": "horde-beacon",
+      "name": "Horde Beacon",
+      "type": "relic",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "enemy_pressure": 1
+      },
+      "tags": [
+        "challenge_beacon"
+      ],
+      "description": "While owned, calls larger, stronger hordes with higher score and XP rewards. Multiple beacons stack. Sell it to ease pressure; currency grows more slowly than danger."
     }
   ]
 }

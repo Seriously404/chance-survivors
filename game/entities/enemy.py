@@ -44,6 +44,7 @@ class Enemy:
     speed: float = 1.0
     turning_speed: float = 1.0
     score_multiplier: int = 1
+    currency_multiplier: int = 1
     currency_drop: str | None = None
     currency_amount: int = 0
     xp_reward: int = 1
@@ -53,6 +54,7 @@ class Enemy:
     summoner_id: int | None = None
     has_summoned: bool = False
     damage_events: dict[str, LargeNumber] = field(default_factory=dict, repr=False)
+    critical_hit_count: int = 0
 
     def __post_init__(self) -> None:
         """Normalize direction vector after initialization."""
@@ -102,10 +104,12 @@ class Enemy:
         self.dy = math.sin(new_angle)
         self.angle = math.atan2(self.dy, self.dx)
 
-    def take_damage(self, damage: int, *, elemental_damage=None) -> int:
+    def take_damage(self, damage: int, *, elemental_damage=None, critical=False) -> int:
         """Apply damage to the enemy. Returns the actual damage dealt."""
         actual_damage = min(damage, self.health)
         self.health -= actual_damage
+        if critical and actual_damage > 0:
+            self.critical_hit_count += 1
         if elemental_damage and actual_damage > 0:
             components = {str(element).lower(): LargeNumber(amount)
                           for element, amount in elemental_damage.items()
@@ -148,6 +152,7 @@ class Enemy:
             speed=float(stats.get("speed", 1.0)),
             turning_speed=float(stats.get("turning_speed", 1.0)),
             score_multiplier=max(1, int(stats.get("score_multiplier", 1))),
+            currency_multiplier=max(1, int(stats.get("currency_multiplier", stats.get("score_multiplier", 1)))),
             currency_drop=(
                 reward_definition.get("currency_drop")
                 if reward_definition is not None

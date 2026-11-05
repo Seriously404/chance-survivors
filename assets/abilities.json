@@ -30,7 +30,11 @@
         "element": "arcane",
         "script": "nova"
       },
-      "description": "A charm that creates an arcane nova around the caster."
+      "description": "A charm that creates an arcane nova around the caster.",
+      "tags": [
+        "elemental",
+        "arcane"
+      ]
     },
     {
       "id": "starter-core",
@@ -63,7 +67,9 @@
       },
       "description": "Fires a homing ember. Combined projectiles or moving summons leave a short burning trail.",
       "tags": [
-        "trail:fire"
+        "trail:fire",
+        "elemental",
+        "fire"
       ]
     },
     {
@@ -96,7 +102,11 @@
         "cast_damage": 24,
         "cast_radius": 0.55
       },
-      "description": "Releases a shadow nova around the caster."
+      "description": "Releases a shadow nova around the caster.",
+      "tags": [
+        "elemental",
+        "shadow"
+      ]
     },
     {
       "id": "glass-cascade",
@@ -114,7 +124,11 @@
         "element": "light",
         "script": "projectile"
       },
-      "description": "A light projectile ability with luck enhancement."
+      "description": "A light projectile ability with luck enhancement.",
+      "tags": [
+        "elemental",
+        "light"
+      ]
     },
     {
       "id": "cinder-ward",
@@ -132,7 +146,11 @@
         "element": "fire",
         "script": "nova"
       },
-      "description": "A fire nova that also provides defensive benefits."
+      "description": "A fire nova that also provides defensive benefits.",
+      "tags": [
+        "elemental",
+        "fire"
+      ]
     },
     {
       "id": "frost-lantern",
@@ -149,7 +167,11 @@
         "cast_damage": 18,
         "cast_speed_modifier": 2.5
       },
-      "description": "Fires a frost projectile that pierces enemies."
+      "description": "Fires a frost projectile that pierces enemies.",
+      "tags": [
+        "elemental",
+        "frost"
+      ]
     },
     {
       "id": "nature-seed",
@@ -164,7 +186,11 @@
         "cast_speed_modifier": 2.5,
         "element": "nature"
       },
-      "description": "Launches a seed charged with nature damage."
+      "description": "Launches a seed charged with nature damage.",
+      "tags": [
+        "elemental",
+        "nature"
+      ]
     },
     {
       "id": "nova-blast",
@@ -300,7 +326,11 @@
         "drop_weight": 12
       },
       "base": true,
-      "fusion_only": false
+      "fusion_only": false,
+      "tags": [
+        "elemental",
+        "fire"
+      ]
     },
     {
       "id": "frost-needle",
@@ -323,7 +353,11 @@
         "drop_weight": 12
       },
       "base": true,
-      "fusion_only": false
+      "fusion_only": false,
+      "tags": [
+        "elemental",
+        "frost"
+      ]
     },
     {
       "id": "arcane-ricochet",
@@ -347,7 +381,11 @@
         "drop_weight": 12
       },
       "base": true,
-      "fusion_only": false
+      "fusion_only": false,
+      "tags": [
+        "elemental",
+        "arcane"
+      ]
     },
     {
       "id": "healing-spark",
@@ -416,7 +454,11 @@
         "drop_weight": 10
       },
       "base": true,
-      "fusion_only": false
+      "fusion_only": false,
+      "tags": [
+        "elemental",
+        "shadow"
+      ]
     },
     {
       "id": "starter-teleport-sigil",
@@ -449,6 +491,144 @@
       },
       "base": true,
       "fusion_only": false
+    },
+    {
+      "id": "engineer-turret",
+      "name": "Relay Turret",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "summon_damage": 10,
+        "summon_duration": 60,
+        "structure_health": 140,
+        "attack_interval": 0.85,
+        "cooldown": 8,
+        "element": "physical",
+        "script": "turret"
+      },
+      "tags": [
+        "engineering",
+        "structure"
+      ],
+      "description": "Place a turret near your cursor. It attacks until destroyed or its 60-second service life ends. Repair it and use Overclock to hold the relay; at most six defenses may be active."
+    },
+    {
+      "id": "engineer-wall",
+      "name": "Bulwark Wall",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "structure_health": 260,
+        "summon_duration": 75,
+        "cooldown": 6,
+        "element": "physical",
+        "script": "wall"
+      },
+      "tags": [
+        "engineering",
+        "structure"
+      ],
+      "description": "Engineer mode: Place a wall near your cursor. Enemies approaching the relay attack walls that block their route. Walls absorb enemy shots, have finite health and last 75 seconds. They do not shoot.",
+      "engineer_only": true
+    },
+    {
+      "id": "engineer-overclock",
+      "name": "Overclock",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "cooldown": 12,
+        "script": "overclock"
+      },
+      "tags": [
+        "engineering",
+        "engineering_support"
+      ],
+      "description": "Engineer mode: Double the firing rate of nearby placed turrets for four seconds. Requires a turret within four world units; has no effect on walls and does not repair damage.",
+      "engineer_only": true
+    },
+    {
+      "id": "engineer-repair-pulse",
+      "name": "Field Repair",
+      "type": "ability",
+      "rarity": "common",
+      "level": 1,
+      "stats": {
+        "cooldown": 14,
+        "script": "repair_pulse"
+      },
+      "tags": [
+        "engineering",
+        "engineering_support"
+      ],
+      "description": "Engineer mode: Repair nearby defenses and the relay for 15% of each maximum health. Stay within four world units. Health-restoration bonuses apply; no cooldown is spent when nothing needs repairs.",
+      "engineer_only": true
+    },
+    {
+      "id": "engineer-arc-turret",
+      "name": "Arc Relay",
+      "type": "ability",
+      "rarity": "rare",
+      "level": 1,
+      "stats": {
+        "summon_damage": 14,
+        "structure_health": 130,
+        "summon_duration": 55,
+        "cooldown": 14,
+        "attack_interval": 1.2,
+        "element": "arcane",
+        "script": "arc_turret"
+      },
+      "tags": [
+        "engineering",
+        "structure"
+      ],
+      "description": "Place a fragile arc sentry whose bolts bounce to two more targets. It has finite health and a 55-second service life. Overclock lets it sweep groups faster."
+    },
+    {
+      "id": "engineer-flame-turret",
+      "name": "Furnace Sentry",
+      "type": "ability",
+      "rarity": "uncommon",
+      "level": 1,
+      "stats": {
+        "summon_damage": 12,
+        "structure_health": 160,
+        "summon_duration": 50,
+        "cooldown": 12,
+        "attack_interval": 1.1,
+        "element": "fire",
+        "script": "flame_turret"
+      },
+      "tags": [
+        "engineering",
+        "structure"
+      ],
+      "description": "Place a furnace sentry whose fire shots explode in a small area. It has finite health and a 50-second service life. Fire trail supplements can leave finite burning ground."
+    },
+    {
+      "id": "engineer-frost-turret",
+      "name": "Cryo Ballista",
+      "type": "ability",
+      "rarity": "uncommon",
+      "level": 1,
+      "stats": {
+        "summon_damage": 16,
+        "structure_health": 110,
+        "summon_duration": 60,
+        "cooldown": 13,
+        "attack_interval": 1.4,
+        "element": "frost",
+        "script": "frost_turret"
+      },
+      "tags": [
+        "engineering",
+        "structure"
+      ],
+      "description": "Place a frost ballista whose needles pierce two additional enemies. It has finite health and a 60-second service life. Its frost damage does not secretly freeze enemies."
     }
   ]
 }

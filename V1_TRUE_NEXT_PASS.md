@@ -5,6 +5,13 @@ findings from the first pass and is a working backlog, not a claim of release
 readiness or a replacement for actual playtesting. Later player instructions
 supersede older design assumptions.
 
+The subsequent implementation and measurement pass is recorded in
+[V1_TRUE_PASS_03.md](V1_TRUE_PASS_03.md). In particular, full codex reward
+browsing, real catalog tag coverage, combat effectiveness stats, relic passive
+scope and the purchase/refund/exchange economy have since received focused
+fixes. The remaining tasks below retain the investigation context; use the
+new pass record and balance report for current evidence.
+
 ## 1. Findings from the first pass
 
 - Fixed-time gates were removed from rarity gambling, the relic market, fusion

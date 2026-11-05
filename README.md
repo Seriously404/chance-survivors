@@ -139,6 +139,20 @@ python -m unittest discover -s tests
 For headless environments, set `SDL_VIDEODRIVER=dummy` and
 `SDL_AUDIODRIVER=dummy` before running tests that initialize the renderer.
 
+The repeatable balance harness exercises real game systems with fixed policies
+and seeds:
+
+```bash
+python -m scripts.balance_simulation --seconds 900 --seeds 7 23 101 --policy managed-shopper
+```
+
+These are automated policy measurements, not human playtests. See
+[the balance report](V1_TRUE_BALANCE_REPORT.md),
+[the content/runtime audit](CONTENT_RUNTIME_AUDIT.md), and
+[the current systems guide](V1_TRUE_SYSTEMS.md) for assumptions, evidence and
+remaining work. [The next-pass document](V1_TRUE_NEXT_PASS.md) records the
+continuing development plan.
+
 ## Project Structure
 
 ```

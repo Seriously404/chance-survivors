@@ -34,7 +34,7 @@ class CombinationEngineTests(unittest.TestCase):
         base = inventory.get("base")
         inventory.assign_combination("base", 0, "chip")
         effective = effective_ability(inventory, base)
-        self.assertEqual(item_stat(effective, "cast_damage"), 140)
+        self.assertEqual(item_stat(effective, "cast_damage"), 114)
         self.assertAlmostEqual(item_stat(effective, "cooldown"), 0.4)
         self.assertEqual(effective["stats"]["script"], "projectile")
         inventory.assign_combination("base", 0, None)
@@ -60,13 +60,13 @@ class CombinationEngineTests(unittest.TestCase):
                             angle=0, base_speed=1, enemy_types=types)
         CollisionSystem(50).check_bullet_enemy_collisions(
             [cast.projectile], [enemy], types, player)
-        self.assertEqual(player.health, LargeNumber(60))
+        self.assertEqual(player.health, LargeNumber("51.75"))
         inventory.assign_combination("fire", 0, None)
         cast = cast_ability(effective_ability(inventory, inventory.get("fire")), player, [enemy],
                             angle=0, base_speed=1, enemy_types=types)
         CollisionSystem(50).check_bullet_enemy_collisions(
             [cast.projectile], [enemy], types, player)
-        self.assertEqual(player.health, LargeNumber(60))
+        self.assertEqual(player.health, LargeNumber("51.75"))
 
     def test_healing_supplement_heals_on_area_damage_without_overkill(self):
         from game.entities.enemy import Enemy
@@ -75,7 +75,7 @@ class CombinationEngineTests(unittest.TestCase):
         inventory = Inventory([
             item("nova", "ability", stats={
                  "cast_damage": 20, "cast_radius": 2, "script": "nova"}),
-            item("heal", "ability", stats={"script": "heal"}),
+            item("heal", "ability", stats={"script": "heal", "heal_amount": 50}),
         ])
         inventory.assign_combination("nova", 0, "heal")
         player = Player(health=50, max_health=100)
@@ -94,7 +94,7 @@ class CombinationEngineTests(unittest.TestCase):
         inventory = Inventory([
             item("sentry", "ability", stats={"script": "sentinel",
                  "summon_damage": 10, "summon_duration": 5}),
-            item("heal", "ability", stats={"script": "heal"}),
+            item("heal", "ability", stats={"script": "heal", "heal_amount": 50}),
         ])
         inventory.assign_combination("sentry", 0, "heal")
         player = Player(health=50, max_health=100)
@@ -122,7 +122,7 @@ class CombinationEngineTests(unittest.TestCase):
 
         combined = self.engine.evaluate(base, [supplement])
 
-        self.assertEqual(combined.stats["damage"], LargeNumber("62.55"))
+        self.assertEqual(combined.stats["damage"], LargeNumber("41.76"))
         self.assertEqual(combined.stats["speed"], LargeNumber("4.95"))
         self.assertEqual(
             combined.stats["homing_strength"], LargeNumber("2.25"))
@@ -147,7 +147,7 @@ class CombinationEngineTests(unittest.TestCase):
             [item("rifle", "weapon", stats={"damage": 8})],
         )
 
-        self.assertEqual(explosive.stats["area_radius"], LargeNumber("4.5"))
+        self.assertEqual(explosive.stats["area_radius"], LargeNumber("1.05"))
         self.assertIn("area_damage", explosive.tags)
         self.assertIn("area_explosion", explosive.behaviors)
         self.assertIn("elemental-firearm", firearm.rules_applied)
@@ -177,7 +177,7 @@ class CombinationEngineTests(unittest.TestCase):
             catalog["starter-fire-rune"], [catalog["starter-teleport-sigil"]]
         )
 
-        self.assertEqual(explosive.stats["area_radius"], LargeNumber("6.5"))
+        self.assertEqual(explosive.stats["area_radius"], LargeNumber("1.925"))
         self.assertIn("area_explosion", explosive.behaviors)
         self.assertIn("burning_teleport_trail", teleport.behaviors)
         self.assertIn("homing_guidance", self.engine.evaluate(
@@ -190,7 +190,7 @@ class CombinationEngineTests(unittest.TestCase):
                  stats={"damage": 2}, ultimate_tier=10),
             [item("chip", "relic", "rare", stats={"damage": 3})],
         )
-        expected = (LargeNumber(2) + LargeNumber(3) * LargeNumber("2.25")) \
+        expected = (LargeNumber(2) + LargeNumber(3) * LargeNumber("2.25") * LargeNumber("0.35")) \
             * LargeNumber("20") * (LargeNumber("1.1") ** 9)
 
         self.assertEqual(combined.stats["damage"], expected)
@@ -206,7 +206,7 @@ class CombinationEngineTests(unittest.TestCase):
         combined = self.engine.evaluate_inventory(inventory, "base")
 
         self.assertEqual(combined.component_ids, ("base", "supplement"))
-        self.assertEqual(combined.stats["damage"], LargeNumber("21.75"))
+        self.assertEqual(combined.stats["damage"], LargeNumber("17.3625"))
         self.assertEqual(inventory.items, original)
         serialized = combined.to_dict()
         self.assertEqual(LargeNumber.from_dict(
@@ -223,8 +223,8 @@ class CombinationEngineTests(unittest.TestCase):
 
         bonuses = player_bonuses(inventory)
 
-        self.assertEqual(bonuses["defense"], LargeNumber("27"))
-        self.assertEqual(bonuses["health"], LargeNumber("6.75"))
+        self.assertEqual(bonuses["defense"], LargeNumber("24.075"))
+        self.assertEqual(bonuses["health"], LargeNumber("2.3625"))
         self.assertEqual(player_speed_multiplier(LargeNumber("1e1000")), 100.0)
         self.assertEqual(player_speed_multiplier(-100), 0.1)
 

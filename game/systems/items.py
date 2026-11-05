@@ -7,6 +7,7 @@ import math
 from typing import Any
 
 from game.systems.inventory import ARMOR_EQUIPMENT_SLOTS, Inventory, _item
+from game.systems.combat_bonuses import combined_local_stat
 from game.systems.item_potential import level_potential
 from game.systems.json_loader import create_item_catalog_from_json
 from game.systems.json_loader import load_item_level_scaling, load_rarity_scaling
@@ -147,7 +148,8 @@ def effective_ability(inventory: Inventory, item: dict[str, Any]) -> dict[str, A
                            "cast_type")) in {"heal", "mend_ward"}
                        for s in supplements)
     return {**item, "stats": stats, "tags": list(combined.tags), "level": 1, "rarity": "common",
-            "heal_on_damage": heals_on_hit}
+            "heal_on_damage": heals_on_hit,
+            "healing_budget_amount": stats.get("heal_amount", 0) if heals_on_hit else None}
 
 
 def player_bonuses(inventory: Inventory) -> dict[str, float]:
@@ -164,15 +166,15 @@ def player_bonuses(inventory: Inventory) -> dict[str, float]:
         "type") in {"misc", "relic"})
     result = {"defense": 0.0, "health": 0.0, "speed_pct": 0.0,
               "luck": 1.0, "damage_pct": 0.0, "crit_chance": 0.0,
-              "score_bonus_pct": 0.0, "elemental_dmg": 0.0}
+              "score_bonus_pct": 0.0, "elemental_dmg": 0.0, "healing_pct": 0.0}
     for item in contributors:
         if item.get("type") in {"armor", "ability"} and any(item.get("combinations", [])):
             from game.systems.combinations import CombinationEngine
             combined = CombinationEngine().evaluate_inventory(
                 inventory, item["id"])
             for stat_name in result:
-                result[stat_name] += combined.stats.get(
-                    stat_name, LargeNumber(0)).to_float()
+                result[stat_name] += combined_local_stat(
+                    combined, stat_name).to_float()
             continue
         for stat_name in result:
             result[stat_name] += item_stat(item, stat_name)

@@ -48,6 +48,7 @@ from game.systems.bazaar import BazaarManager, build_extended_catalog, CRATE_LUC
 from game.systems.bazaar_service import BazaarService
 from game.systems.fusion import FusionManager
 from game.systems.enemy_scaling import EnemyScaling
+from game.systems.engineering import EngineeringDefense
 from game.systems.enemy_catalog import build_enemy_roster
 from game.systems.enemy_abilities import update_enemy_abilities
 from game.systems.enemy_ranged import update_ranged_attacks
@@ -185,6 +186,7 @@ def main() -> None:
     ability_cooldowns = [0.0] * 10
     ability_vfx: list[dict[str, object]] = []
     summons = []
+    defeat_vfx = []
     trails = TrailSystem()
     wallet = CurrencyWallet()
     notifications = CurrencyNotifications()
@@ -207,6 +209,7 @@ def main() -> None:
     spawner = SpawnerSystem(enemy_types, enemy_spawn_delay)
     encounter_director = EncounterDirector()
     enemy_scaling = EnemyScaling()
+    engineering = None
 
     # Initialize game entities
     player = Player(health=player_max_health, max_health=player_max_health)
@@ -224,6 +227,7 @@ def main() -> None:
     paused = False
     upload_status = "Upload is optional; your score is not sent unless you choose Upload."
     upload_complete = False
+    run_end_reason = "Player defeated"
     save_path = configured_save_path()
     save_available = save_path.is_file()
     last_save_seconds = 0.0
@@ -249,6 +253,8 @@ def main() -> None:
                 bazaar_seed=bazaar_seed,
                 bazaar_refresh_count=bazaar_refresh_count,
                 bazaar_last_manual_refresh_cycle=bazaar_last_manual_refresh_cycle,
+                engineering_state=engineering.to_dict() if engineering is not None else None,
+                player_position=(player.x, player.y),
             )
             snapshot.write(save_path)
         except (OSError, TypeError, ValueError) as exc:
@@ -270,14 +276,23 @@ def main() -> None:
         nonlocal bazaar_refresh_count, bazaar_last_manual_refresh_cycle
         nonlocal ability_cooldowns, ability_vfx, save_available, last_save_seconds
         nonlocal applied_health_bonus, upload_status, upload_complete, menu_error, paused, tutorial
+        nonlocal engineering
         run_save = RunSave.read(save_path)
         saved = run_save.state
         player, bullets, spawner = reset_game(player, bullets, spawner)
+        enemies.clear()
         enemy_projectiles.clear()
         summons.clear()
+        defeat_vfx.clear()
         trails.reset()
         player.health = CombatNumber(saved["player"]["health"])
         player.max_health = CombatNumber(saved["player"]["max_health"])
+        player.x = float(saved["player"].get("x", 0))
+        player.y = float(saved["player"].get("y", 0))
+        engineering = (EngineeringDefense.from_dict(saved['engineering'])
+                       if saved.get('engineering') is not None else None)
+        if engineering is not None:
+            summons.extend(engineering.structures)
         run_elapsed_seconds = saved["elapsed_seconds"]
         absolute_score = LargeNumber(saved["score"])
         progress.level = saved["progression"]["level"]
@@ -329,6 +344,42 @@ def main() -> None:
 
             if not running:
                 break
+
+            # A newly unlocked main path is a mandatory, non-simulating choice.
+            # Normal menu/combat actions cannot leak through the modal.
+            if game_state.is_playing() and quest_manager.pending_main_choice:
+                for action in actions:
+                    if action == 'quest_reroll_main':
+                        quest_manager.reroll_main_offers()
+                    elif action == 'quest_decline_main':
+                        quest_manager.decline_main_quest()
+                        game_state.close_panel()
+                        paused = False
+                    elif action.startswith('quest_choose:'):
+                        try:
+                            _, quest_id, power = action.split(':', 2)
+                            old_fraction = CombatNumber(player.health) / CombatNumber(player.max_health)
+                            transition = quest_manager.choose_main_quest(quest_id, inventory, score_power=float(power))
+                            new_bonus = player_bonuses(inventory)
+                            player.max_health = CombatNumber(player_max_health + int(new_bonus['health']))
+                            player.health = max(CombatNumber(1), player.max_health * old_fraction)
+                            applied_health_bonus = int(new_bonus['health'])
+                            if quest_manager.main_quest.restriction_mode == 'engineer':
+                                engineering = EngineeringDefense.create(player.x, player.y)
+                            bullets.clear()
+                            summons.clear()
+                            trails.reset()
+                            weapon_cooldowns = [0.0, 0.0]
+                            ability_cooldowns = [0.0] * 10
+                            renderer.selected_item_id = renderer.selected_base_id = None
+                            game_state.close_panel()
+                            paused = False
+                            if transition.get('stored'):
+                                notifications.items.append({'text': 'Previous gear is safely reserved; sell items to recover it.', 'remaining': 5.0})
+                            persist_run()
+                        except (ValueError, KeyError, OverflowError) as exc:
+                            notifications.items.append({'text': str(exc), 'remaining': 4.0})
+                actions = []
 
             # -------------------------
             # State transitions
@@ -387,13 +438,24 @@ def main() -> None:
                     save_available = False
                     player, bullets, spawner = reset_game(
                         player, bullets, spawner)
+                    enemies.clear()
+                    progress.reset()
+                    spawn_counter = 0
+                    renderer.selected_item_id = None
+                    renderer.selected_base_id = None
+                    renderer._crate_roll = None
+                    renderer.fusion_sources = []
+                    renderer.fusion_last_result = None
                     enemy_projectiles.clear()
                     summons.clear()
+                    defeat_vfx.clear()
                     trails.reset()
                     renderer.reset_timer()
                     enemy_spawn_timer = 0
                     run_elapsed_seconds = 0.0
                     enemy_scaling = EnemyScaling()
+                    engineering = None
+                    run_end_reason = 'Player defeated'
                     ability_vfx = []
                     absolute_score = LargeNumber(0)
                     wallet = CurrencyWallet()
@@ -439,6 +501,7 @@ def main() -> None:
                     game_state.change_state(GameState.MENU)
 
             elif game_state.is_playing():
+                bazaar_manager.engineer_available = engineering is not None
                 bonuses = player_bonuses(inventory)
                 if "pause" in actions:
                     paused = not paused
@@ -631,6 +694,9 @@ def main() -> None:
                     elif action.startswith("upgrade_"):
                         renderer.upgrade_tab = action[8:]
                     elif action.startswith("quest_accept:"):
+                        quest_id = action.split(':', 1)[1]
+                        if any(bp['id'] == quest_id and bp['quest_type'] == 'main' for bp in quest_manager.blueprints):
+                            continue
                         equipped_ids = {item_id for slots in inventory.active_slots.values()
                                         for item_id in slots if item_id is not None}
                         equipped_ids.update(sid for item_id in tuple(equipped_ids)
@@ -680,7 +746,8 @@ def main() -> None:
                         _, base_id, combo_index, item_id = action.split(":", 3)
                         try:
                             before = list(inventory.get(base_id)["combinations"])
-                            if not quest_manager.can_equip(inventory.get(item_id)):
+                            inventory.validate_combination_progress(base_id)
+                            if not quest_manager.can_use_supplement(inventory.get(item_id)):
                                 raise ValueError(
                                     "Main quest restrictions prevent using this item.")
                             inventory.assign_combination(
@@ -696,10 +763,7 @@ def main() -> None:
                             ":", 3)
                         try:
                             item = inventory.get(item_id)
-                            if not quest_manager.can_equip(item) or any(
-                                not quest_manager.can_equip(inventory.get(sid))
-                                for sid in item.get("combinations", []) if sid is not None
-                            ):
+                            if not quest_manager.can_activate(item, inventory):
                                 raise ValueError(
                                     "Main quest restrictions prevent equipping this item.")
                             inventory.equip(item_id, slot_kind,
@@ -722,6 +786,9 @@ def main() -> None:
                             pass
                     elif action == "set_base" and renderer.selected_item_id:
                         renderer.selected_base_id = renderer.selected_item_id
+                recovered = quest_manager.recover_stored_items(inventory)
+                if recovered:
+                    notifications.items.append({'text': f'Recovered {len(recovered)} reserved items.', 'remaining': 3.0})
                 if "close_panel" in actions or "bazaar_close" in actions:
                     if game_state.active_panel:
                         game_state.close_panel()
@@ -784,21 +851,25 @@ def main() -> None:
             # -------------------------
             # Gameplay update
             # -------------------------
-            if game_state.is_playing() and not paused and not game_state.active_panel:
-                run_elapsed_seconds += dt
+            if game_state.is_playing() and not paused and not game_state.active_panel and not quest_manager.pending_main_choice:
+                if not tutorial.active:
+                    run_elapsed_seconds += dt
                 player.update_shield(dt)
                 ability_vfx = [
                     {**effect, "remaining": float(effect["remaining"]) - dt}
                     for effect in ability_vfx
                     if float(effect["remaining"]) > dt
                 ]
+                for effect in defeat_vfx:
+                    effect["remaining"] -= dt
+                defeat_vfx[:] = [effect for effect in defeat_vfx if effect["remaining"] > 0]
                 bonuses = player_bonuses(inventory)
                 relic_summary = relic_effect_summary(inventory)
                 current_health_bonus = int(bonuses["health"])
                 if current_health_bonus != applied_health_bonus:
-                    player.max_health = player_max_health+current_health_bonus
-                    player.health = max(0, min(
-                        player.max_health, player.health+current_health_bonus-applied_health_bonus))
+                    ratio = CombatNumber(player.health) / CombatNumber(player.max_health)
+                    player.max_health = CombatNumber(player_max_health+current_health_bonus)
+                    player.health = max(CombatNumber(1), player.max_health * ratio) if ratio > 0 else CombatNumber(0)
                     applied_health_bonus = current_health_bonus
                 weapon_cooldowns = [max(0.0, value-dt)
                                     for value in weapon_cooldowns]
@@ -836,6 +907,8 @@ def main() -> None:
                         str(ability_id)) if ability_id else None
                     if ability is None or ability_cooldowns[ability_index] > 0:
                         continue
+                    if not quest_manager.can_activate(ability, inventory):
+                        continue
                     angle = renderer.aim_angle(
                         renderer.get_mouse_position(), player.x, player.y)
                     effective_cast = effective_ability(inventory, ability)
@@ -860,9 +933,16 @@ def main() -> None:
                         base_speed=bullet_base_speed,
                         enemy_types=enemy_types,
                         damage_bonus_pct=bonuses["damage_pct"],
+                        elemental_bonus_pct=bonuses["elemental_dmg"],
+                        healing_bonus_pct=bonuses["healing_pct"],
+                        critical_chance=bonuses["crit_chance"],
+                        engineering=engineering,
+                        cursor_position=renderer.cursor_world(player.x, player.y),
                         core=core_for_item(inventory, ability),
                     )
                     if not outcome.consumed:
+                        if engineering is not None and engineering.last_error:
+                            notifications.items.append({'text': engineering.last_error, 'remaining': 2.5})
                         continue
                     ability_cooldowns[ability_index] = cooldown
                     if outcome.projectile is not None:
@@ -889,6 +969,8 @@ def main() -> None:
                     weapon = by_id.get(str(weapon_id)) if weapon_id else None
                     if weapon is None:
                         continue
+                    if not quest_manager.can_activate(weapon, inventory):
+                        continue
                     weapon_stats = weapon.get("stats", {}) if weapon else {}
                     type_name = weapon_stats.get(
                         "bullet_type", ("rapid_fire", "heavy_shot")[slot_index])
@@ -908,7 +990,10 @@ def main() -> None:
                                         if any(weapon.get("combinations", [])) else weapon)
                     volley, cooldown, _ = projectiles_for_weapon(
                         player, player_angle, effective_weapon, slot_index, bullet_types,
-                        bullet_base_speed, bonuses["damage_pct"])
+                        bullet_base_speed, bonuses["damage_pct"],
+                        elemental_bonus_pct=bonuses["elemental_dmg"],
+                        healing_bonus_pct=bonuses["healing_pct"],
+                        critical_chance_bonus=bonuses["crit_chance"])
                     for projectile in volley:
                         projectile.elemental_core = core_for_item(
                             inventory, weapon)
@@ -918,35 +1003,48 @@ def main() -> None:
                 # Update quests, spawner, and progression
                 quest_manager.register_time(run_elapsed_seconds)
                 quest_manager.register_level(progress.level)
+                enemy_scaling.progress_level = progress.level
+                enemy_scaling.threat_level = min(enemy_scaling.max_threat_level, int(sum(
+                    max(0.0, item_stat(item, 'enemy_pressure', 0))
+                    for item in inventory.items if item.get('type') == 'relic')))
+                challenge = quest_manager.challenge_modifiers()
+                maximum_enemies = enemy_scaling.crowd_limit()
                 base_spawn_delay = enemy_scaling.spawn_delay_ms(
                     enemy_spawn_delay,
                     run_elapsed_seconds,
                 )
-                health_fraction = (CombatNumber(player.health) / CombatNumber(player.max_health)).to_float()
-                spawner.spawn_delay_ms = encounter_director.delay_ms(base_spawn_delay, len(enemies), health_fraction)
+                defended = engineering.objective if engineering is not None else player
+                health_fraction = (CombatNumber(defended.health) / CombatNumber(defended.max_health)).to_float()
+                wave_pressure = 1 + .08 * (engineering.wave - 1) if engineering is not None else 1.0
+                spawner.spawn_delay_ms = encounter_director.delay_ms(
+                    max(80, round(base_spawn_delay / challenge['spawn'] / wave_pressure)), len(enemies), health_fraction)
                 world_dt = dt * \
                     (0.2 if player.time_shift_remaining > 0 else 1.0)
-                spawner.update(world_dt)
-                if spawner.should_spawn() and encounter_director.can_spawn(len(enemies)):
+                if tutorial.active:
+                    spawner.reset()
+                else:
+                    spawner.update(world_dt)
+                if spawner.should_spawn() and encounter_director.can_spawn(len(enemies), maximum_enemies):
                     spawner.spawn(
-                        player.x,
-                        player.y,
+                        defended.x,
+                        defended.y,
                         enemies,
                         elapsed_seconds=run_elapsed_seconds,
                         scaling=enemy_scaling,
-                        max_enemies=encounter_director.MAX_ENEMIES,
+                        max_enemies=maximum_enemies,
+                        challenge=challenge,
                     )
                     spawner.reset()
-                elif not encounter_director.can_spawn(len(enemies)):
+                elif not encounter_director.can_spawn(len(enemies), maximum_enemies):
                     spawner.reset()
                 update_enemy_abilities(
                     enemies,
                     enemy_types,
                     world_dt,
-                    player.x,
-                    player.y,
+                    defended.x,
+                    defended.y,
                     pixels_per_unit=PIXELS_PER_UNIT,
-                    max_enemies=encounter_director.MAX_ENEMIES,
+                    max_enemies=maximum_enemies,
                 )
 
                 # Get player movement
@@ -961,52 +1059,55 @@ def main() -> None:
                 for ally in summons:
                     trails.emit(ally, dt)
                 despawn_distance = (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT) * 1.5
+                if engineering is not None:
+                    despawn_distance = max(despawn_distance, 4.5)
                 bullets = [
                     bullet for bullet in bullets
-                    if not bullet.should_despawn(player.x, player.y, despawn_distance)
+                    if not bullet.should_despawn(defended.x, defended.y, despawn_distance)
                 ]
                 for bullet in bullets:
                     if bullet.homing_strength > 0:
                         bullet.steer_towards(enemies, dt)
                     bullet.move(dt)
                     trails.emit(bullet, dt)
+                if engineering is not None:
+                    bullets = engineering.process_repair_shots(bullets)
 
                 # Update enemies
                 for enemy in enemies:
+                    target = engineering.target_for(enemy) if engineering is not None else player
+                    speed = enemy.speed * .5
+                    if engineering is not None and (enemy.x - target.x) ** 2 + (enemy.y - target.y) ** 2 <= .5 ** 2:
+                        speed = 0.0
                     enemy.move_towards_player(
-                        player.x,
-                        player.y,
-                        enemy.speed * 0.5,
+                        target.x,
+                        target.y,
+                        speed,
                         enemy.turning_speed,
                         world_dt,
                     )
-                enemy_projectiles.extend(
-                    update_ranged_attacks(
-                        enemies,
-                        enemy_types,
-                        world_dt,
-                        player.x,
-                        player.y,
-                    )
-                )
+                    enemy_projectiles.extend(update_ranged_attacks(
+                        [enemy], enemy_types, world_dt, target.x, target.y))
                 enemy_projectiles = [
                     projectile
                     for projectile in enemy_projectiles
                     if not projectile.should_despawn(
-                        player.x,
-                        player.y,
+                        defended.x,
+                        defended.y,
                         (SCREEN_WIDTH / 2 / PIXELS_PER_UNIT) * 1.5,
                     )
                 ]
                 for projectile in enemy_projectiles:
                     projectile.move(world_dt)
-                enemy_projectiles, projectile_damage = (
-                    collision_system.check_enemy_projectile_player_collisions(
-                        enemy_projectiles,
-                        player,
-                        bonuses["defense"],
-                    )
-                )
+                if engineering is not None:
+                    enemy_projectiles = engineering.update(enemies, enemy_projectiles, world_dt)
+                    summons[:] = [ally for ally in summons if not getattr(ally, 'structure_kind', None)
+                                  or ally in engineering.structures]
+                    projectile_damage = []
+                else:
+                    enemy_projectiles, projectile_damage = (
+                        collision_system.check_enemy_projectile_player_collisions(
+                            enemy_projectiles, player, bonuses["defense"]))
                 for damage in projectile_damage:
                     notifications.items.append({
                         "text": f"Enemy shot: -{damage} HP",
@@ -1035,6 +1136,8 @@ def main() -> None:
                         quest_manager.register_elemental_damage(element, amount)
                     damaged.damage_events.clear()
                 for _enemy in [*ability_kills, *collision_system.killed_enemies]:
+                    defeat_vfx.append({"x": _enemy.x, "y": _enemy.y, "remaining": .35})
+                    del defeat_vfx[:-64]
                     if not _enemy.reward_eligible:
                         continue
                     absolute_score += score_for_kill(
@@ -1044,11 +1147,11 @@ def main() -> None:
                             _enemy.currency_drop,
                             _enemy.currency_amount,
                             luck=bonuses["luck"],
-                            multiplier=_enemy.score_multiplier,
+                            multiplier=getattr(_enemy, 'currency_multiplier', None) or _enemy.score_multiplier,
                         )
                     else:
                         currency, amount = wallet.reward_for_kill(
-                            luck=bonuses["luck"], multiplier=_enemy.score_multiplier)
+                            luck=bonuses["luck"], multiplier=getattr(_enemy, 'currency_multiplier', None) or _enemy.score_multiplier)
                     notifications.add(currency, amount)
                     if currency != "Gold":
                         gold = wallet.gold_bonus_for_kill(luck=bonuses["luck"])
@@ -1062,17 +1165,18 @@ def main() -> None:
                         multiplier=_enemy.score_multiplier,
                     )
                     quest_manager.register_level(progress.level)
+                    if engineering is not None:
+                        quest_manager.register_defense_wave(engineering.register_kills(1))
                 settings.mission_score_bonus_pct = quest_manager.total_bonus_pct()
-                player = collision_system.check_enemy_player_collisions(
-                    enemies,
-                    player,
-                    enemy_types,
-                    bonuses["defense"],
-                    armor_core_resistance(inventory),
-                )
+                if engineering is None and not quest_manager.pending_main_choice:
+                    player = collision_system.check_enemy_player_collisions(
+                        enemies, player, enemy_types, bonuses["defense"], armor_core_resistance(inventory))
 
                 # Check game over
-                if not player.is_alive():
+                if not player.is_alive() or (engineering is not None and engineering.failed):
+                    if engineering is not None and engineering.failed:
+                        notifications.items.append({'text': 'Defense relay destroyed.', 'remaining': 5.0})
+                        run_end_reason = 'Defense relay destroyed'
                     game_state.change_state(GameState.GAME_OVER)
                     try:
                         save_path.unlink(missing_ok=True)
@@ -1122,6 +1226,10 @@ def main() -> None:
                     "ability_vfx": ability_vfx,
                     "summons": summons,
                     "trails": trails.trails,
+                    "defeat_vfx": defeat_vfx,
+                    "engineering": engineering,
+                    "main_quest_choice": quest_manager.main_choice_state(),
+                    "combination_progress": inventory.combination_progress(),
                     "spawn_catalog": spawn_catalog,
                     "bazaar": _bazaar_view_state(
                         bazaar_manager,
@@ -1161,7 +1269,8 @@ def main() -> None:
                     codex_crates.append({'name': crate.name, 'description': crate.description,
                                          'costs': crate.costs, 'bias': crate.bias,
                                          'unlock_seconds': crate.unlock_seconds,
-                                         'rewards': [(item.get('name', 'Item'), weight/total if total else 0)
+                                         'preview_luck': 1,
+                                         'rewards': [{**item, 'chance': weight/total if total else 0}
                                                      for item, weight in zip(items, weights)]})
                 renderer.draw_codex(bazaar_manager.catalog,
                                     fusion_manager.all_recipes(), codex_crates)
@@ -1179,6 +1288,7 @@ def main() -> None:
                     "luck": player_bonuses(inventory)["luck"],
                     "upload_status": upload_status,
                     "upload_complete": upload_complete,
+                    "end_reason": run_end_reason,
                 })
             elif game_state.is_playing():
                 bonuses = player_bonuses(inventory)
@@ -1200,6 +1310,10 @@ def main() -> None:
                                "ability_vfx": ability_vfx,
                                "summons": summons,
                                "trails": trails.trails,
+                               "defeat_vfx": defeat_vfx,
+                               "engineering": engineering,
+                               "main_quest_choice": quest_manager.main_choice_state(),
+                               "combination_progress": inventory.combination_progress(),
                                "bazaar": _bazaar_view_state(
                                    bazaar_manager,
                                    inventory,

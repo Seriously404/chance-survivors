@@ -68,10 +68,10 @@ class WeaponCombinationAdapterTests(unittest.TestCase):
         projectile, cooldown, automatic = projectile_for_weapon(
             PLAYER, 0.0, combined, 0, self.bullet_types, 3.0
         )
-        self.assertEqual(projectile.damage, LargeNumber(15))
-        self.assertEqual(projectile.piercing, 3)
+        self.assertEqual(projectile.damage, LargeNumber("11.75"))
+        self.assertEqual(projectile.piercing, 1)
         self.assertEqual(projectile.bullet_type, "heavy_shot")
-        self.assertEqual(projectile.speed, 12.0)
+        self.assertAlmostEqual(projectile.speed, 8.1)
         self.assertEqual(cooldown, 0.4)
         self.assertFalse(automatic)
 
@@ -110,9 +110,9 @@ class WeaponCombinationAdapterTests(unittest.TestCase):
             PLAYER, 0.0, combined, 0, self.bullet_types, 1.0
         )
 
-        self.assertEqual(projectile.explosion_radius, 4.0)
-        self.assertEqual(projectile.homing_strength, 2.0)
-        self.assertEqual(projectile.bounces_remaining, 2)
+        self.assertEqual(projectile.explosion_radius, 1.05)
+        self.assertEqual(projectile.homing_strength, 1.35)
+        self.assertEqual(projectile.bounces_remaining, 1)
 
     def test_existing_dictionary_callers_keep_item_level_and_damage_bonus(self) -> None:
         item = weapon("legacy", {

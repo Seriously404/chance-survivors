@@ -27,6 +27,12 @@ class Projectile:
     exploded: bool = False
     elemental_core: dict | None = None
     heal_on_damage: bool = False
+    healing_budget: object = None
+    friendly_repair: bool = False
+    repair_fraction: float = 0.0
+    elemental_bonus_pct: float = 0.0
+    healing_bonus_pct: float = 0.0
+    critical_chance: float = 0.0
     damage_components: List[Any] = field(default_factory=list)
     previous_x: float | None = None
     previous_y: float | None = None

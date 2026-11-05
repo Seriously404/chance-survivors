@@ -22,6 +22,6 @@ INTRO_PAGES = (
         "Changes take effect immediately. Different tags can add special behavior.",
         "Use the fusion codex to discover recipes, then place ingredients in the table.",
         "Rarity gambling spends a chosen currency pool even if the attempt fails.",
-        "Accept quests when ready. You can revisit this guide in the title codex.",
+        "Main quests pause the run for a choice. Every menu tab has a Help button.",
     )),
 )

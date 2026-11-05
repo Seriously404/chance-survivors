@@ -4,13 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import math
+import random
 from typing import Any
 
 from game.entities.enemy import Enemy
 from game.entities.player import Player
 from game.entities.projectile import Projectile
 from game.systems.elements import resolve_damage_components, normalize_element
+from game.systems.criticals import resolve_critical_hit
 from game.systems.items import item_stat
+from game.systems.combat_bonuses import (
+    effect_multiplier, restore_health, heal_from_damage, HealingBudget,
+)
 from game.ability_scripts.effects import Summon, teleport, ward, summon
 from game.systems.elemental_core import weakened_resistances, apply_lingering
 from game.systems.trails import trail_element
@@ -39,7 +44,7 @@ def ability_cooldown(item: dict[str, Any]) -> float:
     if not math.isfinite(float(raw_cooldown)) or raw_cooldown <= 0:
         raise ValueError("Ability cooldown must be a positive finite number")
     cooldown = item_stat(item, "cooldown", 8.0)
-    if item.get("stats", {}).get("script") == "sandevistan":
+    if item.get("stats", {}).get("script") in {"sandevistan", "architect_protocol"}:
         return max(60.0, float(cooldown))
     return float(cooldown)
 
@@ -54,18 +59,63 @@ def cast_ability(
     enemy_types: dict[str, dict[str, Any]],
     damage_bonus_pct: float = 0.0,
     core: dict[str, Any] | None = None,
+    elemental_bonus_pct: float = 0.0,
+    healing_bonus_pct: float = 0.0,
+    critical_chance: float | None = None,
+    rng=None,
+    engineering=None,
+    cursor_position=None,
 ) -> AbilityOutcome:
     """Execute one configured projectile, area-damage, or healing ability."""
     if str(item.get("type", "")).lower() != "ability":
         raise ValueError("Only ability items can be cast")
     stats = item.get("stats", {})
+    # Equipped abilities already contribute passive crit to the total supplied
+    # by the main loop. Standalone casts fall back to the item's own value.
+    hit_crit_chance = (item_stat(item, "crit_chance", 0)
+                       if critical_chance is None else critical_chance)
     damage_factor = 1.0 + max(-99.0, damage_bonus_pct) / 100.0
+    budget_amount = item.get('healing_budget_amount')
+    healing_budget = (HealingBudget(budget_amount)
+                      if budget_amount is not None else None)
     components = [
         {"element": part["element"],
          "damage": LargeNumber(part["damage"]) * damage_factor}
         for part in stats.get("hybrid_damage_components", [])
     ]
     script = stats.get("script", stats.get("cast_type", "projectile"))
+    from game.systems.engineering import (
+        ENGINEER_DEPLOY_SCRIPTS, ENGINEER_SUPPORT_SCRIPTS,
+    )
+    if script in ENGINEER_SUPPORT_SCRIPTS:
+        return AbilityOutcome(consumed=bool(engineering and engineering.support(
+            script, player, healing_bonus_pct)))
+    if script in ENGINEER_DEPLOY_SCRIPTS and engineering is not None:
+        ally = engineering.deploy(item, player, angle, cursor_position)
+        if ally is None:
+            return AbilityOutcome(consumed=False)
+        ally.damage = max(0, int(ally.damage * damage_factor))
+        ally.elemental_core = core
+        ally.heal_on_damage = bool(item.get('heal_on_damage'))
+        ally.healing_budget = healing_budget
+        ally.critical_chance = hit_crit_chance
+        ally.elemental_bonus_pct = elemental_bonus_pct
+        ally.healing_bonus_pct = healing_bonus_pct
+        ally.damage_components = components
+        ally.explosion_radius = max(ally.explosion_radius,
+                                    float(stats.get('area_radius', 0)))
+        ally.homing_strength = max(0.0, float(stats.get('homing_strength', 0)))
+        ally.piercing = max(ally.piercing, int(item_stat(item, 'cast_piercing', 0)))
+        ally.bounces = max(ally.bounces, int(stats.get('bounce_count', 0)))
+        ally.trail_element = trail_element(item.get('tags', []))
+        return AbilityOutcome(summon=ally)
+    # Engineering deployments also function as finite summons outside the
+    # defense quest, so every catalog ability has an executable standalone cast.
+    if script in ENGINEER_DEPLOY_SCRIPTS - {'turret', 'sentinel'}:
+        from game.systems.engineering import EngineeringDefense
+        temporary = EngineeringDefense(player.x - 10, player.y - 10)
+        ally = temporary.deploy(item, player, angle, cursor_position)
+        return AbilityOutcome(summon=ally, consumed=ally is not None)
     if script not in {"projectile", "nova", "heal", "teleport", "ward", "sentinel", "turret", "ember", "void", "frost", "mend_ward", "siphon", "dash", "sandevistan"}:
         raise ValueError(f"Unsupported ability script: {script!r}")
 
@@ -86,6 +136,7 @@ def cast_ability(
             damage_stat = "trail_damage" if "trail_damage" in stats else "cast_damage"
             damage = max(1.0, item_stat(item, damage_stat, 1))
             damage *= 1.0 + max(-99.0, damage_bonus_pct) / 100.0
+            damage *= effect_multiplier(elemental_bonus_pct)
             return AbilityOutcome(trail_segment=(
                 start, (player.x, player.y), element, damage))
         return AbilityOutcome()
@@ -99,6 +150,10 @@ def cast_ability(
             1.0 + max(-99.0, damage_bonus_pct) / 100.0)))
         ally.elemental_core = core
         ally.heal_on_damage = bool(item.get("heal_on_damage"))
+        ally.healing_budget = healing_budget
+        ally.critical_chance = hit_crit_chance
+        ally.elemental_bonus_pct = elemental_bonus_pct
+        ally.healing_bonus_pct = healing_bonus_pct
         ally.damage_components = components
         ally.explosion_radius = max(0.0, float(stats.get("area_radius", 0)))
         ally.homing_strength = max(0.0, float(stats.get("homing_strength", 0)))
@@ -109,12 +164,13 @@ def cast_ability(
 
     if script in {"heal", "mend_ward"}:
         heal_amount = max(0, int(item_stat(item, "heal_amount", 0)))
-        healed = min(heal_amount, max(0, player.max_health - player.health))
+        healed = min(heal_amount * effect_multiplier(healing_bonus_pct),
+                     max(0, player.max_health - player.health))
         shield_increase = script == "mend_ward" and player.shield < item_stat(
             item, "shield", 8)
         if healed <= 0 and not shield_increase:
             return AbilityOutcome(consumed=False)
-        player.health += healed
+        healed = restore_health(player, heal_amount, healing_bonus_pct)
         if script == "mend_ward":
             ward(item, player)
         return AbilityOutcome(healed=healed)
@@ -150,9 +206,13 @@ def cast_ability(
         elif script == "frost":
             projectile.piercing = max(1, projectile.piercing)
         projectile.elemental_core = core
+        projectile.elemental_bonus_pct = elemental_bonus_pct
+        projectile.healing_bonus_pct = healing_bonus_pct
         projectile.damage_components = components
         projectile.trail_element = trail_element(item.get("tags", []))
         projectile.heal_on_damage = bool(item.get("heal_on_damage"))
+        projectile.healing_budget = healing_budget
+        projectile.critical_chance = hit_crit_chance
         projectile.explosion_radius = max(
             0.0, float(stats.get("area_radius", 0)))
         projectile.homing_strength = max(
@@ -181,16 +241,21 @@ def cast_ability(
             element,
             weakened_resistances(enemy_stats.get("resistances", {}), core)
             if core else enemy_stats.get("resistances", {}),
-            components,
+            components, elemental_bonus_pct=elemental_bonus_pct,
         )
+        resolved, critical = resolve_critical_hit(
+            resolved, hit_crit_chance, rng=rng if rng is not None else random)
         effective_damage = sum(resolved.values(), LargeNumber(0))
         health_before = enemy.health
-        enemy.take_damage(effective_damage, elemental_damage=resolved)
+        enemy.take_damage(effective_damage, elemental_damage=resolved,
+                          critical=critical)
         if item.get("heal_on_damage") or script == "siphon":
             dealt = min(health_before, effective_damage)
-            player.health = min(player.max_health, player.health + dealt)
+            heal_from_damage(player, dealt, healing_bonus_pct,
+                             None if script == 'siphon' else healing_budget)
         if core:
-            apply_lingering(enemy, damage, core)
+            apply_lingering(enemy, damage, core,
+                            elemental_bonus_pct=elemental_bonus_pct)
         if enemy.is_dead():
             killed.append(enemy)
         else:

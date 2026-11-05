@@ -269,6 +269,8 @@ class CombinationEngine:
         metadata: dict[str, Any] = {}
         supplement_rarity = self.rarity_multiplier(
             item) if supplement else LargeNumber(1)
+        transfer = (min(LargeNumber(1), LargeNumber('0.35') + LargeNumber('0.05') * (level - 1))
+                    if supplement else LargeNumber(1))
         for name, value in stats.items():
             if not isinstance(name, str) or not name:
                 raise ValueError("Item stat names must be non-empty strings")
@@ -284,7 +286,7 @@ class CombinationEngine:
                 rate = (LargeNumber("-0.02") if name == "cooldown" else self.level_add_fraction) * \
                     LargeNumber(str(level_potential(item)))
                 level_value = base_value + base_value * rate * (level - 1)
-                output[name] = level_value * supplement_rarity
+                output[name] = level_value * supplement_rarity * transfer
             else:
                 metadata[name] = value
         return output, metadata
@@ -358,6 +360,8 @@ class CombinationEngine:
                     "A supplement cannot also contain its own supplements")
 
             component_ids.append(supplement_id)
+            if supplement_type in {"relic", "misc"}:
+                metadata.setdefault("owned_relic_ids", []).append(supplement_id)
             supplement_stats, supplement_metadata = self._component_stats(
                 supplement, supplement=True)
             for stat, amount in supplement_stats.items():

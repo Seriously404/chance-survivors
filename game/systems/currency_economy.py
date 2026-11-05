@@ -6,6 +6,7 @@ from game.systems.bazaar import RARITY_ORDER
 from game.systems.currency import CURRENCY_DEFINITIONS, CURRENCY_NAMES
 from game.systems.inventory import RARITY_COMBINATION_SLOTS
 from game.systems.numbers import LargeNumber
+from game.systems.liquidation import record_investment
 
 
 def currency_definition(name):
@@ -64,9 +65,15 @@ def rarity_chance(item, target, pool, luck=0.0):
     steps = RARITY_ORDER.index(target) - RARITY_ORDER.index(current)
     if steps <= 0:
         raise ValueError('Choose a rarity above the current rarity.')
-    luck = float(luck)
-    if not math.isfinite(luck) or luck < 0:
+    try:
+        luck_value = LargeNumber(luck).to_decimal()
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError('Luck must be finite and non-negative.') from exc
+    if luck_value < 0:
         raise ValueError('Luck must be finite and non-negative.')
+    # Probabilities saturate smoothly; a finite large luck value must not
+    # overflow just because the display/input representation exceeds float.
+    luck = float(min(luck_value, Decimal('1e300')))
     # Use decimal arithmetic: a late-run wallet can exceed float's range.
     effective = Decimal(0)
     for name, amount in pool.items():
@@ -88,17 +95,25 @@ def gamble_rarity(item, target, pool, wallet, rng, *, elapsed_seconds=None, luck
     selected = str(target).split('~')[:2]
     if 'ultimate' in selected and item.get('rarity') != 'mythical':
         raise ValueError('Reach mythical rarity before attempting ultimate.')
-    if 'ultimate' in selected and luck is not None and luck < 20:
+    if 'ultimate' in selected and luck is not None and LargeNumber(luck) < 20:
         raise ValueError('Ultimate upgrades require at least 20 luck.')
     chance = rarity_chance(item, target, pool, 0 if luck is None else luck)
     if chance <= 0:
         raise ValueError('Add currency to the pool first.')
+    canonical_pool = {}
     for currency, amount in pool.items():
+        canonical = currency_definition(currency)['name']
+        canonical_pool[canonical] = canonical_pool.get(canonical, 0) + amount
+    for currency, amount in canonical_pool.items():
         if wallet.get(currency) < amount:
             raise ValueError(f'Not enough {currency} for the pool.')
-    for currency, amount in pool.items():
+    # Compute and validate the inherited budget before spending anything.
+    updated_item = dict(item)
+    record_investment(updated_item, canonical_pool)
+    for currency, amount in canonical_pool.items():
         if amount:
             wallet.spend(currency, LargeNumber(amount))
+    item['liquidation_basis_gold'] = updated_item['liquidation_basis_gold']
     success = rng.random() < chance
     if success:
         item.setdefault('base_rarity', item.get('rarity', 'common'))

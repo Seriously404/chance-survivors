@@ -16,6 +16,49 @@ from game.entities.player import Player
 
 
 class RunTutorialTests(unittest.TestCase):
+    def test_reading_practice_guide_does_not_spawn_or_age_the_run(self):
+        from game.main import main
+
+        observations = []
+
+        class PracticeRenderer(Renderer):
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.set_player_name("Practice")
+                self.frame = 0
+                pygame.event.clear()
+
+            def tick(self, rate):
+                return .5
+
+            def draw(self, state):
+                observations.append((state.get("tutorial") is not None,
+                                     state["run_elapsed_ms"], len(state["enemies"])))
+                super().draw(state)
+
+            def process_events(self):
+                self.frame += 1
+                if self.frame == 1:
+                    return True, [], ["play"]
+                if self.frame == 2:
+                    return True, [], ["start_run"]
+                if self.frame == 16:
+                    pos = self._buttons["tutorial_skip"].center
+                    pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
+                    pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=pos))
+                    return super().process_events()
+                return self.frame < 18, [], []
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("game.main.Renderer", PracticeRenderer), patch(
+                "game.main.configured_save_path", return_value=Path(directory) / "run.json"
+            ):
+                main()
+        practice = [row for row in observations if row[0]]
+        self.assertGreater(len(practice), 10)
+        self.assertTrue(all(elapsed == 0 and enemies == 0 for _, elapsed, enemies in practice))
+        self.assertTrue(any(not active and elapsed > 0 for active, elapsed, _ in observations))
+
     def test_completes_only_after_real_actions_without_a_purchase(self):
         tutorial = RunTutorial(active=True)
         context = dict(actions=[], panel=None, tab="inventory",

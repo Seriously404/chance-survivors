@@ -17,7 +17,7 @@ def _item(item_id: str, name: str, kind: str, rarity: str, level: int,
     rarity = rarity.lower()
     if rarity not in RARITY_COMBINATION_SLOTS:
         raise ValueError(f"Unsupported rarity: {rarity}")
-    return {"id": item_id, "name": name, "type": kind, "rarity": rarity, "base_rarity": rarity,
+    return {"id": item_id, "definition_id": item_id, "name": name, "type": kind, "rarity": rarity, "base_rarity": rarity,
             "level": level, "stats": stats,
             "combinations": [None] * RARITY_COMBINATION_SLOTS[rarity],
             "status": "normal"}
@@ -56,6 +56,11 @@ class Inventory:
         }
         self._refresh_statuses()
 
+        self.seen_ability_definitions = {
+            str(item.get("definition_id", item.get("name", item["id"])))
+            for item in self.items if item.get("type") == "ability"
+        }
+
     def get(self, item_id: str) -> dict[str, Any]:
         for item in self.items:
             if item["id"] == item_id:
@@ -77,11 +82,25 @@ class Inventory:
             raise ValueError(
                 "An actively equipped item cannot be a combination supplement")
         self.items.append(item)
+        if item.get("type") == "ability":
+            self.seen_ability_definitions.add(str(item.get("definition_id", item.get("name", item["id"]))))
         self._refresh_statuses()
         return len(self.items) - 1
 
     def is_combination_supplement(self, item_id: str) -> bool:
         return any(item_id in item["combinations"] for item in self.items)
+
+    def combination_progress(self) -> dict[str, Any]:
+        count = len(self.seen_ability_definitions)
+        return {"discovered": count, "required": 3,
+                "ready": count >= 3, "minimum_base_level": 2}
+
+    def validate_combination_progress(self, base_id: str) -> None:
+        """Live-run progression check; graph validation stays independent."""
+        if len(self.seen_ability_definitions) < 3:
+            raise ValueError("Discover 3 different abilities before making combinations.")
+        if self.get(base_id).get("level", 1) < 2:
+            raise ValueError("Upgrade the base item to level 2 before combining.")
 
     @staticmethod
     def _validate_combination_records(items: list[dict[str, Any]]) -> set[str]:

@@ -27,6 +27,13 @@ class CurrencyEconomyTests(unittest.TestCase):
             rarity_chance(self.item, 'uncommon', {'Copper': 50}, luck=0),
         )
 
+    def test_large_luck_is_bounded_without_float_overflow(self):
+        chance = rarity_chance(self.item, 'uncommon', {'Copper': 50}, luck=10 ** 1000)
+        self.assertGreater(chance, 0)
+        self.assertLessEqual(chance, .95)
+        with self.assertRaises(ValueError):
+            rarity_chance(self.item, 'uncommon', {'Copper': 50}, luck=float('inf'))
+
     def test_rarity_pool_can_exceed_float_range(self):
         self.assertEqual(rarity_chance(self.item, 'uncommon',
                                        {'Copper': 10 ** 309}), 0.95)

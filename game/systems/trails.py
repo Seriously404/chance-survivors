@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import math
 from game.systems.elements import apply_elemental_damage
+from game.systems.combat_bonuses import effect_multiplier
 from game.utils.large_number import LargeNumber
 
 
@@ -52,6 +53,8 @@ class TrailSystem:
         self.trails = self.trails[-self.MAX_TRAILS:]
 
     def emit(self, source, dt):
+        if getattr(source, 'friendly_repair', False):
+            return
         element = getattr(source, 'trail_element', None)
         if not element:
             return
@@ -62,6 +65,9 @@ class TrailSystem:
         timer = getattr(source, '_trail_timer', 0) - dt
         if timer <= 0:
             damage = LargeNumber(getattr(source, 'damage', 1)) * .2
+            if element != 'physical':
+                damage *= effect_multiplier(
+                    getattr(source, 'elemental_bonus_pct', 0.0))
             self.trails.append(Trail(source.x, source.y, element, damage))
             self.trails = self.trails[-self.MAX_TRAILS:]
             timer = self.INTERVAL

@@ -3,6 +3,7 @@
 import random
 import math
 import copy
+from decimal import Decimal
 from typing import List
 
 from game.entities.enemy import Enemy
@@ -23,8 +24,8 @@ class EncounterDirector:
         danger = max(0.0, (0.4 - health_fraction) / 0.4)
         return max(1, round(base_delay_ms * (1 + crowd + danger)))
 
-    def can_spawn(self, enemy_count: int) -> bool:
-        return enemy_count < self.MAX_ENEMIES
+    def can_spawn(self, enemy_count: int, maximum: int | None = None) -> bool:
+        return enemy_count < (self.MAX_ENEMIES if maximum is None else maximum)
 
 
 class SpawnerSystem:
@@ -70,6 +71,7 @@ class SpawnerSystem:
         elapsed_seconds: float = 0.0,
         scaling: EnemyScaling | None = None,
         max_enemies: int | None = None,
+        challenge: dict | None = None,
     ) -> None:
         """Spawn a new enemy at a random position.
 
@@ -103,6 +105,12 @@ class SpawnerSystem:
         stats = self.enemy_types[enemy_name]
         if scaling is not None:
             stats = scaling.scale_stats(stats, elapsed_seconds)
+        if challenge:
+            stats = copy.deepcopy(stats)
+            for field, factor in (('max_health', challenge['health']), ('damage', challenge['damage'])):
+                if not math.isfinite(factor) or factor < 1:
+                    raise ValueError('Invalid challenge multiplier')
+                stats[field] = max(1, int(Decimal(stats[field]) * Decimal(str(factor))))
         group_count = stats.get("spawn_group_count", 1)
         if type(group_count) is not int or not 1 <= group_count <= 8:
             raise ValueError(

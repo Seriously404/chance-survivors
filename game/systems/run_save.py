@@ -83,6 +83,8 @@ class RunSave:
         bazaar_seed: int = 0,
         bazaar_refresh_count: int = 0,
         bazaar_last_manual_refresh_cycle: int = -1,
+        engineering_state: dict[str, Any] | None = None,
+        player_position: tuple[float, float] = (0.0, 0.0),
     ) -> RunSave:
         return cls({
             "version": SAVE_VERSION,
@@ -92,6 +94,8 @@ class RunSave:
             "player": {
                 "health": player_health,
                 "max_health": player_max_health,
+                "x": player_position[0],
+                "y": player_position[1],
             },
             "progression": {
                 "level": progression_level,
@@ -101,6 +105,7 @@ class RunSave:
             "inventory": {
                 "items": deepcopy(inventory.items),
                 "active_slots": deepcopy(inventory.active_slots),
+                "seen_ability_definitions": sorted(inventory.seen_ability_definitions),
             },
             "currencies": {
                 key: str(value.to_decimal()) for key, value in currencies.items()
@@ -111,6 +116,7 @@ class RunSave:
             "bazaar_seed": bazaar_seed,
             "bazaar_refresh_count": bazaar_refresh_count,
             "bazaar_last_manual_refresh_cycle": bazaar_last_manual_refresh_cycle,
+            "engineering": deepcopy(engineering_state),
         })
 
     def _validate(self) -> None:
@@ -145,6 +151,17 @@ class RunSave:
             raise ValueError("Run save has invalid player health") from exc
         if max_health_number < 1 or health_number < 0 or health_number > max_health_number:
             raise ValueError("Run save has invalid player health")
+        for coordinate in ('x', 'y'):
+            value = player.get(coordinate, 0.0)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError('Run save has invalid player position')
+        engineering = state.get('engineering')
+        if engineering is not None:
+            from game.systems.engineering import EngineeringDefense
+            try:
+                EngineeringDefense.from_dict(engineering)
+            except (KeyError, TypeError, ValueError, OverflowError) as exc:
+                raise ValueError('Run save has invalid engineering defense') from exc
         if type(progression.get("level")) is not int or progression["level"] < 1:
             raise ValueError("Run save needs a positive progression level")
         _nonnegative_number(progression.get("current_exp"), "current_exp")
@@ -154,6 +171,9 @@ class RunSave:
             inventory_state.get("items"), list
         ):
             raise ValueError("Run save has invalid inventory")
+        seen = inventory_state.get('seen_ability_definitions', [])
+        if not isinstance(seen, list) or any(not isinstance(value, str) or not value for value in seen):
+            raise ValueError('Run save has invalid learned abilities')
         try:
             inventory = Inventory(deepcopy(inventory_state["items"]))
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
@@ -220,6 +240,10 @@ class RunSave:
         """Rebuild the pure inventory model, including active equipment slots."""
         inventory_state = self.state["inventory"]
         inventory = Inventory(deepcopy(inventory_state["items"]))
+        seen = inventory_state.get("seen_ability_definitions", [])
+        if not isinstance(seen, list) or any(not isinstance(value, str) or not value for value in seen):
+            raise ValueError("Invalid learned ability definitions")
+        inventory.seen_ability_definitions.update(seen)
         for kind, slot_ids in inventory_state["active_slots"].items():
             for index, item_id in enumerate(slot_ids):
                 if item_id is not None:

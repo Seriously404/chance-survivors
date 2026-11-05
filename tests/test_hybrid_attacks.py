@@ -27,7 +27,7 @@ class HybridAttackTests(unittest.TestCase):
             "script": "projectile", "cast_damage": 20, "element": "fire"})
         fire["tags"] = ["elemental"]
         heal = _item("heal", "Heal", "ability", "common", 1,
-                     {"script": "heal"})
+                     {"script": "heal", "heal_amount": 5})
         inventory = Inventory([gun, fire, heal])
         inventory.assign_combination("gun", 0, "fire")
         inventory.assign_combination("gun", 1, "heal")
@@ -44,11 +44,11 @@ class HybridAttackTests(unittest.TestCase):
         CollisionSystem(200).check_bullet_enemy_collisions(
             [projectile], [first, second], self.types, player)
         for enemy in (first, second):
-            # 200 physical + (400 fire * .5 resistance), scaled once.
-            self.assertEqual(enemy.health, LargeNumber(600))
+            # 200 physical + (20 fire * .35 transfer * 20 rarity * .5 resistance).
+            self.assertEqual(enemy.health, LargeNumber(730))
             self.assertEqual(enemy.damage_events["physical"], LargeNumber(200))
-            self.assertEqual(enemy.damage_events["fire"], LargeNumber(200))
-        self.assertEqual(player.health, LargeNumber(900))
+            self.assertEqual(enemy.damage_events["fire"], LargeNumber(70))
+        self.assertEqual(player.health, LargeNumber(100) + combined.stats["heal_amount"])
 
     def test_elemental_ability_adds_physical_weapon_damage(self):
         fire = _item("fire", "Fire", "ability", "ultimate", 1, {
@@ -65,10 +65,10 @@ class HybridAttackTests(unittest.TestCase):
                                enemy_types=self.types)
         CollisionSystem(200).check_bullet_enemy_collisions(
             [outcome.projectile], [enemy], self.types, player)
-        # (200 fire * .5 resistance) + 400 physical, scaled once.
-        self.assertEqual(enemy.health, LargeNumber(500))
+        # (200 fire * .5 resistance) + (20 physical * .35 * 20 rarity).
+        self.assertEqual(enemy.health, LargeNumber(760))
         self.assertEqual(enemy.damage_events["fire"], LargeNumber(100))
-        self.assertEqual(enemy.damage_events["physical"], LargeNumber(400))
+        self.assertEqual(enemy.damage_events["physical"], LargeNumber(140))
 
 
 if __name__ == "__main__":

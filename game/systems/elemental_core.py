@@ -42,8 +42,10 @@ def weakened_resistances(resistances, core):
             for element in ELEMENTS}
 
 
-def apply_lingering(enemy, damage, core, rng=random):
+def apply_lingering(enemy, damage, core, rng=random, *, elemental_bonus_pct=0.0):
     """Roll independent elemental effects, each lasting three seconds."""
+    from game.systems.combat_bonuses import effect_multiplier
+
     _, chance, limit = core_power(core)
     if not limit:
         return
@@ -52,7 +54,8 @@ def apply_lingering(enemy, damage, core, rng=random):
         if len(effects) >= limit and element not in effects:
             continue
         if rng.random() < chance:
-            effects[element] = (3.0, LargeNumber(damage) * .10)
+            effects[element] = (3.0, LargeNumber(damage) * .10 * (
+                effect_multiplier(elemental_bonus_pct) if element != "physical" else 1))
     enemy.elemental_lingering = effects
 
 

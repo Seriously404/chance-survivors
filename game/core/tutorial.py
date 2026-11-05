@@ -2,7 +2,7 @@
 
 
 STEPS = (
-    ("Move", "Use WASD to move. Keep your distance from enemies."),
+    ("Move", "Use WASD to move. This is safe practice; skip the guide to begin immediately."),
     ("Dash", "Press Space to dash. It has a short cooldown."),
     ("Visit the Bazaar", "Open Inventory, then choose the Bazaar tab."),
     ("Browse crates", "Choose the Crates tab to see possible rewards and prices."),
@@ -13,7 +13,7 @@ STEPS = (
 
 
 class RunTutorial:
-    """Track only observed actions; guidance never pauses or changes a run."""
+    """Track optional practice actions before the live run clock and spawning."""
 
     def __init__(self, active=False):
         self.active = active

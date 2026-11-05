@@ -15,6 +15,7 @@ class EnemyScaling:
 
     threat_level: int = 0
     max_threat_level: int = 20
+    progress_level: int = 1
 
     def __post_init__(self) -> None:
         if not isinstance(self.threat_level, int) or isinstance(self.threat_level, bool):
@@ -43,7 +44,17 @@ class EnemyScaling:
         elapsed_minutes = int(elapsed_seconds // 60)
         # Smooth exponential growth avoids a sudden tenfold health spike every
         # five minutes while still letting long runs reach large numbers.
-        return Decimal("1.09") ** elapsed_minutes * Decimal("1.25") ** self.threat_level
+        progress = max(0, self.progress_level - 10)
+        return (Decimal("1.14") ** elapsed_minutes
+                * Decimal("1.045") ** progress
+                * Decimal("1.45") ** self.threat_level)
+
+    def horde_size(self) -> int:
+        """Progress and player-owned beacons increase numbers as well as HP."""
+        return min(8, 1 + max(0, self.progress_level - 1) // 8 + self.threat_level // 2)
+
+    def crowd_limit(self) -> int:
+        return min(180, 60 + max(0, self.progress_level - 8) * 2 + self.threat_level * 4)
 
     def scale_stats(self, stats: dict[str, Any], elapsed_seconds: float) -> dict[str, Any]:
         """Return a scaled copy; never mutate the shared enemy configuration."""
@@ -66,6 +77,9 @@ class EnemyScaling:
                 )
             ),
         )
+        result["currency_multiplier"] = max(1, int(multiplier.sqrt().to_integral_value(rounding=ROUND_CEILING)))
+        result["spawn_group_count"] = min(8, int(stats.get("spawn_group_count", 1)) * self.horde_size())
+        result.setdefault("spawn_group_radius", .16)
         return result
 
     def spawn_delay_ms(self, base_delay_ms: int, elapsed_seconds: float) -> int:
@@ -77,6 +91,7 @@ class EnemyScaling:
         if elapsed_seconds < 0:
             raise ValueError("elapsed_seconds cannot be negative")
         minutes = elapsed_seconds / 60.0
-        multiplier = 1.0 + self.threat_level * \
-            0.08 + max(0.0, minutes - 3.0) * 0.12
+        multiplier = (1.0 + self.threat_level * .15
+                      + max(0.0, minutes - 2.0) * .18
+                      + max(0, self.progress_level - 10) * .035)
         return max(100, int(base_delay_ms / multiplier))
